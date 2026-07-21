@@ -53,6 +53,7 @@ export type CardPrintingSearchRecord = {
 
 export type DeckCardSearchFilters = {
   name: string;
+  cardText: string;
   worlds: string[];
   cardTypes: CardType[];
   races: string[];
@@ -63,6 +64,7 @@ export type DeckCardSearchFilters = {
 
 export const EMPTY_DECK_CARD_SEARCH_FILTERS: DeckCardSearchFilters = {
   name: "",
+  cardText: "",
   worlds: [],
   cardTypes: [],
   races: [],
@@ -184,6 +186,7 @@ export function filterDeckCandidateCards(input: {
   });
 
   const keyword = input.filters.name.trim().toLowerCase();
+  const textKeyword = input.filters.cardText.trim().toLowerCase();
 
   return input.cards
     .filter((card) => card.id !== input.selectedBuddyCardId)
@@ -191,6 +194,11 @@ export function filterDeckCandidateCards(input: {
     .filter((card) => !input.excludeInactive || card.is_active)
     .filter((card) => !input.excludeFlagCard || card.card_type !== "flag_card")
     .filter((card) => !keyword || card.name.toLowerCase().includes(keyword))
+    .filter(
+      (card) =>
+        !textKeyword ||
+        (card.card_text ?? "").toLowerCase().includes(textKeyword)
+    )
     .filter((card) => hasAny(card.worlds, input.filters.worlds))
     .filter(
       (card) =>

@@ -115,6 +115,15 @@ export function DeckCardSearchPanel({
     ...(filters.name.trim()
       ? [{ key: "name", label: filters.name.trim(), onRemove: () => setFilters({ ...filters, name: "" }) }]
       : []),
+    ...(filters.cardText.trim()
+      ? [
+          {
+            key: "cardText",
+            label: `テキスト: ${filters.cardText.trim()}`,
+            onRemove: () => setFilters({ ...filters, cardText: "" })
+          }
+        ]
+      : []),
     ...filters.worlds.map((world) => ({
       key: `world:${world}`,
       label: world,
@@ -164,6 +173,17 @@ export function DeckCardSearchPanel({
           value={filters.name}
           placeholder="カード名を入力"
           onChange={(event) => setFilters({ ...filters, name: event.target.value })}
+        />
+      </label>
+
+      <label className="dm-deck-search-name">
+        カードテキスト
+        <input
+          value={filters.cardText}
+          placeholder="カードテキストを入力"
+          onChange={(event) =>
+            setFilters({ ...filters, cardText: event.target.value })
+          }
         />
       </label>
 

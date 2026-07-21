@@ -1,12 +1,13 @@
 import type { BattleZoneId } from "@/types/battle";
 import type {
   DeckPosition,
-  ActivateBiriKinataInput,
   ApplyRuleChangeInput,
   ClearDeckLookInput,
   LookTopDeckInput,
   MoveRevealedCardInput,
   MoveAreaStackToSlotInput,
+  PlaceHyakuganCompositeInput,
+  ResolveBiriKinataNotificationInput,
   PlaceAsFlagInput,
   ReorderLookedCardsInput,
   ReturnLookedCardsInput,
@@ -128,9 +129,14 @@ export type ApplyRuleChangeCommand = {
   payload: ApplyRuleChangeInput;
 };
 
-export type ActivateBiriKinataCommand = {
-  type: "ACTIVATE_BIRI_KINATA";
-  payload: ActivateBiriKinataInput;
+export type ResolveBiriKinataNotificationCommand = {
+  type: "RESOLVE_BIRI_KINATA_NOTIFICATION";
+  payload: ResolveBiriKinataNotificationInput;
+};
+
+export type PlaceHyakuganCompositeCommand = {
+  type: "PLACE_HYAKUGAN_COMPOSITE";
+  payload: PlaceHyakuganCompositeInput;
 };
 
 export type MoveSoulCardCommand = {
@@ -248,7 +254,8 @@ export type BattleCommand =
     | ClearDeckLookCommand
     | PlaceAsFlagCommand
     | ApplyRuleChangeCommand
-    | ActivateBiriKinataCommand
+    | ResolveBiriKinataNotificationCommand
+    | PlaceHyakuganCompositeCommand
     | MoveSoulCardCommand
     | MoveSoulCardsCommand
     | StackCardCommand

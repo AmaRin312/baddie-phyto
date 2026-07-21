@@ -1,5 +1,10 @@
+import { getAbilityMenuContributions } from "@/lib/battle/abilities/battleAbilityDefinitions";
+import type {
+  AbilityActionId,
+  BattleCardAbilityMap
+} from "@/lib/battle/abilities/abilityTypes";
 import type { BattleCommand } from "@/lib/battle/commands/battleCommandTypes";
-import type { BattleCard, BattleZoneId } from "@/types/battle";
+import type { BattleCard, BattleState, BattleZoneId } from "@/types/battle";
 import type { CardRecord } from "@/types/baddiePhyto";
 
 export type BattleMenuDirection = "W" | "A" | "S" | "D";
@@ -20,7 +25,9 @@ export type BattleMenuUiAction =
   | "showSoul"
   | "openDeckLook"
   | "openDeckReveal"
-  | "activateBiriKinata";
+  | "activateBiriKinata"
+  | "activateFaceDownSoul"
+  | "activateHyakuganComposite";
 
 export type BattleMenuItem = {
   direction: BattleMenuDirection;
@@ -28,6 +35,7 @@ export type BattleMenuItem = {
   command?: BattleCommand;
   placementSource?: BattlePlacementSource;
   uiAction?: BattleMenuUiAction;
+  abilityActionId?: AbilityActionId;
   children?: BattleMenuItem[];
 };
 
@@ -36,6 +44,8 @@ export type BattleContextMenuSource =
       kind: "card";
       card: BattleCard;
       cardRecord?: CardRecord | null;
+      state: BattleState;
+      cardAbilityMap: BattleCardAbilityMap;
     }
   | {
       kind: "deck";
@@ -91,11 +101,6 @@ function moveSoulCommand(input: {
 
 function isFlagCard(cardRecord: CardRecord | null | undefined) {
   return cardRecord?.card_type === "flag_card";
-}
-
-function isBiriKinata(cardRecord: CardRecord | null | undefined) {
-  const name = cardRecord?.name ?? "";
-  return name.includes("ビリ・キナータ") || name.includes("ビリキナータ");
 }
 
 function buildUsePlacement(card: BattleCard): BattleMenuItem {
@@ -184,64 +189,115 @@ function buildMoveSubmenuForSoul(input: {
   ]);
 }
 
-function buildHandMenu(
-  card: BattleCard,
-  cardRecord?: CardRecord | null
-): BattleMenuItem[] {
-  return compactItems([
-    isFlagCard(cardRecord)
-      ? {
-          direction: "W",
-          label: "新フラッグとして使用",
-          command: {
-            type: "PLACE_AS_FLAG",
-            payload: {
-              instanceId: card.instanceId,
-              fromZone: "hand"
-            }
+function createAbilityMenuChildren(input: {
+  state: BattleState;
+  card: BattleCard;
+  cardRecord?: CardRecord | null;
+  cardAbilityMap: BattleCardAbilityMap;
+}): BattleMenuItem[] {
+  if (!input.cardRecord) return [];
+
+  return getAbilityMenuContributions({
+    state: input.state,
+    card: input.card,
+    cardRecord: input.cardRecord,
+    cardAbilityMap: input.cardAbilityMap
+  }).map((contribution): BattleMenuItem => ({
+    direction: contribution.direction,
+    label: contribution.label,
+    abilityActionId: contribution.actionId,
+    uiAction:
+      contribution.actionId === "use_biri_kinata_face_down"
+        ? "activateBiriKinata"
+        : contribution.actionId === "use_face_down_soul"
+          ? "activateFaceDownSoul"
+          : "activateHyakuganComposite"
+  }));
+}
+
+function buildHandMenu(input: {
+  card: BattleCard;
+  cardRecord?: CardRecord | null;
+  abilityChildren: BattleMenuItem[];
+}): BattleMenuItem[] {
+  const useItem: BattleMenuItem = isFlagCard(input.cardRecord)
+    ? {
+        direction: "W" as const,
+        label: "新フラッグとして使用",
+        command: {
+          type: "PLACE_AS_FLAG",
+          payload: {
+            instanceId: input.card.instanceId,
+            fromZone: "hand"
           }
+        } satisfies BattleCommand
+      }
+    : input.abilityChildren.length > 0
+      ? {
+          direction: "W" as const,
+          label: "使用",
+          children: compactItems([
+            buildUsePlacement(input.card),
+            ...input.abilityChildren
+          ])
         }
-      : buildUsePlacement(card),
+      : buildUsePlacement(input.card);
+
+  return compactItems([
+    useItem,
     {
       direction: "A",
       label: "チャージ",
-      command: moveCardCommand(card, "gauge")
+      command: moveCardCommand(input.card, "gauge")
     },
     {
       direction: "S",
       label: "移動",
-      children: buildMoveSubmenuForCard(card)
+      children: buildMoveSubmenuForCard(input.card)
     }
   ]);
 }
 
-function buildAreaMenu(
-  card: BattleCard,
-  cardRecord?: CardRecord | null
-): BattleMenuItem[] {
-  return compactItems([
-    isBiriKinata(cardRecord)
+function buildAreaMenu(input: {
+  card: BattleCard;
+  abilityChildren: BattleMenuItem[];
+}): BattleMenuItem[] {
+  const primaryItem: BattleMenuItem =
+    input.abilityChildren.length > 0
       ? {
-          direction: "W",
-          label: "Ability",
-          children: [
+          direction: "W" as const,
+          label: "使用",
+          children: compactItems([
             {
-              direction: "S",
-              label: "起動能力",
-              uiAction: "activateBiriKinata"
-            }
-          ]
+              direction: "W" as const,
+              label:
+                input.card.zoneId === "set"
+                  ? "上下反転"
+                  : "レスト／スタンド",
+              command: {
+                type: "TOGGLE_CARD_ORIENTATION",
+                payload: {
+                  instanceId: input.card.instanceId
+                }
+              } satisfies BattleCommand
+            },
+            ...input.abilityChildren
+          ])
         }
       : {
-          direction: "W",
-          label: card.zoneId === "set" ? "上下反転" : "レスト/スタンド",
+          direction: "W" as const,
+          label:
+            input.card.zoneId === "set" ? "上下反転" : "レスト／スタンド",
           command: {
             type: "TOGGLE_CARD_ORIENTATION",
             payload: {
-              instanceId: card.instanceId
+              instanceId: input.card.instanceId
             }
-          }
-        },
+          } satisfies BattleCommand
+        };
+
+  return compactItems([
+    primaryItem,
     {
       direction: "A",
       label: "ソウル",
@@ -249,14 +305,14 @@ function buildAreaMenu(
       command: {
         type: "SET_VIEWER_CARD",
         payload: {
-          instanceId: card.instanceId
+          instanceId: input.card.instanceId
         }
       }
     },
     {
       direction: "S",
       label: "ゾーン移動",
-      children: buildMoveSubmenuForCard(card)
+      children: buildMoveSubmenuForCard(input.card)
     }
   ]);
 }
@@ -271,9 +327,15 @@ function buildGaugeMenu(card: BattleCard): BattleMenuItem[] {
   ]);
 }
 
-function buildDropMenu(card: BattleCard): BattleMenuItem[] {
+function buildDropMenu(card: BattleCard, abilityChildren: BattleMenuItem[] = []): BattleMenuItem[] {
   return compactItems([
-    buildUsePlacement(card),
+    abilityChildren.length > 0
+      ? {
+          direction: "W",
+          label: "使用",
+          children: compactItems([buildUsePlacement(card), ...abilityChildren])
+        }
+      : buildUsePlacement(card),
     {
       direction: "S",
       label: "ゾーン移動",
@@ -451,12 +513,17 @@ export function buildBattleContextMenu(source: BattleContextMenuSource): BattleM
     return buildSoulMenu(source);
   }
 
+  const abilityChildren = createAbilityMenuChildren(source);
   const { card, cardRecord } = source;
-  if (card.zoneId === "hand") return buildHandMenu(card, cardRecord);
-  if (AREA_ZONE_IDS.includes(card.zoneId)) return buildAreaMenu(card, cardRecord);
+  if (card.zoneId === "hand") {
+    return buildHandMenu({ card, cardRecord, abilityChildren });
+  }
+  if (AREA_ZONE_IDS.includes(card.zoneId)) {
+    return buildAreaMenu({ card, abilityChildren });
+  }
   if (card.zoneId === "resolution") return buildResolutionMenu(card);
   if (card.zoneId === "gauge") return buildGaugeMenu(card);
-  if (card.zoneId === "drop") return buildDropMenu(card);
+  if (card.zoneId === "drop") return buildDropMenu(card, abilityChildren);
   if (card.zoneId === "deck") return buildDeckMenu(card);
 
   return [];

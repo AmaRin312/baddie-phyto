@@ -7,6 +7,9 @@ export type BattleShortcutBlockState = {
   isDeckBrowserPopupOpen?: boolean;
   isDeckDropDialogOpen?: boolean;
   isBiriKinataPopupOpen?: boolean;
+  isFaceDownSoulPopupOpen?: boolean;
+  isHyakuganPopupOpen?: boolean;
+  isAbilityNotificationOpen?: boolean;
 };
 
 export function isBattleShortcutBlocked(state: BattleShortcutBlockState) {

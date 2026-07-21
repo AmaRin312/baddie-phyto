@@ -213,9 +213,17 @@ export type ApplyRuleChangeInput = {
   itemLimit?: number | null;
 };
 
-export type ActivateBiriKinataInput = {
+export type ResolveBiriKinataNotificationInput = {
   sourceInstanceId: string;
   targetInstanceId: string;
+};
+
+export type PlaceHyakuganCompositeInput = {
+  sourceInstanceId: string;
+  pairInstanceId: string;
+  sourceRole: "heaven" | "earth";
+  pairRole: "heaven" | "earth";
+  toZone: Extract<BattleZoneId, "center" | "left" | "right">;
 };
 
 export type ChangeLifeInput = {
@@ -276,6 +284,40 @@ function withoutAreaStackData(card: BattleCard): BattleCard {
     ...card,
     meta
   };
+}
+
+function getCompositeId(card: BattleCard) {
+  return typeof card.meta.compositeId === "string"
+    ? card.meta.compositeId
+    : null;
+}
+
+function getCompositeRole(card: BattleCard) {
+  return card.meta.compositeRole === "heaven" ||
+    card.meta.compositeRole === "earth"
+    ? card.meta.compositeRole
+    : null;
+}
+
+function withoutCompositeData(card: BattleCard): BattleCard {
+  const meta = { ...card.meta };
+  delete meta.compositeId;
+  delete meta.compositeRole;
+  delete meta.compositeKind;
+  return {
+    ...card,
+    meta
+  };
+}
+
+function getCompositeSortedCards(cards: BattleCard[]) {
+  return [...cards].sort((left, right) => {
+    const leftRole = getCompositeRole(left);
+    const rightRole = getCompositeRole(right);
+    const leftOrder = leftRole === "heaven" ? 0 : 1;
+    const rightOrder = rightRole === "heaven" ? 0 : 1;
+    return leftOrder - rightOrder;
+  });
 }
 
 function clonePlayer(player: PlayerState): PlayerState {
@@ -474,6 +516,11 @@ export function canMoveToZone(zoneId: BattleZoneId) {
   return DROPPABLE_ZONE_IDS.has(zoneId);
 }
 
+function getAreaStackLimit(state: BattleState, zoneId: BattleZoneId) {
+  if (zoneId === "item" && state.ruleState.itemLimit == null) return Infinity;
+  return 2;
+}
+
 export function canDragBattleCard(input: {
   card: BattleCard;
   playerId: BattlePlayerId;
@@ -562,6 +609,83 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!located) return state;
   if (input.fromZone && located.zoneId !== input.fromZone) return state;
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
+
+  const compositeId = getCompositeId(located.card);
+  if (compositeId && isAreaStackZone(located.zoneId)) {
+    const sourceCards = state.players[located.playerId].zones[located.zoneId].cards;
+    const compositeCards = getCompositeSortedCards(
+      sourceCards.filter((card) => getCompositeId(card) === compositeId)
+    );
+    if (compositeCards.length > 1) {
+      const nextState = cloneBattleState(state);
+      const player = nextState.players[located.playerId];
+      const fromCards = player.zones[located.zoneId].cards;
+      const movingIds = new Set(compositeCards.map((card) => card.instanceId));
+      player.zones[located.zoneId].cards = fromCards.filter(
+        (card) => !movingIds.has(card.instanceId)
+      );
+
+      const toCards = player.zones[input.toZone].cards;
+      const nextIndex = getMoveInsertIndex(input, toCards.length);
+      const normalizedCards = isAreaStackZone(input.toZone)
+        ? (() => {
+            const areaStacks = getAreaStacks(toCards);
+            if (
+              areaStacks.length >= getAreaStackLimit(state, input.toZone) &&
+              located.zoneId !== input.toZone
+            ) {
+              return null;
+            }
+            const areaSlot: BattleAreaSlot = areaStacks.some(
+              (areaStack) => areaStack.areaSlot === 0
+            )
+              ? 1
+              : 0;
+            const stackId = `area-stack:${input.toZone}:${compositeId}`;
+            return [...compositeCards]
+              .sort((left, right) => {
+                const leftRole = getCompositeRole(left);
+                const rightRole = getCompositeRole(right);
+                const leftOrder = leftRole === "heaven" ? 0 : 1;
+                const rightOrder = rightRole === "heaven" ? 0 : 1;
+                return leftOrder - rightOrder;
+              })
+              .map((card) =>
+                withAreaStackData(
+                  withoutDeckRevealData({
+                    ...card,
+                    zoneId: input.toZone,
+                    visibility: getVisibilityForZone(input.toZone),
+                    meta: { ...card.meta }
+                  }),
+                  stackId,
+                  areaSlot
+                )
+              );
+          })()
+        : compositeCards.map((card) =>
+            withoutCompositeData(
+              withoutAreaStackData(
+                withoutDeckRevealData({
+                  ...card,
+                  zoneId: input.toZone,
+                  visibility: getVisibilityForZone(input.toZone),
+                  meta: { ...card.meta }
+                })
+              )
+            )
+          );
+
+      if (!normalizedCards) return state;
+      toCards.splice(nextIndex, 0, ...normalizedCards);
+      if (located.zoneId === "deck" && input.toZone !== "deck") {
+        for (const card of compositeCards) {
+          cleanupDeckLookForMovedCard(nextState, card.instanceId);
+        }
+      }
+      return nextState;
+    }
+  }
 
   const nextState = cloneBattleState(state);
   const player = nextState.players[located.playerId];
@@ -661,7 +785,7 @@ export function placeCardInAreaSlot(
 
   const targetCards = state.players[located.playerId].zones[input.toZone].cards;
   const areaStacks = getAreaStacks(targetCards);
-  if (areaStacks.length >= 2) return state;
+  if (areaStacks.length >= getAreaStackLimit(state, input.toZone)) return state;
 
   const nextState = cloneBattleState(state);
   const player = nextState.players[located.playerId];
@@ -974,7 +1098,7 @@ function getAreaPlacementForSoulCard(
     };
   }
 
-  if (areaStacks.length >= 2) return null;
+  if (areaStacks.length >= getAreaStackLimit(state, input.toZone)) return null;
 
   if (!input.placeAsNewStack && areaStacks.length === 1) {
     return {
@@ -1191,6 +1315,22 @@ export function toggleCardOrientation(
   if (!located) return state;
 
   const nextState = cloneBattleState(state);
+  const compositeId = getCompositeId(located.card);
+  if (compositeId) {
+    const nextOrientation =
+      located.card.orientation === "horizontal" ? "vertical" : "horizontal";
+    nextState.players[located.playerId].zones[located.zoneId].cards =
+      nextState.players[located.playerId].zones[located.zoneId].cards.map((card) =>
+        getCompositeId(card) === compositeId
+          ? {
+              ...card,
+              orientation: nextOrientation
+            }
+          : card
+      );
+    return nextState;
+  }
+
   const card = nextState.players[located.playerId].zones[located.zoneId].cards[
     located.index
   ];
@@ -1261,27 +1401,30 @@ export function applyRuleChange(
   };
 }
 
-export function activateBiriKinata(
+export function resolveBiriKinataNotification(
   state: BattleState,
-  input: ActivateBiriKinataInput
+  input: ResolveBiriKinataNotificationInput
 ): BattleState {
   const source = findBattleCard(state, input.sourceInstanceId);
   const target = findBattleCard(state, input.targetInstanceId);
   if (!source || !target) return state;
-  if (source.playerId !== "self") return state;
+  if (source.playerId !== "opponent") return state;
   if (!isAreaStackZone(source.zoneId)) return state;
-  if (target.playerId !== "opponent" || target.zoneId !== "drop") return state;
+  if (target.playerId !== "self" || target.zoneId !== "drop") return state;
+  if (getAreaStacks(state.players.self.zones.center.cards).length >= 2) {
+    return state;
+  }
 
   const nextState = cloneBattleState(state);
-  const opponent = nextState.players.opponent;
-  const dropCards = opponent.zones.drop.cards;
+  const self = nextState.players.self;
+  const dropCards = self.zones.drop.cards;
   const targetIndex = dropCards.findIndex(
     (card) => card.instanceId === input.targetInstanceId
   );
   const [removedCard] = dropCards.splice(targetIndex, 1);
   if (!removedCard) return state;
 
-  opponent.zones.center.cards.push(
+  self.zones.center.cards.push(
     withAreaStackData(
       withoutDeckRevealData({
         ...removedCard,
@@ -1289,17 +1432,101 @@ export function activateBiriKinata(
         visibility: "face_down",
         meta: {
           ...removedCard.meta,
-          placedByAbility: "biri_kinata"
+          placedByAbility: "biri_kinata_face_down_use"
         }
       }),
       `area-stack:center:${removedCard.instanceId}`,
-      getAreaStacks(opponent.zones.center.cards).some(
+      getAreaStacks(self.zones.center.cards).some(
         (areaStack) => areaStack.areaSlot === 0
       )
         ? 1
         : 0
     )
   );
+
+  return nextState;
+}
+
+export function placeHyakuganComposite(
+  state: BattleState,
+  input: PlaceHyakuganCompositeInput
+): BattleState {
+  if (!["center", "left", "right"].includes(input.toZone)) return state;
+  if (input.sourceRole === input.pairRole) return state;
+
+  const source = findBattleCard(state, input.sourceInstanceId);
+  const pair = findBattleCard(state, input.pairInstanceId);
+  if (!source || !pair) return state;
+  if (source.playerId !== "self" || pair.playerId !== "self") return state;
+  if (source.zoneId !== pair.zoneId) return state;
+
+  const destinationCards = state.players.self.zones[input.toZone].cards;
+  const destinationStacks = getAreaStacks(destinationCards);
+  if (destinationStacks.length >= 2) return state;
+
+  const compositeId = `composite:hyakugan:${crypto.randomUUID()}`;
+  const stackId = `area-stack:${input.toZone}:${compositeId}`;
+  const areaSlot: BattleAreaSlot = destinationStacks.some(
+    (areaStack) => areaStack.areaSlot === 0
+  )
+    ? 1
+    : 0;
+
+  const nextState = cloneBattleState(state);
+  const player = nextState.players.self;
+  const sourceZoneCards = player.zones[source.zoneId].cards;
+  const movingIds = new Set([input.sourceInstanceId, input.pairInstanceId]);
+  const sourceCard = sourceZoneCards.find(
+    (card) => card.instanceId === input.sourceInstanceId
+  );
+  const pairCard = sourceZoneCards.find(
+    (card) => card.instanceId === input.pairInstanceId
+  );
+  if (!sourceCard || !pairCard) return state;
+
+  player.zones[source.zoneId].cards = sourceZoneCards.filter(
+    (card) => !movingIds.has(card.instanceId)
+  );
+
+  const roleCards = [
+    {
+      card: sourceCard,
+      role: input.sourceRole
+    },
+    {
+      card: pairCard,
+      role: input.pairRole
+    }
+  ].sort((left, right) => {
+    const leftOrder = left.role === "heaven" ? 0 : 1;
+    const rightOrder = right.role === "heaven" ? 0 : 1;
+    return leftOrder - rightOrder;
+  });
+
+  player.zones[input.toZone].cards.push(
+    ...roleCards.map(({ card, role }) =>
+      withAreaStackData(
+        withoutDeckRevealData({
+          ...card,
+          zoneId: input.toZone,
+          visibility: "public",
+          meta: {
+            ...card.meta,
+            compositeId,
+            compositeRole: role,
+            compositeKind: "hyakugan_yamigedo"
+          }
+        }),
+        stackId,
+        areaSlot
+      )
+    )
+  );
+
+  if (source.zoneId === "deck") {
+    cleanupDeckLookForMovedCard(nextState, input.sourceInstanceId);
+    cleanupDeckLookForMovedCard(nextState, input.pairInstanceId);
+  }
 
   return nextState;
 }

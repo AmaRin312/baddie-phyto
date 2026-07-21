@@ -28,6 +28,14 @@ import {
   type DeckCardSetOption
 } from "@/lib/decks/deckCardSearch";
 import {
+  areDeckCardDraftsEqual,
+  createDeckCardDraftMap,
+  createDeckCardDrafts,
+  setDeckCardDraftImage,
+  setDeckCardDraftQuantity,
+  type DeckCardDraft
+} from "@/lib/decks/deckEditorState";
+import {
   getCardTypeLabel,
   type CardImageRecord,
   type CardRecord,
@@ -39,32 +47,15 @@ import {
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
-type ExcludeFilters = {
-  dragon: boolean;
-  hyakki: boolean;
-  chaos: boolean;
-  generic: boolean;
-  flagCard: boolean;
-  inactive: boolean;
-};
-
 const CARD_TYPE_ORDER: CardType[] = [
   "monster",
   "spell",
   "item",
   "impact",
+  "impact_monster",
   "flag_card",
   "other"
 ];
-
-const DEFAULT_FILTERS: ExcludeFilters = {
-  dragon: false,
-  hyakki: false,
-  chaos: false,
-  generic: false,
-  flagCard: true,
-  inactive: true
-};
 
 function getFlagName(flag?: FlagWithCardRecord | null) {
   return flag?.name || flag?.card?.name || "未選択";
@@ -105,17 +96,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [cardPrintings, setCardPrintings] = useState<CardPrintingSearchRecord[]>([]);
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
-  const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
-  const [selectedImages, setSelectedImages] = useState<Record<string, string>>(
+  const [savedDeckCards, setSavedDeckCards] = useState<DeckCardRecord[]>([]);
+  const [draftDeckCards, setDraftDeckCards] = useState<DeckCardDraft[]>([]);
+  const [pendingSelectedImages, setPendingSelectedImages] = useState<Record<string, string>>(
     {}
   );
   const [searchFilters, setSearchFilters] = useState<DeckCardSearchFilters>(
     EMPTY_DECK_CARD_SEARCH_FILTERS
   );
-  const [filters, setFilters] = useState<ExcludeFilters>(DEFAULT_FILTERS);
   const [loading, setLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [savingCardId, setSavingCardId] = useState("");
+  const [savingDeck, setSavingDeck] = useState(false);
+  const [selectedPreviewCardId, setSelectedPreviewCardId] = useState("");
   const [message, setMessage] = useState("");
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -173,12 +164,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDeckName(nextDeck.name);
     setSelectedFlagId(nextDeck.flag_id);
     setSelectedBuddyCardId(nextDeck.buddy_card_id);
-    setDeckCards(deckCardsResult.data ?? []);
+    const nextDeckCards = deckCardsResult.data ?? [];
+    setSavedDeckCards(nextDeckCards);
+    setDraftDeckCards(createDeckCardDrafts(nextDeckCards));
     setFlags(nextFlags);
     setCards(nextCards);
     setImages(imageResult.data ?? []);
     setCardPrintings(printingSearchResult.printings);
     setCardSets(printingSearchResult.sets);
+    setPendingSelectedImages({});
     setLoading(false);
   }, []);
 
@@ -203,9 +197,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     [cards]
   );
 
-  const deckCardMap = useMemo(
-    () => new Map(deckCards.map((item) => [item.card_id, item])),
-    [deckCards]
+  const savedDeckCardDrafts = useMemo(
+    () => createDeckCardDrafts(savedDeckCards),
+    [savedDeckCards]
+  );
+
+  const draftDeckCardMap = useMemo(
+    () => createDeckCardDraftMap(draftDeckCards),
+    [draftDeckCards]
   );
 
   const imagesByCard = useMemo(() => {
@@ -224,6 +223,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   const selectedFlag = flagMap.get(selectedFlagId) ?? null;
   const selectedBuddy = cardMap.get(selectedBuddyCardId) ?? null;
+  const selectedPreviewCard = cardMap.get(selectedPreviewCardId) ?? null;
   const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
 
   const buddyCandidates = useMemo(
@@ -236,72 +236,112 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   const filteredCards = useMemo(() => {
     return filterDeckCandidateCards({
-      cards: cards
-        .filter((card) => !filters.dragon || !card.is_dragon)
-        .filter((card) => !filters.hyakki || !card.is_hyakki)
-        .filter((card) => !filters.chaos || !card.is_chaos)
-        .filter((card) => !filters.generic || !card.is_generic),
+      cards,
       printings: cardPrintings,
       filters: searchFilters,
       selectedBuddyCardId,
       selectedFlagCardId: selectedFlag?.card_id,
-      excludeInactive: filters.inactive,
-      excludeFlagCard: filters.flagCard
+      excludeInactive: false,
+      excludeFlagCard: false
     });
   }, [
     cardPrintings,
     cards,
-    filters.chaos,
-    filters.dragon,
-    filters.flagCard,
-    filters.generic,
-    filters.hyakki,
-    filters.inactive,
     searchFilters,
     selectedBuddyCardId,
     selectedFlag?.card_id
   ]);
 
-  const mainDeckTotal = deckCards.reduce((sum, item) => sum + item.quantity, 0);
-  const typeCounts = countByCardType(deckCards, cardMap);
-  const worldCounts = countByWorld(deckCards, cardMap);
+  const mainDeckTotal = draftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
+  const draftAsDeckCards = useMemo(
+    () =>
+      draftDeckCards.map(
+        (draft): DeckCardRecord => ({
+          id: draft.cardId,
+          deck_id: deckId,
+          card_id: draft.cardId,
+          selected_image_id: draft.selectedImageId,
+          quantity: draft.quantity,
+          sort_order: draft.sortOrder,
+          created_at: "",
+          updated_at: ""
+        })
+      ),
+    [deckId, draftDeckCards]
+  );
+  const typeCounts = countByCardType(draftAsDeckCards, cardMap);
+  const worldCounts = countByWorld(draftAsDeckCards, cardMap);
+  const hasUnsavedChanges = deck
+    ? deckName.trim() !== deck.name ||
+      selectedFlagId !== deck.flag_id ||
+      selectedBuddyCardId !== deck.buddy_card_id ||
+      !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
+    : false;
 
-  function setFilter(key: keyof ExcludeFilters, value: boolean) {
-    setFilters((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleSaveSettings() {
+  async function handleSaveDeck() {
     if (!deck || !deckName.trim() || !selectedFlagId || !selectedBuddyCardId) {
       setMessage("デッキ名、フラッグ、バディを選択してください。");
       return;
     }
 
-    setSavingSettings(true);
+    setSavingDeck(true);
     setMessage("");
-    const { error, data } = await updateDeckSettings({
+    const settingsResult = await updateDeckSettings({
       deckId: deck.id,
       name: deckName.trim(),
       flagId: selectedFlagId,
       buddyCardId: selectedBuddyCardId
     });
-    setSavingSettings(false);
 
-    if (error || !data) {
-      console.error(error);
-      setMessage(`デッキ設定の保存に失敗しました。${error?.message ?? ""}`);
+    if (settingsResult.error || !settingsResult.data) {
+      console.error(settingsResult.error);
+      setMessage(`デッキ設定の保存に失敗しました。${settingsResult.error?.message ?? ""}`);
+      setSavingDeck(false);
       return;
     }
 
+    const draftMap = createDeckCardDraftMap(draftDeckCards);
+    const savedMap = createDeckCardDraftMap(savedDeckCardDrafts);
+    const cardIds = Array.from(new Set([...draftMap.keys(), ...savedMap.keys()]));
+
+    for (const cardId of cardIds) {
+      const draft = draftMap.get(cardId);
+      const saved = savedMap.get(cardId);
+      if (
+        draft &&
+        saved &&
+        draft.quantity === saved.quantity &&
+        draft.selectedImageId === saved.selectedImageId
+      ) {
+        continue;
+      }
+
+      const { error } = await setDeckCard({
+        deckId: deck.id,
+        cardId,
+        quantity: draft?.quantity ?? 0,
+        sortOrder: draft?.sortOrder ?? saved?.sortOrder ?? 0,
+        selectedImageId: draft?.selectedImageId ?? null
+      });
+
+      if (error) {
+        console.error(error);
+        setMessage(`デッキカードの保存に失敗しました。${error.message}`);
+        setSavingDeck(false);
+        return;
+      }
+    }
+
     await reload(deck.id);
-    setMessage("デッキ設定を保存しました。");
+    setSavingDeck(false);
+    setMessage("デッキを保存しました。");
   }
 
-  async function saveCardQuantity(
+  function setLocalCardQuantity(
     card: CardRecord,
     quantity: number,
     selectedImageId?: string | null
   ) {
-    if (!deckId) return;
     if (card.id === selectedBuddyCardId) {
       setMessage("バディは deck_cards には入れません。");
       return;
@@ -310,43 +350,23 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setMessage("ゲーム開始フラッグは deck_cards には入れません。");
       return;
     }
-
-    const existing = deckCardMap.get(card.id);
-    setSavingCardId(card.id);
     setMessage("");
-    const { error } = await setDeckCard({
-      deckId,
-      cardId: card.id,
-      quantity,
-      sortOrder: existing?.sort_order ?? deckCards.length,
-      selectedImageId:
-        selectedImageId !== undefined
-          ? selectedImageId
-          : existing?.selected_image_id ?? null
+    setDraftDeckCards((current) =>
+      setDeckCardDraftQuantity(current, {
+        cardId: card.id,
+        quantity,
+        selectedImageId
+      })
+    );
+    setPendingSelectedImages((current) => {
+      const next = { ...current };
+      delete next[card.id];
+      return next;
     });
-    setSavingCardId("");
-
-    if (error) {
-      console.error(error);
-      setMessage(`デッキカードの保存に失敗しました。${error.message}`);
-      return;
-    }
-
-    await reload(deckId);
-  }
-
-  async function saveSelectedImage(card: CardRecord, imageId: string) {
-    const existing = deckCardMap.get(card.id);
-    if (!existing) {
-      setSelectedImages((current) => ({ ...current, [card.id]: imageId }));
-      return;
-    }
-
-    await saveCardQuantity(card, existing.quantity, imageId || null);
   }
 
   function getImageSelectValue(cardId: string) {
-    return selectedImages[cardId] ?? deckCardMap.get(cardId)?.selected_image_id ?? "";
+    return pendingSelectedImages[cardId] ?? draftDeckCardMap.get(cardId)?.selectedImageId ?? "";
   }
 
   return (
@@ -364,16 +384,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         <AppCard title="読み込み中" description="デッキ情報を取得しています。" />
       ) : deck ? (
         <div className="dm-deck-editor-layout">
-          <div className="dm-deck-editor-main">
+          <div className="dm-deck-editor-side">
             <AppCard
-              title="1. デッキ設定"
-              description="フラッグとバディを選択して保存します。バディは1枚固定で deck_cards には入りません。"
+              title="デッキ設定"
+              description="保存ボタンを押すまでSupabaseへ反映しません。"
             >
               <form
                 className="dm-auth-form dm-card-form"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void handleSaveSettings();
+                  void handleSaveDeck();
                 }}
               >
                 <label>
@@ -420,29 +440,30 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <Button
                   type="submit"
                   variant="primary"
-                  loading={savingSettings}
+                  loading={savingDeck}
+                  disabled={!hasUnsavedChanges}
                   fullWidth
                 >
-                  デッキ設定を保存
+                  {hasUnsavedChanges ? "デッキを保存" : "保存済み"}
                 </Button>
               </form>
             </AppCard>
 
             <AppCard
-              title="2. デッキ内容"
-              description="枚数変更はすぐ保存されます。0枚にすると deck_cards から削除されます。"
+              title="デッキ一覧"
+              description="編集中のローカルStateです。枚数変更は保存ボタンまでDBへ反映しません。"
             >
               <div className="dm-deck-list">
-                {deckCards.map((item) => {
-                  const card = cardMap.get(item.card_id);
+                {draftDeckCards.map((item) => {
+                  const card = cardMap.get(item.cardId);
                   if (!card) return null;
                   return (
-                    <div key={item.id} className="dm-deck-row">
+                    <div key={item.cardId} className="dm-deck-row">
                       <span className="dm-deck-card-cell">
                         <CardViewer
                           card={card}
                           images={imagesByCard.get(card.id) ?? []}
-                          selectedImageId={item.selected_image_id}
+                          selectedImageId={item.selectedImageId}
                           variant="compact"
                         />
                         <span>
@@ -453,9 +474,19 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       <div className="dm-deck-row-actions">
                         <select
                           value={getImageSelectValue(card.id)}
-                          onChange={(event) =>
-                            void saveSelectedImage(card, event.target.value)
-                          }
+                          onChange={(event) => {
+                            setPendingSelectedImages((current) => {
+                              const next = { ...current };
+                              delete next[card.id];
+                              return next;
+                            });
+                            setDraftDeckCards((current) =>
+                              setDeckCardDraftImage(current, {
+                                cardId: card.id,
+                                selectedImageId: event.target.value || null
+                              })
+                            );
+                          }}
                         >
                           <option value="">Default画像を使う</option>
                           {(imagesByCard.get(card.id) ?? []).map((image, index) => (
@@ -468,23 +499,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         </select>
                         <Button
                           size="sm"
-                          disabled={savingCardId === card.id}
-                          onClick={() => saveCardQuantity(card, item.quantity - 1)}
+                          onClick={() => setLocalCardQuantity(card, item.quantity - 1)}
                         >
                           -
                         </Button>
                         <Button
                           size="sm"
-                          disabled={savingCardId === card.id}
-                          onClick={() => saveCardQuantity(card, item.quantity + 1)}
+                          onClick={() => setLocalCardQuantity(card, item.quantity + 1)}
                         >
                           +
                         </Button>
                         <Button
                           size="sm"
                           variant="danger"
-                          loading={savingCardId === card.id}
-                          onClick={() => saveCardQuantity(card, 0)}
+                          onClick={() => setLocalCardQuantity(card, 0)}
                         >
                           削除
                         </Button>
@@ -492,15 +520,45 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </div>
                   );
                 })}
-                {deckCards.length === 0 && (
+                {draftDeckCards.length === 0 && (
                   <p className="dm-muted-text">まだカードが追加されていません。</p>
                 )}
               </div>
             </AppCard>
 
+            <AppCard title="枚数表示" description="現在の編集中デッキ内容です。">
+              <div className="dm-deck-summary">
+                <p>
+                  <b>メインデッキ合計</b>
+                  <span>{mainDeckTotal}枚</span>
+                </p>
+                <p>
+                  <b>選択フラッグ</b>
+                  <span>{getFlagName(selectedFlag)}</span>
+                </p>
+                <p>
+                  <b>バディカード</b>
+                  <span>{selectedBuddy?.name ?? "未選択"}</span>
+                </p>
+              </div>
+            </AppCard>
+
+            <AppCard title="カードタイプ別" description="編集中 deck_cards の枚数です。">
+              <div className="dm-deck-summary-list">
+                {CARD_TYPE_ORDER.map((cardType) => (
+                  <p key={cardType}>
+                    <b>{getCardTypeLabel(cardType)}</b>
+                    <span>{typeCounts.get(cardType) ?? 0}枚</span>
+                  </p>
+                ))}
+              </div>
+            </AppCard>
+          </div>
+
+          <div className="dm-deck-editor-main">
             <AppCard
-              title="3. カード追加"
-              description="複数条件を組み合わせて候補を絞り込みます。採用画像未選択なら selected_image_id=null でDefault画像を使います。"
+              title="カード検索"
+              description="フラッグの使用可能ワールドでは候補を制限しません。同一カードの再録は1枚として表示します。"
             >
               <form className="dm-auth-form dm-card-form">
                 <DeckCardSearchPanel
@@ -511,66 +569,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   onChange={setSearchFilters}
                 />
 
-                <fieldset className="dm-form-fieldset">
-                  <legend>除外フィルター</legend>
-                  <div className="dm-checkbox-grid">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.dragon}
-                        onChange={(event) => setFilter("dragon", event.target.checked)}
-                      />
-                      ドラゴン除外
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.hyakki}
-                        onChange={(event) => setFilter("hyakki", event.target.checked)}
-                      />
-                      百鬼除外
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.chaos}
-                        onChange={(event) => setFilter("chaos", event.target.checked)}
-                      />
-                      カオス除外
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.generic}
-                        onChange={(event) => setFilter("generic", event.target.checked)}
-                      />
-                      ジェネリック除外
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.flagCard}
-                        onChange={(event) => setFilter("flagCard", event.target.checked)}
-                      />
-                      flag_card 除外
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={filters.inactive}
-                        onChange={(event) => setFilter("inactive", event.target.checked)}
-                      />
-                      無効カード除外
-                    </label>
-                  </div>
-                </fieldset>
               </form>
 
               <div className="dm-deck-list">
                 {filteredCards.map((card) => {
-                  const existing = deckCardMap.get(card.id);
+                  const existing = draftDeckCardMap.get(card.id);
                   return (
-                    <div key={card.id} className="dm-deck-row">
+                    <div
+                      key={card.id}
+                      className="dm-deck-row"
+                      onClick={() => setSelectedPreviewCardId(card.id)}
+                    >
                       <span className="dm-deck-card-cell">
                         <CardViewer
                           card={card}
@@ -587,12 +596,27 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       <div className="dm-deck-row-actions">
                         <select
                           value={getImageSelectValue(card.id)}
-                          onChange={(event) =>
-                            setSelectedImages((current) => ({
+                          onChange={(event) => {
+                            const nextImageId = event.target.value;
+                            if (existing) {
+                              setPendingSelectedImages((current) => {
+                                const next = { ...current };
+                                delete next[card.id];
+                                return next;
+                              });
+                              setDraftDeckCards((current) =>
+                                setDeckCardDraftImage(current, {
+                                  cardId: card.id,
+                                  selectedImageId: nextImageId || null
+                                })
+                              );
+                              return;
+                            }
+                            setPendingSelectedImages((current) => ({
                               ...current,
-                              [card.id]: event.target.value
-                            }))
-                          }
+                              [card.id]: nextImageId
+                            }));
+                          }}
                         >
                           <option value="">Default画像を使う</option>
                           {(imagesByCard.get(card.id) ?? []).map((image, index) => (
@@ -606,9 +630,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         <Button
                           size="sm"
                           variant="primary"
-                          loading={savingCardId === card.id}
                           onClick={() =>
-                            saveCardQuantity(
+                            setLocalCardQuantity(
                               card,
                               (existing?.quantity ?? 0) + 1,
                               getImageSelectValue(card.id) || null
@@ -626,36 +649,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 )}
               </div>
             </AppCard>
-          </div>
-
-          <aside className="dm-deck-editor-side">
-            <AppCard title="枚数表示" description="現在の保存済みデッキ内容です。">
-              <div className="dm-deck-summary">
-                <p>
-                  <b>メインデッキ合計</b>
-                  <span>{mainDeckTotal}枚</span>
-                </p>
-                <p>
-                  <b>選択フラッグ</b>
-                  <span>{getFlagName(selectedFlag)}</span>
-                </p>
-                <p>
-                  <b>バディカード</b>
-                  <span>{selectedBuddy?.name ?? "未選択"}</span>
-                </p>
-              </div>
-            </AppCard>
-
-            <AppCard title="カードタイプ別" description="deck_cards の枚数です。">
-              <div className="dm-deck-summary-list">
-                {CARD_TYPE_ORDER.map((cardType) => (
-                  <p key={cardType}>
-                    <b>{getCardTypeLabel(cardType)}</b>
-                    <span>{typeCounts.get(cardType) ?? 0}枚</span>
-                  </p>
-                ))}
-              </div>
-            </AppCard>
 
             <AppCard title="ワールド別" description="複数ワールドカードは各ワールドに加算します。">
               <div className="dm-deck-summary-list">
@@ -670,7 +663,25 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 )}
               </div>
             </AppCard>
-          </aside>
+
+            <AppCard title="カード詳細" description="検索結果をクリックすると表示します。">
+              {selectedPreviewCard ? (
+                <div className="dm-deck-card-detail">
+                  <CardViewer
+                    card={selectedPreviewCard}
+                    images={imagesByCard.get(selectedPreviewCard.id) ?? []}
+                    selectedImageId={getImageSelectValue(selectedPreviewCard.id) || null}
+                  />
+                  <p>
+                    <b>{selectedPreviewCard.name}</b>
+                  </p>
+                  <p>{selectedPreviewCard.card_text || "カードテキストなし"}</p>
+                </div>
+              ) : (
+                <p className="dm-muted-text">カードを選択してください。</p>
+              )}
+            </AppCard>
+          </div>
         </div>
       ) : (
         <AppCard title="エラー" description={message || "デッキが見つかりません。"} />

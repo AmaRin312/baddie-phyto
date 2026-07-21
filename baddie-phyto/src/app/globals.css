@@ -1762,6 +1762,194 @@ select {
   font-weight: 900;
 }
 
+.bf-composite-card-view {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.bf-composite-card-view.is-board {
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  padding: 4px;
+}
+
+.bf-composite-card-view.is-viewer {
+  width: min(100%, 520px);
+  height: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.bf-composite-card-view.is-viewer.is-horizontal {
+  transform: rotate(-90deg) scale(0.72);
+  transform-origin: center;
+}
+
+.bf-composite-card-piece {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bf-composite-card-piece::before {
+  content: attr(data-role);
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 6px;
+  min-width: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.28);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: #111827;
+  background: rgba(250, 204, 21, 0.92);
+  font-size: 12px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.bf-composite-card-view.is-board .bp-board-card {
+  border-radius: 8px;
+}
+
+.bf-composite-card-view.is-board .bf-composite-card-piece::before {
+  top: 3px;
+  left: 3px;
+  min-width: 16px;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.bf-composite-card-view.is-viewer .bf-composite-card-piece {
+  display: grid;
+  gap: 6px;
+}
+
+.bf-ability-notification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.bf-ability-notification-card {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.bf-ability-notification-card h3 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.bf-ability-notification-card .bp-board-card {
+  width: 120px;
+  height: 168px;
+  border-radius: 10px;
+}
+
+.bf-ability-notification-card strong {
+  font-size: 13px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.bf-ability-notification-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.bf-ability-notification-reopen {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 65;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid rgba(250, 204, 21, 0.72);
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: #fef3c7;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(88, 28, 135, 0.92));
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.3);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.bf-ability-notification-reopen:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.38);
+}
+
+.bf-ability-notification-reopen strong {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #111827;
+  background: #facc15;
+  font-size: 12px;
+}
+
+.bf-ability-notification-list-popup .bf-battle-popup-content {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+
+.bf-ability-notification-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.bf-ability-notification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bf-ability-notification-list-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: 14px;
+  padding: 12px;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.96);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bf-ability-notification-list-item:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: #eff6ff;
+}
+
+.bf-ability-notification-list-item span {
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.bf-ability-notification-list-item strong {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.bf-ability-notification-list-item small {
+  color: #475569;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .bp-viewer-card-wrap {
   width: min(100%, 462px);
   display: grid;

@@ -2,6 +2,7 @@
 
 import { CardViewer } from "@/components/cards/CardViewer";
 import { BoardCard } from "@/components/cards/BoardCard";
+import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
 import { SoulCardList } from "@/components/battle/SoulCardList";
 import {
   canDragBattleCard,
@@ -10,6 +11,7 @@ import {
   canDropSingleCard,
   canDropSingleSoulCard
 } from "@/lib/battle/battleActions";
+import { findCompositeGroupCardsInBattleState } from "@/lib/battle/compositeCards";
 import type { MouseEvent } from "react";
 import type {
   BattleCard,
@@ -218,6 +220,9 @@ export function BattleSidebar({
   onDropCard
 }: BattleSidebarProps) {
   const activeCardRecord = activeCard ? cardMap.get(activeCard.cardId) : null;
+  const activeCompositeCards = activeCard
+    ? findCompositeGroupCardsInBattleState(battleState, activeCard)
+    : [];
 
   return (
     <aside className="bf-right-panel" aria-label="手札とビューアー">
@@ -256,7 +261,14 @@ export function BattleSidebar({
           </button>
         </div>
         <div className="bf-single-viewer">
-          {activeCard && activeCardRecord ? (
+          {activeCompositeCards.length > 1 ? (
+            <BattleCompositeCardView
+              cards={activeCompositeCards}
+              cardMap={cardMap}
+              imagesByCard={imagesByCard}
+              variant="viewer"
+            />
+          ) : activeCard && activeCardRecord ? (
             <CardViewer
               card={activeCardRecord}
               images={imagesByCard.get(activeCardRecord.id) ?? []}

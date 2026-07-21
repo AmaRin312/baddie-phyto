@@ -1,7 +1,6 @@
 import {
   addSoulCardFaceDown,
   addSoulCardFaceUp,
-  activateBiriKinata,
   applyRuleChange,
   changeLife,
   clearDeckLook,
@@ -17,11 +16,13 @@ import {
   moveSoulCards,
   moveTopDeckCard,
   placeCardInAreaSlot,
+  placeHyakuganComposite,
   placeAsFlag,
   placeOrStackAreaCard,
   reorderLookedCards,
   returnLookedCards,
   revealDeckCards,
+  resolveBiriKinataNotification,
   setViewerCard,
   shuffleDeck,
   stackCardOnAreaCard,
@@ -68,8 +69,10 @@ export function executeBattleCommand(
       return placeAsFlag(state, command.payload);
     case "APPLY_RULE_CHANGE":
       return applyRuleChange(state, command.payload);
-    case "ACTIVATE_BIRI_KINATA":
-      return activateBiriKinata(state, command.payload);
+    case "RESOLVE_BIRI_KINATA_NOTIFICATION":
+      return resolveBiriKinataNotification(state, command.payload);
+    case "PLACE_HYAKUGAN_COMPOSITE":
+      return placeHyakuganComposite(state, command.payload);
     case "MOVE_SOUL_CARD":
       return moveSoulCard(state, command.payload);
     case "MOVE_SOUL_CARDS":

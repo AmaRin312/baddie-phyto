@@ -8,6 +8,9 @@ import {
   BattleActionPopup,
   type BattleActionPopupAction
 } from "@/components/battle/BattleActionPopup";
+import { AbilityNotificationDialog } from "@/components/battle/AbilityNotificationDialog";
+import { AbilityNotificationListPanel } from "@/components/battle/AbilityNotificationListPanel";
+import { AbilityCardTargetPopup } from "@/components/battle/AbilityCardTargetPopup";
 import { BiriKinataTargetPopup } from "@/components/battle/BiriKinataTargetPopup";
 import { BattleBoard } from "@/components/battle/BattleBoard";
 import { BattleContextMenu } from "@/components/battle/BattleContextMenu";
@@ -21,16 +24,44 @@ import {
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
 import {
+  createBattleAbilityNotification,
+  loadPendingBattleAbilityNotifications,
+  subscribeBattleAbilityNotifications,
+  unsubscribeBattleAbilityNotifications,
+  updateBattleAbilityNotificationStatus,
+  type BattleAbilityNotification
+} from "@/lib/battle/battleAbilityNotifications";
+import {
   createBattleState,
   deleteBattleState,
   loadBattleState,
   saveBattleState
 } from "@/lib/battle/battlePersistence";
+import {
+  BATTLE_PLAYER_SEATS,
+  getBattleStatePlayerKeyForSeat,
+  deleteSyncedPlayerBattleStates,
+  getOpponentSeat,
+  getCurrentBattleUserId,
+  loadSyncedPlayerBattleStates,
+  mapSyncedSeatStatesToPlayers,
+  normalizeBattlePlayerSeat,
+  saveSyncedPlayerBattleState,
+  subscribeSyncedPlayerBattleStates,
+  unsubscribeSyncedPlayerBattleStates,
+  type BattlePlayerSeat,
+  type RealtimeStatus
+} from "@/lib/battle/battlePlayerStateSync";
 import { executeBattleCommand } from "@/lib/battle/commands/executeBattleCommand";
 import type { BattleCommand } from "@/lib/battle/commands/battleCommandTypes";
 import { createCommandsFromDeckBrowserRequests } from "@/lib/battle/commands/battleCommandFactory";
 import type { DeckBrowserRequest } from "@/lib/battle/deckBrowser/deckBrowserTypes";
 import { getAutomaticAbilityCommands } from "@/lib/battle/abilities/battleAbilityDefinitions";
+import { findCompositeGroupCardsInBattleState } from "@/lib/battle/compositeCards";
+import type {
+  AbilityId,
+  BattleCardAbilityMap
+} from "@/lib/battle/abilities/abilityTypes";
 import { createInitialBattleState } from "@/lib/battle/createInitialBattleState";
 import {
   buildBattleContextMenu,
@@ -40,6 +71,7 @@ import {
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
+import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import { loadDeck, loadDeckCards } from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
@@ -54,8 +86,10 @@ import {
 import type {
   BattleCard,
   BattleDropInput,
+  BattlePlayerId,
   BattleState,
-  BattleZoneId
+  BattleZoneId,
+  PlayerState
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord, DeckRecord } from "@/types/baddiePhyto";
 import type { DeckPosition } from "@/lib/battle/battleActions";
@@ -71,6 +105,12 @@ const MULTI_SELECT_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "right",
   "resolution"
 ]);
+
+const HYAKUGAN_PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
+  "center",
+  "left",
+  "right"
+];
 
 type BattleSelection = {
   zoneId: BattleZoneId | null;
@@ -127,6 +167,17 @@ type PendingBiriKinataPopup = {
   sourceInstanceId: string;
 };
 
+type PendingFaceDownSoulPopup = {
+  sourceInstanceId: string;
+  candidates: BattleCard[];
+};
+
+type PendingHyakuganPopup = {
+  sourceInstanceId: string;
+  pairCandidates: BattleCard[];
+  selectedPairInstanceId: string | null;
+};
+
 const PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
   "center",
   "left",
@@ -171,14 +222,41 @@ function canUseBattleMultiSelection(
   return playerId === "self" && MULTI_SELECT_ZONE_IDS.has(card.zoneId);
 }
 
+function getBattleSelectionUnitInstanceIds(
+  battleState: BattleState | null,
+  card: BattleCard
+) {
+  const compositeCards = battleState
+    ? findCompositeGroupCardsInBattleState(battleState, card)
+    : [];
+
+  return compositeCards.length > 1
+    ? compositeCards.map((item) => item.instanceId)
+    : [card.instanceId];
+}
+
+function hasBattleAbility(
+  cardAbilityMap: BattleCardAbilityMap,
+  card: BattleCard,
+  abilityId: AbilityId
+) {
+  return cardAbilityMap.get(card.cardId)?.includes(abilityId) ?? false;
+}
+
 export function BattleController() {
   const searchParams = useSearchParams();
   const deckId = searchParams.get("deckId");
   const roomId = searchParams.get("roomId") ?? deckId;
+  const selfSeat = normalizeBattlePlayerSeat(
+    searchParams.get("seat") ?? searchParams.get("playerSeat")
+  );
   const [battleState, setBattleState] = useState<BattleState | null>(null);
   const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [cardAbilityMap, setCardAbilityMap] = useState<BattleCardAbilityMap>(
+    () => new Map()
+  );
   const [selection, setSelection] = useState<BattleSelection>({
     zoneId: null,
     instanceIds: []
@@ -202,13 +280,59 @@ export function BattleController() {
     useState<PendingDeckCountPopup | null>(null);
   const [pendingBiriKinataPopup, setPendingBiriKinataPopup] =
     useState<PendingBiriKinataPopup | null>(null);
+  const [pendingFaceDownSoulPopup, setPendingFaceDownSoulPopup] =
+    useState<PendingFaceDownSoulPopup | null>(null);
+  const [pendingHyakuganPopup, setPendingHyakuganPopup] =
+    useState<PendingHyakuganPopup | null>(null);
+  const [abilityNotifications, setAbilityNotifications] = useState<
+    BattleAbilityNotification[]
+  >([]);
+  const [activeAbilityNotificationId, setActiveAbilityNotificationId] =
+    useState<string | null>(null);
+  const [showAbilityNotificationList, setShowAbilityNotificationList] =
+    useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
   const [shortcutSettings, setShortcutSettings] = useState<
     Required<ShortcutSettings>
   >(mergeWithDefaultShortcuts(null));
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
   const resetSourceRef = useRef<BattleResetSource | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
+  const playerVersionsRef = useRef<Record<BattlePlayerSeat, number>>({
+    player1: 0,
+    player2: 0
+  });
+
+  function mergePlayerStates(
+    state: BattleState,
+    players: Partial<Record<BattlePlayerId, PlayerState>>
+  ): BattleState {
+    return {
+      ...state,
+      players: {
+        ...state.players,
+        ...players
+      }
+    };
+  }
+
+  function hasSelfPlayerStateChanged(current: BattleState, nextState: BattleState) {
+    return (
+      JSON.stringify(current.players.self) !==
+      JSON.stringify(nextState.players.self)
+    );
+  }
+
+  function rememberPlayerVersion(seatKey: BattlePlayerSeat, version: number) {
+    playerVersionsRef.current = {
+      ...playerVersionsRef.current,
+      [seatKey]: Math.max(playerVersionsRef.current[seatKey] ?? 0, version)
+    };
+  }
 
   const loadBattle = useCallback(async () => {
     if (!deckId) {
@@ -223,21 +347,32 @@ export function BattleController() {
       return;
     }
 
-    if (!(await getOrCreateProfile())) {
+    const profile = await getOrCreateProfile();
+    if (!profile) {
       window.location.href = "/login";
       return;
     }
+    currentUserIdRef.current = await getCurrentBattleUserId();
 
     setLoading(true);
     setMessage("");
+    setSyncMessage("");
 
-    const [deckResult, deckCardsResult, cardResult, imageResult, shortcutResult] =
+    const [
+      deckResult,
+      deckCardsResult,
+      cardResult,
+      imageResult,
+      shortcutResult,
+      abilityMapResult
+    ] =
       await Promise.all([
         loadDeck(deckId),
         loadDeckCards(deckId),
         loadCards(),
         loadCardImages(),
-        loadShortcutSettings()
+        loadShortcutSettings(),
+        loadBattleCardAbilityMap()
       ]);
 
     if (
@@ -245,13 +380,15 @@ export function BattleController() {
       deckCardsResult.error ||
       cardResult.error ||
       imageResult.error ||
+      abilityMapResult.error ||
       !deckResult.data
     ) {
       console.error(
         deckResult.error ??
           deckCardsResult.error ??
           cardResult.error ??
-          imageResult.error
+          imageResult.error ??
+          abilityMapResult.error
       );
       setMessage("Battle開始に必要なデッキ情報の読み込みに失敗しました。");
       setLoading(false);
@@ -272,10 +409,40 @@ export function BattleController() {
         buddyCardId: deckResult.data.buddy_card_id,
         deckCards: deckCardsResult.data ?? []
       };
+      const freshBattleState = createInitialBattleState(resetSource);
       const savedBattleStateResult = await loadBattleState(roomId);
-      const initialState =
-        savedBattleStateResult.data ??
-        createInitialBattleState(resetSource);
+      const baseState = savedBattleStateResult.data ?? freshBattleState;
+      const syncedPlayersResult = selfSeat
+        ? await loadSyncedPlayerBattleStates(roomId)
+        : { data: {}, error: null };
+      const syncedSeats = syncedPlayersResult.data;
+
+      if (!selfSeat) {
+        setRealtimeStatus("idle");
+        setSyncMessage(
+          "Realtime固定席を特定できません。URLに ?seat=player1 または ?seat=player2 を付けるまで、席別同期保存は行いません。"
+        );
+      }
+
+      const initialState = selfSeat
+        ? mergePlayerStates(baseState, {
+            self: syncedSeats[selfSeat]?.state ?? freshBattleState.players.self,
+            opponent:
+              syncedSeats[getOpponentSeat(selfSeat)]?.state ??
+              mapSyncedSeatStatesToPlayers({
+                seatStates: syncedSeats,
+                selfSeat
+              }).opponent ??
+              baseState.players.opponent
+          })
+        : baseState;
+
+      BATTLE_PLAYER_SEATS.forEach((seatKey) => {
+        const syncedSeat = syncedSeats[seatKey];
+        if (syncedSeat) {
+          rememberPlayerVersion(seatKey, syncedSeat.version);
+        }
+      });
 
       if (!savedBattleStateResult.data) {
         const createResult = await createBattleState({
@@ -287,10 +454,26 @@ export function BattleController() {
         }
       }
 
+      if (selfSeat && !syncedSeats[selfSeat]) {
+        const result = await saveSyncedPlayerBattleState({
+          roomId,
+          seatKey: selfSeat,
+          state: initialState.players.self,
+          expectedVersion: playerVersionsRef.current[selfSeat] ?? 0
+        });
+        if (result.data) {
+          rememberPlayerVersion(selfSeat, result.data.version);
+        } else if (result.error) {
+          setRealtimeStatus("error");
+          setSyncMessage("自分の固定席PlayerStateの初期保存に失敗しました。");
+        }
+      }
+
       resetSourceRef.current = resetSource;
       setDeck(deckResult.data);
       setCards((cardResult.data ?? []) as CardRecord[]);
       setImages(imageResult.data ?? []);
+      setCardAbilityMap(abilityMapResult.data);
       setShortcutSettings(shortcutResult.data);
       setBattleState(initialState);
     } catch (error) {
@@ -303,7 +486,7 @@ export function BattleController() {
     }
 
     setLoading(false);
-  }, [deckId, roomId]);
+  }, [deckId, roomId, selfSeat]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -312,6 +495,89 @@ export function BattleController() {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadBattle]);
+
+  const isBattleLoaded = battleState != null;
+
+  useEffect(() => {
+    if (!roomId || !isBattleLoaded || !selfSeat) return;
+
+    const channel = subscribeSyncedPlayerBattleStates({
+      roomId,
+      onStatusChange: setRealtimeStatus,
+      onError: setSyncMessage,
+      onPlayerState: (syncedPlayer) => {
+        const currentVersion =
+          playerVersionsRef.current[syncedPlayer.seatKey] ?? 0;
+        if (syncedPlayer.version <= currentVersion) return;
+
+        rememberPlayerVersion(syncedPlayer.seatKey, syncedPlayer.version);
+        const playerId = getBattleStatePlayerKeyForSeat({
+          seatKey: syncedPlayer.seatKey,
+          selfSeat
+        });
+        setBattleState((current) =>
+          current
+            ? mergePlayerStates(current, {
+                [playerId]: syncedPlayer.state
+              })
+            : current
+        );
+      }
+    });
+
+    return () => {
+      void unsubscribeSyncedPlayerBattleStates(channel);
+    };
+  }, [isBattleLoaded, roomId, selfSeat]);
+
+  useEffect(() => {
+    if (!roomId || !isBattleLoaded || !selfSeat) return;
+
+    void loadPendingBattleAbilityNotifications({
+      roomId,
+      targetSeatKey: selfSeat
+    }).then((result) => {
+      if (result.error) {
+        setSyncMessage(result.error);
+        return;
+      }
+      setAbilityNotifications(result.data);
+      setActiveAbilityNotificationId(
+        (current) => current ?? result.data[0]?.id ?? null
+      );
+    });
+
+    const channel = subscribeBattleAbilityNotifications({
+      roomId,
+      targetSeatKey: selfSeat,
+      onError: setSyncMessage,
+      onNotification: (notification) => {
+        if (notification.status !== "pending") {
+          setAbilityNotifications((current) =>
+            current.filter((item) => item.id !== notification.id)
+          );
+          setActiveAbilityNotificationId((current) =>
+            current === notification.id ? null : current
+          );
+          return;
+        }
+
+        setAbilityNotifications((current) => {
+          if (current.some((item) => item.id === notification.id)) {
+            return current.map((item) =>
+              item.id === notification.id ? notification : item
+            );
+          }
+          return [...current, notification];
+        });
+        setActiveAbilityNotificationId((current) => current ?? notification.id);
+      }
+    });
+
+    return () => {
+      void unsubscribeBattleAbilityNotifications(channel);
+    };
+  }, [isBattleLoaded, roomId, selfSeat]);
 
   const cardMap = useMemo(
     () => new Map(cards.map((card) => [card.id, card])),
@@ -330,6 +596,27 @@ export function BattleController() {
     battleState,
     battleState?.activeViewerCardInstanceId ?? null
   );
+  const activeAbilityNotification =
+    activeAbilityNotificationId == null
+      ? null
+      : abilityNotifications.find(
+          (notification) => notification.id === activeAbilityNotificationId
+        ) ?? null;
+  const pendingAbilityNotificationCount = abilityNotifications.length;
+  const hasHiddenAbilityNotification =
+    pendingAbilityNotificationCount > 0 && activeAbilityNotification == null;
+  const activeAbilityNotificationSourceCard = activeAbilityNotification
+    ? findBattleCardByInstanceId(
+        battleState,
+        activeAbilityNotification.sourceInstanceId
+      )
+    : null;
+  const activeAbilityNotificationTargetCard = activeAbilityNotification
+    ? findBattleCardByInstanceId(
+        battleState,
+        activeAbilityNotification.targetInstanceId
+      )
+    : null;
 
   const selectedInstanceIds = useMemo(
     () => new Set(selection.instanceIds),
@@ -377,7 +664,8 @@ export function BattleController() {
     const commandState = executeBattleCommand(state, command);
     return getAutomaticAbilityCommands({
       state: commandState,
-      cardMap
+      cardMap,
+      cardAbilityMap
     }).reduce(
       (nextState, abilityCommand) =>
         executeBattleCommand(nextState, abilityCommand),
@@ -405,7 +693,67 @@ export function BattleController() {
     });
   }
 
+  function persistSelfPlayerState(
+    previousState: BattleState,
+    nextState: BattleState
+  ) {
+    if (!roomId || !selfSeat) return;
+    if (!hasSelfPlayerStateChanged(previousState, nextState)) return;
+
+    setSavingSeatKeys((current) => Array.from(new Set([...current, selfSeat])));
+    setSyncMessage("");
+
+    void saveSyncedPlayerBattleState({
+      roomId,
+      seatKey: selfSeat,
+      state: nextState.players.self,
+      expectedVersion: playerVersionsRef.current[selfSeat] ?? 0
+    }).then(async (result) => {
+      setSavingSeatKeys((current) =>
+        current.filter((item) => item !== selfSeat)
+      );
+
+      if (result.error || !result.data) {
+        setRealtimeStatus("error");
+        setSyncMessage(
+          `${selfSeat}側の同期保存に失敗しました。再読み込みまたは再操作で再試行できます。`
+        );
+        const latest = await loadSyncedPlayerBattleStates(roomId);
+        const latestSeat = latest.data[selfSeat];
+        if (latestSeat) {
+          rememberPlayerVersion(selfSeat, latestSeat.version);
+          setBattleState((current) =>
+            current
+              ? mergePlayerStates(current, {
+                  self: latestSeat.state
+                })
+              : current
+          );
+        }
+        return;
+      }
+
+      rememberPlayerVersion(selfSeat, result.data.version);
+    });
+  }
+
+  function isAllowedSelfSideCommand(command: BattleCommand) {
+    if (
+      "playerId" in command.payload &&
+      command.payload.playerId === "opponent"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
   function executeCommand(command: BattleCommand) {
+    if (!isAllowedSelfSideCommand(command)) {
+      setSyncMessage("通常操作では相手側PlayerStateを直接変更できません。");
+      return;
+    }
+
     if (command.type === "SHUFFLE_DECK") {
       const confirmed = window.confirm("山札をシャッフルします。よろしいですか？");
       if (!confirmed) return;
@@ -418,7 +766,7 @@ export function BattleController() {
       if (nextState === current) return current;
 
       const versionedState = incrementBattleVersion(nextState);
-      persistBattleState(versionedState);
+      persistSelfPlayerState(current, versionedState);
       return versionedState;
     });
   }
@@ -426,6 +774,11 @@ export function BattleController() {
   function executeCommands(commands: BattleCommand[]) {
     const effectiveCommands = commands.filter(Boolean);
     if (effectiveCommands.length === 0) return;
+    if (!effectiveCommands.every(isAllowedSelfSideCommand)) {
+      setSyncMessage("通常操作では相手側PlayerStateを直接変更できません。");
+      return;
+    }
+
     if (
       effectiveCommands.some((command) => command.type === "SHUFFLE_DECK") &&
       !window.confirm("山札をシャッフルします。よろしいですか？")
@@ -443,7 +796,7 @@ export function BattleController() {
       if (nextState === current) return current;
 
       const versionedState = incrementBattleVersion(nextState);
-      persistBattleState(versionedState);
+      persistSelfPlayerState(current, versionedState);
       return versionedState;
     });
   }
@@ -468,6 +821,9 @@ export function BattleController() {
     };
     setBattleState(nextState);
     persistBattleState(nextState);
+    if (battleState) {
+      persistSelfPlayerState(battleState, nextState);
+    }
     handleClearSelection();
     setDragSelection(null);
     setSoulDragSelection(null);
@@ -477,6 +833,8 @@ export function BattleController() {
     setSelectionMode(null);
     setPendingDeckCountPopup(null);
     setPendingBiriKinataPopup(null);
+    setPendingFaceDownSoulPopup(null);
+    setPendingHyakuganPopup(null);
   }
 
   function handleDeleteRoomState() {
@@ -486,8 +844,11 @@ export function BattleController() {
     );
     if (!confirmed) return;
 
-    void deleteBattleState(roomId).then((result) => {
-      if (result.error) {
+    void Promise.all([
+      deleteBattleState(roomId),
+      deleteSyncedPlayerBattleStates(roomId)
+    ]).then(([battleResult, playerResult]) => {
+      if (battleResult.error || playerResult.error) {
         setMessage("ルーム削除に失敗しました。");
         return;
       }
@@ -654,7 +1015,10 @@ export function BattleController() {
           isDeckCountPopupOpen: pendingDeckCountPopup != null,
           isDeckBrowserPopupOpen: lookedDeckCards.length > 0,
           isDeckDropDialogOpen: pendingDeckDrop != null,
-          isBiriKinataPopupOpen: pendingBiriKinataPopup != null
+          isBiriKinataPopupOpen: pendingBiriKinataPopup != null,
+          isFaceDownSoulPopupOpen: pendingFaceDownSoulPopup != null,
+          isHyakuganPopupOpen: pendingHyakuganPopup != null,
+          isAbilityNotificationOpen: activeAbilityNotification != null
         })
       ) {
         return;
@@ -679,6 +1043,9 @@ export function BattleController() {
     pendingContextMenu,
     pendingDeckCountPopup,
     pendingDeckDrop,
+    pendingFaceDownSoulPopup,
+    pendingHyakuganPopup,
+    activeAbilityNotification,
     selectionMode,
     shortcutSettings
   ]);
@@ -711,24 +1078,33 @@ export function BattleController() {
       return;
     }
 
+    const selectionUnitInstanceIds = getBattleSelectionUnitInstanceIds(
+      battleState,
+      card
+    );
+
     setSelection((current) => {
       if (!shiftKey) {
         return {
           zoneId: card.zoneId,
-          instanceIds: [card.instanceId]
+          instanceIds: selectionUnitInstanceIds
         };
       }
 
       if (current.zoneId !== card.zoneId) {
         return {
           zoneId: card.zoneId,
-          instanceIds: [card.instanceId]
+          instanceIds: selectionUnitInstanceIds
         };
       }
 
-      if (current.instanceIds.includes(card.instanceId)) {
+      const isSelectionUnitSelected = selectionUnitInstanceIds.every(
+        (instanceId) => current.instanceIds.includes(instanceId)
+      );
+
+      if (isSelectionUnitSelected) {
         const nextInstanceIds = current.instanceIds.filter(
-          (instanceId) => instanceId !== card.instanceId
+          (instanceId) => !selectionUnitInstanceIds.includes(instanceId)
         );
 
         return {
@@ -739,7 +1115,12 @@ export function BattleController() {
 
       return {
         zoneId: card.zoneId,
-        instanceIds: [...current.instanceIds, card.instanceId]
+        instanceIds: [
+          ...current.instanceIds,
+          ...selectionUnitInstanceIds.filter(
+            (instanceId) => !current.instanceIds.includes(instanceId)
+          )
+        ]
       };
     });
   }
@@ -872,6 +1253,7 @@ export function BattleController() {
     event.preventDefault();
     event.stopPropagation();
     if (playerId !== "self") return;
+    if (!battleState) return;
 
     const items = buildBattleContextMenu(
       card.zoneId === "deck"
@@ -882,7 +1264,9 @@ export function BattleController() {
         : {
             kind: "card",
             card,
-            cardRecord: cardMap.get(card.cardId) ?? null
+            cardRecord: cardMap.get(card.cardId) ?? null,
+            state: battleState,
+            cardAbilityMap
           }
     );
     if (items.length === 0) return;
@@ -1135,6 +1519,84 @@ export function BattleController() {
     setPendingContextMenu(null);
   }
 
+  function getFaceDownSoulCandidates(sourceInstanceId: string) {
+    if (!battleState) return [];
+    return [
+      ...battleState.players.self.zones.hand.cards,
+      ...battleState.players.self.zones.drop.cards,
+      ...battleState.players.self.zones.deck.cards.slice(0, 1),
+      ...(["center", "left", "right", "item", "set"] as const).flatMap(
+        (zoneId) => battleState.players.self.zones[zoneId].cards
+      )
+    ].filter((card) => card.instanceId !== sourceInstanceId);
+  }
+
+  function getHyakuganPairCandidates(sourceCard: BattleCard) {
+    if (!battleState) return [];
+    const sourceIsTen = hasBattleAbility(
+      cardAbilityMap,
+      sourceCard,
+      "ten_no_hanshin_composite"
+    );
+    const requiredAbility: AbilityId = sourceIsTen
+      ? "chi_no_hanshin_composite"
+      : "ten_no_hanshin_composite";
+    const zoneCards =
+      battleState.players.self.zones[sourceCard.zoneId]?.cards ?? [];
+
+    return zoneCards.filter(
+      (card) =>
+        card.instanceId !== sourceCard.instanceId &&
+        hasBattleAbility(cardAbilityMap, card, requiredAbility)
+    );
+  }
+
+  function handleStartHyakuganPlacement(pairInstanceId: string) {
+    if (!pendingHyakuganPopup) return;
+    setPendingHyakuganPopup({
+      ...pendingHyakuganPopup,
+      selectedPairInstanceId: pairInstanceId
+    });
+    setSelectionMode({
+      type: "zone",
+      title: "ヒャクガンヤミゲドウの配置先を選択してください",
+      description: "Center / Left / Right から選択します。",
+      allowedZones: HYAKUGAN_PLACEMENT_TARGET_ZONES,
+      playerId: "self",
+      onSelect: (zoneId) => {
+        const sourceCard = findBattleCardByInstanceId(
+          battleState,
+          pendingHyakuganPopup.sourceInstanceId
+        );
+        if (!sourceCard) return;
+        const sourceRole = hasBattleAbility(
+          cardAbilityMap,
+          sourceCard,
+          "ten_no_hanshin_composite"
+        )
+          ? "heaven"
+          : "earth";
+        executeCommand({
+          type: "PLACE_HYAKUGAN_COMPOSITE",
+          payload: {
+            sourceInstanceId: pendingHyakuganPopup.sourceInstanceId,
+            pairInstanceId,
+            sourceRole,
+            pairRole: sourceRole === "heaven" ? "earth" : "heaven",
+            toZone: zoneId as "center" | "left" | "right"
+          },
+          source: "ability"
+        });
+        setPendingHyakuganPopup(null);
+        setSelectionMode(null);
+      },
+      onCancel: () => {
+        setPendingHyakuganPopup(null);
+        setSelectionMode(null);
+      }
+    });
+  }
+
   function handleContextUiAction(item: BattleMenuItem) {
     if (item.uiAction === "showSoul") {
       const activeInstanceId = selection.instanceIds[0] ?? null;
@@ -1163,20 +1625,128 @@ export function BattleController() {
       });
     }
 
+    if (
+      item.uiAction === "activateFaceDownSoul" &&
+      pendingContextMenu?.sourceCard
+    ) {
+      const sourceInstanceId = pendingContextMenu.sourceCard.instanceId;
+      setPendingFaceDownSoulPopup({
+        sourceInstanceId,
+        candidates: getFaceDownSoulCandidates(sourceInstanceId)
+      });
+    }
+
+    if (
+      item.uiAction === "activateHyakuganComposite" &&
+      pendingContextMenu?.sourceCard
+    ) {
+      const pairCandidates = getHyakuganPairCandidates(pendingContextMenu.sourceCard);
+      if (pairCandidates.length === 0) {
+        setMessage("同じゾーンにもう片方の半身がありません。");
+      } else {
+        setPendingHyakuganPopup({
+          sourceInstanceId: pendingContextMenu.sourceCard.instanceId,
+          pairCandidates,
+          selectedPairInstanceId: null
+        });
+      }
+    }
+
     setPendingContextMenu(null);
+  }
+
+  function handleFaceDownSoulTargetSelect(targetInstanceId: string) {
+    if (!pendingFaceDownSoulPopup) return;
+
+    executeCommand({
+      type: "ADD_SOUL_FACE_DOWN",
+      payload: {
+        instanceId: targetInstanceId,
+        targetInstanceId: pendingFaceDownSoulPopup.sourceInstanceId
+      },
+      source: "ability"
+    });
+    setPendingFaceDownSoulPopup(null);
   }
 
   function handleBiriKinataTargetSelect(targetInstanceId: string) {
     if (!pendingBiriKinataPopup) return;
+    if (!roomId || !selfSeat) {
+      setMessage("ビリ・キナータの通知Abilityには roomId と seat が必要です。");
+      setPendingBiriKinataPopup(null);
+      return;
+    }
 
-    executeCommand({
-      type: "ACTIVATE_BIRI_KINATA",
+    void createBattleAbilityNotification({
+      roomId,
+      abilityKey: "biri_kinata_face_down_use",
+      sourceSeatKey: selfSeat,
+      targetSeatKey: getOpponentSeat(selfSeat),
+      sourceInstanceId: pendingBiriKinataPopup.sourceInstanceId,
+      targetInstanceId,
       payload: {
-        sourceInstanceId: pendingBiriKinataPopup.sourceInstanceId,
-        targetInstanceId
+        targetZone: "center",
+        visibility: "face_down"
+      }
+    }).then((result) => {
+      if (result.error) {
+        setMessage(`Ability通知の作成に失敗しました: ${result.error}`);
       }
     });
     setPendingBiriKinataPopup(null);
+  }
+
+  function removeAbilityNotification(notificationId: string) {
+    setAbilityNotifications((current) =>
+      current.filter((notification) => notification.id !== notificationId)
+    );
+    setActiveAbilityNotificationId((current) =>
+      current === notificationId ? null : current
+    );
+  }
+
+  function handleConfirmAbilityNotification() {
+    if (!activeAbilityNotification) return;
+
+    const notification = activeAbilityNotification;
+    let didChange = false;
+
+    setBattleState((current) => {
+      if (!current) return current;
+
+      const nextState = applyBattleCommand(current, {
+        type: "RESOLVE_BIRI_KINATA_NOTIFICATION",
+        payload: {
+          sourceInstanceId: notification.sourceInstanceId,
+          targetInstanceId: notification.targetInstanceId
+        },
+        source: "ability"
+      });
+      if (nextState === current) return current;
+
+      didChange = true;
+      const versionedState = incrementBattleVersion(nextState);
+      persistSelfPlayerState(current, versionedState);
+      return versionedState;
+    });
+
+    window.setTimeout(() => {
+      if (!didChange) {
+        setMessage("Ability通知の解決条件を満たしていないため、盤面は変更されませんでした。");
+        return;
+      }
+
+      void updateBattleAbilityNotificationStatus({
+        id: notification.id,
+        status: "resolved"
+      }).then((result) => {
+        if (result.error) {
+          setMessage(`Ability通知の完了更新に失敗しました: ${result.error}`);
+          return;
+        }
+        removeAbilityNotification(notification.id);
+      });
+    }, 0);
   }
 
   function handleDeckCountSubmit(count: number) {
@@ -1459,6 +2029,13 @@ export function BattleController() {
 
         <div className="bf-battle-danger-actions">
           <span>Version {battleState.version ?? 0}</span>
+          <span>
+            Realtime {realtimeStatus}
+            {savingSeatKeys.length > 0
+              ? ` / 保存中 ${savingSeatKeys.join(", ")}`
+              : ""}
+          </span>
+          {syncMessage && <span>{syncMessage}</span>}
           <button type="button" onClick={handleResetBattleState}>
             対戦状態リセット
           </button>
@@ -1527,6 +2104,31 @@ export function BattleController() {
         onContextMenuSoulCard={handleContextMenuSoulCard}
         onDropCard={handleDropCard}
       />
+
+      {hasHiddenAbilityNotification && (
+        <button
+          type="button"
+          className="bf-ability-notification-reopen"
+          onClick={() => setShowAbilityNotificationList(true)}
+          aria-label={`未確認Ability通知 ${pendingAbilityNotificationCount}件を表示`}
+        >
+          <span>Ability通知</span>
+          <strong>{pendingAbilityNotificationCount}</strong>
+        </button>
+      )}
+
+      {showAbilityNotificationList && (
+        <AbilityNotificationListPanel
+          notifications={abilityNotifications}
+          battleState={battleState}
+          cardMap={cardMap}
+          onSelect={(notificationId) => {
+            setActiveAbilityNotificationId(notificationId);
+            setShowAbilityNotificationList(false);
+          }}
+          onClose={() => setShowAbilityNotificationList(false)}
+        />
+      )}
 
       {pendingDeckDrop && (
         <div
@@ -1609,6 +2211,30 @@ export function BattleController() {
         />
       )}
 
+      {pendingFaceDownSoulPopup && (
+        <AbilityCardTargetPopup
+          title="裏向きソウル"
+          description="ソウルへ裏向きで入れる自分のカードを1枚選択してください。"
+          candidates={pendingFaceDownSoulPopup.candidates}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          onSelect={handleFaceDownSoulTargetSelect}
+          onCancel={() => setPendingFaceDownSoulPopup(null)}
+        />
+      )}
+
+      {pendingHyakuganPopup && pendingHyakuganPopup.selectedPairInstanceId == null && (
+        <AbilityCardTargetPopup
+          title="ヒャクガンヤミゲドウ"
+          description="同じゾーンからもう片方の半身を1枚選択してください。"
+          candidates={pendingHyakuganPopup.pairCandidates}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          onSelect={handleStartHyakuganPlacement}
+          onCancel={() => setPendingHyakuganPopup(null)}
+        />
+      )}
+
       {pendingBiriKinataPopup && (
         <BiriKinataTargetPopup
           dropCards={battleState.players.opponent.zones.drop.cards}
@@ -1616,6 +2242,18 @@ export function BattleController() {
           imagesByCard={imagesByCard}
           onSelect={handleBiriKinataTargetSelect}
           onCancel={() => setPendingBiriKinataPopup(null)}
+        />
+      )}
+
+      {activeAbilityNotification && (
+        <AbilityNotificationDialog
+          notification={activeAbilityNotification}
+          sourceCard={activeAbilityNotificationSourceCard}
+          targetCard={activeAbilityNotificationTargetCard}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          onConfirm={handleConfirmAbilityNotification}
+          onCancel={() => setActiveAbilityNotificationId(null)}
         />
       )}
     </main>

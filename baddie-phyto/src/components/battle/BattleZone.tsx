@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import { BoardCard } from "@/components/cards/BoardCard";
+import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
 import {
   canDragBattleCard,
   canDropMultipleCards,
@@ -12,6 +13,7 @@ import {
   getAreaStacks,
   isAreaStackZone
 } from "@/lib/battle/battleActions";
+import { getCompositeGroupCards } from "@/lib/battle/compositeCards";
 import type { BattleCard, BattleDropInput, BattleZoneId } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
@@ -249,15 +251,20 @@ export function BattleZone({
           {areaStacks.map((areaStack) => {
             const areaTopCard = areaStack.topCard;
             const areaCardRecord = cardMap.get(areaTopCard.cardId);
+            const compositeCards = getCompositeGroupCards(
+              areaStack.cards,
+              areaTopCard
+            );
             const areaIsSelected = selectedInstanceIds.has(areaTopCard.instanceId);
             const areaIsDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
+            const areaIsRotated = areaTopCard.orientation === "horizontal";
             if (!areaCardRecord) return null;
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaIsRotated ? " is-rotated" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
@@ -307,13 +314,22 @@ export function BattleZone({
                   onContextMenuCard(areaTopCard, event, playerId)
                 }
               >
-                <BoardCard
-                  card={areaCardRecord}
-                  images={imagesByCard.get(areaCardRecord.id) ?? []}
-                  selectedImageId={areaTopCard.selectedImageId}
-                  isPublic={shouldShowFace(areaTopCard)}
-                  variant="board"
-                />
+                {compositeCards.length > 1 ? (
+                  <BattleCompositeCardView
+                    cards={compositeCards}
+                    cardMap={cardMap}
+                    imagesByCard={imagesByCard}
+                    variant="board"
+                  />
+                ) : (
+                  <BoardCard
+                    card={areaCardRecord}
+                    images={imagesByCard.get(areaCardRecord.id) ?? []}
+                    selectedImageId={areaTopCard.selectedImageId}
+                    isPublic={shouldShowFace(areaTopCard)}
+                    variant="board"
+                  />
+                )}
                 {areaStack.cards.length > 1 && (
                   <span className="bf-area-stack-badge">{areaStack.cards.length}</span>
                 )}
