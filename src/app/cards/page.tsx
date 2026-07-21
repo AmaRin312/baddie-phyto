@@ -6,11 +6,15 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
 import { searchCardRecords, setCardActive } from "@/lib/cards/cardActions";
 import { getCardTypeLabel, type CardRecord } from "@/types/baddiePhyto";
 
 export default function CardsPage() {
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [abilityKeyMap, setAbilityKeyMap] = useState<Map<string, string[]>>(
+    () => new Map()
+  );
   const [keyword, setKeyword] = useState("");
   const [includeInactive, setIncludeInactive] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -29,8 +33,23 @@ export default function CardsPage() {
       console.error(error);
       setMessage(`カード一覧の読み込みに失敗しました。${error.message}`);
       setCards([]);
+      setAbilityKeyMap(new Map());
     } else {
-      setCards(data ?? []);
+      const nextCards = data ?? [];
+      setCards(nextCards);
+
+      const abilityResult = await loadCardAbilityBehaviorKeyMap(
+        nextCards.map((card) => card.id)
+      );
+      if (abilityResult.error) {
+        console.error(abilityResult.error);
+        setMessage(
+          `Ability紐付け情報の読み込みに失敗しました。${abilityResult.error.message}`
+        );
+        setAbilityKeyMap(new Map());
+      } else {
+        setAbilityKeyMap(abilityResult.data);
+      }
     }
     setLoading(false);
   }, [includeInactive, keyword]);
@@ -130,6 +149,7 @@ export default function CardsPage() {
               <span>サイズ</span>
               <span>ワールド</span>
               <span>種族</span>
+              <span>Ability</span>
               <span>状態</span>
               <span>操作</span>
             </div>
@@ -142,6 +162,7 @@ export default function CardsPage() {
                 <span>{card.size ?? "-"}</span>
                 <span>{card.worlds.join(", ") || "-"}</span>
                 <span>{card.races.join(", ") || "-"}</span>
+                <span>{abilityKeyMap.get(card.id)?.join(", ") || "-"}</span>
                 <span>{card.is_active ? "有効" : "無効"}</span>
                 <span className="dm-card-admin-actions">
                   <Link href={`/cards/${card.id}`} className="dm-button secondary">

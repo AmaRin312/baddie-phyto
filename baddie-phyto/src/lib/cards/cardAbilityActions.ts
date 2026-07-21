@@ -16,6 +16,13 @@ type CardAbilityBehaviorRow = {
   } | null;
 };
 
+type CardAbilitySummaryRow = {
+  card_id: string;
+  ability: {
+    behavior_key: string;
+  } | null;
+};
+
 const BATTLE_ABILITY_IDS = new Set<AbilityId>([
   "face_down_soul",
   "biri_kinata_face_down_use",
@@ -104,4 +111,39 @@ export async function removeCardAbilityLink(cardAbilityId: string) {
     .from("card_abilities")
     .delete()
     .eq("id", cardAbilityId);
+}
+
+export async function loadCardAbilityBehaviorKeyMap(cardIds: string[]) {
+  if (cardIds.length === 0) {
+    return {
+      data: new Map<string, string[]>(),
+      error: null
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("card_abilities")
+    .select("card_id, ability:abilities!inner(behavior_key)")
+    .in("card_id", cardIds)
+    .order("sort_order")
+    .returns<CardAbilitySummaryRow[]>();
+
+  if (error) {
+    return {
+      data: new Map<string, string[]>(),
+      error
+    };
+  }
+
+  const map = new Map<string, string[]>();
+  for (const row of data ?? []) {
+    const behaviorKey = row.ability?.behavior_key;
+    if (!behaviorKey) continue;
+    map.set(row.card_id, [...(map.get(row.card_id) ?? []), behaviorKey]);
+  }
+
+  return {
+    data: map,
+    error: null
+  };
 }
