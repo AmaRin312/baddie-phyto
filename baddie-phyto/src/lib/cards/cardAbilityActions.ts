@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
-import type { AbilityId, BattleCardAbilityMap } from "@/lib/battle/abilities/abilityTypes";
+import {
+  isBattleAbilityId,
+  type BattleCardAbilityMap
+} from "@/lib/battle/abilities/abilityTypes";
 import type { AbilityRecord, CardAbilityRecord } from "@/types/baddiePhyto";
 
 export type CardAbilityWithAbilityRecord = CardAbilityRecord & {
@@ -23,19 +26,6 @@ type CardAbilitySummaryRow = {
   } | null;
 };
 
-const BATTLE_ABILITY_IDS = new Set<AbilityId>([
-  "face_down_soul",
-  "biri_kinata_face_down_use",
-  "levantine_item_limit_unlimited",
-  "hyakugan_yamigedo",
-  "ten_no_hanshin_composite",
-  "chi_no_hanshin_composite"
-]);
-
-function isAbilityId(value: string): value is AbilityId {
-  return BATTLE_ABILITY_IDS.has(value as AbilityId);
-}
-
 export async function loadBattleCardAbilityMap(): Promise<{
   data: BattleCardAbilityMap;
   error: Error | null;
@@ -56,7 +46,7 @@ export async function loadBattleCardAbilityMap(): Promise<{
   const map: BattleCardAbilityMap = new Map();
   for (const row of data ?? []) {
     const behaviorKey = row.ability?.behavior_key;
-    if (!behaviorKey || !isAbilityId(behaviorKey)) continue;
+    if (!behaviorKey || !isBattleAbilityId(behaviorKey)) continue;
     map.set(row.card_id, [...(map.get(row.card_id) ?? []), behaviorKey]);
   }
 
