@@ -1,7 +1,9 @@
 import { BATTLE_ABILITY_DEFINITIONS } from "@/lib/battle/abilities/battleAbilityDefinitions";
-import type {
+import {
+  BATTLE_ABILITY_IDS,
+  type
   AbilityActionId,
-  AbilityId,
+  type AbilityId,
   ExecutorId,
   TargetDefinitionId
 } from "@/lib/battle/abilities/abilityTypes";
@@ -33,7 +35,7 @@ const SUPPORTED_EXECUTOR_IDS = {
 } satisfies Readonly<Record<ExecutorId, true>>;
 
 export function validateBattleAbilityRegistry(): AbilityRegistryIssue[] {
-  return Object.entries(BATTLE_ABILITY_DEFINITIONS).flatMap(
+  const definitionIssues = Object.entries(BATTLE_ABILITY_DEFINITIONS).flatMap(
     ([abilityId, definition]) => {
       const issues: AbilityRegistryIssue[] = [];
 
@@ -95,4 +97,18 @@ export function validateBattleAbilityRegistry(): AbilityRegistryIssue[] {
       return issues;
     }
   );
+
+  const missingDefinitionIssues = BATTLE_ABILITY_IDS.flatMap((abilityId) =>
+    BATTLE_ABILITY_DEFINITIONS[abilityId]
+      ? []
+      : [
+          {
+            severity: "error" as const,
+            abilityId,
+            message: `Ability "${abilityId}" is listed in AbilityId but has no definition.`
+          }
+        ]
+  );
+
+  return [...definitionIssues, ...missingDefinitionIssues];
 }
