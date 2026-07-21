@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CardAdminForm } from "@/components/cards/CardAdminForm";
+import { CardAbilityEditor } from "@/components/cards/CardAbilityEditor";
 import { CardImageInput } from "@/components/cards/CardImageInput";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
@@ -248,6 +249,13 @@ export default function CardEditPage({ params }: CardEditPageProps) {
             >
               画像をアップロード
             </Button>
+          </AppCard>
+
+          <AppCard
+            title="Ability紐付け"
+            description="abilities.behavior_key をカードへ紐付けます。Battleではこの紐付けを読み込んでAbilityを判定します。"
+          >
+            <CardAbilityEditor cardId={card.id} />
           </AppCard>
 
           <AppCard
