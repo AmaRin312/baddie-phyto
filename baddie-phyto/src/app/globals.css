@@ -591,6 +591,32 @@ select {
   color: var(--dm-blue-dark);
 }
 
+.dm-ability-key-list,
+.dm-ability-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.dm-ability-key,
+.dm-ability-support-badge {
+  border: 1px solid rgba(147, 197, 253, 0.7);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(239, 246, 255, 0.86);
+  color: var(--dm-blue-dark);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dm-ability-key.unsupported,
+.dm-ability-support-badge.unsupported {
+  border-color: rgba(251, 191, 36, 0.7);
+  background: rgba(254, 243, 199, 0.86);
+  color: #92400e;
+}
+
 .dm-card-admin-head {
   color: var(--dm-blue-dark);
   background: rgba(219, 234, 254, 0.78);

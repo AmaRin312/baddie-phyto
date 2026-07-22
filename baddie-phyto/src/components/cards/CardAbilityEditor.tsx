@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/button";
+import { isBattleAbilityId } from "@/lib/battle/abilities/abilityTypes";
 import {
   addCardAbilityLink,
   loadAvailableAbilities,
@@ -133,6 +134,21 @@ export function CardAbilityEditor({ cardId }: CardAbilityEditorProps) {
     return <p className="dm-muted-text">Ability情報を読み込んでいます。</p>;
   }
 
+  function renderAbilitySupportBadge(behaviorKey: string | undefined) {
+    const isSupported = behaviorKey ? isBattleAbilityId(behaviorKey) : false;
+    return (
+      <span
+        className={
+          isSupported
+            ? "dm-ability-support-badge supported"
+            : "dm-ability-support-badge unsupported"
+        }
+      >
+        {isSupported ? "Battle対応" : "Battle未対応"}
+      </span>
+    );
+  }
+
   return (
     <div className="dm-form-stack">
       <div className="dm-form-row">
@@ -145,6 +161,7 @@ export function CardAbilityEditor({ cardId }: CardAbilityEditorProps) {
             <option value="">選択してください</option>
             {selectableAbilities.map((ability) => (
               <option key={ability.id} value={ability.id}>
+                {isBattleAbilityId(ability.behavior_key) ? "Battle対応" : "未対応"} /{" "}
                 {ability.behavior_key} / {ability.name}
               </option>
             ))}
@@ -167,7 +184,10 @@ export function CardAbilityEditor({ cardId }: CardAbilityEditorProps) {
         {links.map((link) => (
           <article key={link.id} className="dm-admin-list-item">
             <div>
-              <strong>{link.ability?.name ?? "Unknown Ability"}</strong>
+              <div className="dm-ability-title-row">
+                <strong>{link.ability?.name ?? "Unknown Ability"}</strong>
+                {renderAbilitySupportBadge(link.ability?.behavior_key)}
+              </div>
               <p className="dm-muted-text">
                 {link.ability?.behavior_key ?? link.ability_id}
               </p>

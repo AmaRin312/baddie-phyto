@@ -6,6 +6,7 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import { isBattleAbilityId } from "@/lib/battle/abilities/abilityTypes";
 import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
 import { searchCardRecords, setCardActive } from "@/lib/cards/cardActions";
 import { getCardTypeLabel, type CardRecord } from "@/types/baddiePhyto";
@@ -79,6 +80,32 @@ export default function CardsPage() {
     }
 
     await reload();
+  }
+
+  function renderAbilityKeys(cardId: string) {
+    const abilityKeys = abilityKeyMap.get(cardId) ?? [];
+    if (abilityKeys.length === 0) return "-";
+
+    return (
+      <span className="dm-ability-key-list">
+        {abilityKeys.map((abilityKey) => {
+          const isSupported = isBattleAbilityId(abilityKey);
+          return (
+            <span
+              className={
+                isSupported
+                  ? "dm-ability-key supported"
+                  : "dm-ability-key unsupported"
+              }
+              key={abilityKey}
+              title={isSupported ? "Battle対応Ability" : "Battle未対応Ability"}
+            >
+              {abilityKey}
+            </span>
+          );
+        })}
+      </span>
+    );
   }
 
   return (
@@ -162,7 +189,7 @@ export default function CardsPage() {
                 <span>{card.size ?? "-"}</span>
                 <span>{card.worlds.join(", ") || "-"}</span>
                 <span>{card.races.join(", ") || "-"}</span>
-                <span>{abilityKeyMap.get(card.id)?.join(", ") || "-"}</span>
+                <span>{renderAbilityKeys(card.id)}</span>
                 <span>{card.is_active ? "有効" : "無効"}</span>
                 <span className="dm-card-admin-actions">
                   <Link href={`/cards/${card.id}`} className="dm-button secondary">
