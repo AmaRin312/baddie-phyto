@@ -1,11 +1,10 @@
 import { BATTLE_ABILITY_DEFINITIONS } from "@/lib/battle/abilities/battleAbilityDefinitions";
 import {
   BATTLE_ABILITY_IDS,
-  type
-  AbilityActionId,
+  type AbilityActionId,
   type AbilityId,
-  ExecutorId,
-  TargetDefinitionId
+  type ExecutorId,
+  type TargetDefinitionId
 } from "@/lib/battle/abilities/abilityTypes";
 
 export type AbilityRegistryIssueSeverity = "error" | "warning";
@@ -91,6 +90,14 @@ export function validateBattleAbilityRegistry(): AbilityRegistryIssue[] {
           abilityId: definition.id,
           message:
             "Target definition is set without an executor. Confirm this is intentional."
+        });
+      }
+
+      if (definition.databaseDescription.trim().length === 0) {
+        issues.push({
+          severity: "warning",
+          abilityId: definition.id,
+          message: "Database description is empty."
         });
       }
 

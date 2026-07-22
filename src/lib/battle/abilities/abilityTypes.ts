@@ -53,6 +53,7 @@ export type BattleAbilityMenuContribution = {
 export type BattleAbilityDefinition = {
   id: AbilityId;
   label: string;
+  databaseDescription: string;
   actionId?: AbilityActionId;
   targetDefinitionId?: TargetDefinitionId;
   executorId?: ExecutorId;

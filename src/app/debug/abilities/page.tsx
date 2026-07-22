@@ -1,4 +1,8 @@
 import { BATTLE_ABILITY_DEFINITIONS } from "@/lib/battle/abilities/battleAbilityDefinitions";
+import {
+  generateBattleAbilityRegistryPostcheckSql,
+  generateBattleAbilityRegistrySeedSql
+} from "@/lib/battle/abilities/abilityRegistrySql";
 import { validateBattleAbilityRegistry } from "@/lib/battle/abilities/abilityRegistryValidation";
 import type { CSSProperties } from "react";
 
@@ -40,6 +44,18 @@ const cellStyle = {
   verticalAlign: "top"
 } satisfies CSSProperties;
 
+const preStyle = {
+  background: "rgba(2, 6, 23, 0.86)",
+  border: "1px solid rgba(148, 163, 184, 0.28)",
+  borderRadius: "12px",
+  color: "#bfdbfe",
+  fontSize: "12px",
+  lineHeight: 1.6,
+  overflowX: "auto",
+  padding: "14px",
+  whiteSpace: "pre-wrap"
+} satisfies CSSProperties;
+
 function formatValue(value: string | undefined) {
   return value ?? "—";
 }
@@ -52,6 +68,8 @@ export default function DebugAbilitiesPage() {
   ).length;
   const abilityDefinitions = Object.values(BATTLE_ABILITY_DEFINITIONS);
   const isHealthy = errorCount === 0;
+  const seedSql = generateBattleAbilityRegistrySeedSql();
+  const postcheckSql = generateBattleAbilityRegistryPostcheckSql();
 
   return (
     <main style={pageStyle}>
@@ -206,6 +224,30 @@ export default function DebugAbilitiesPage() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section style={{ ...cardStyle, marginTop: "18px" }}>
+          <h2 style={{ fontSize: "20px", margin: "0 0 12px" }}>
+            Generated Supabase SQL
+          </h2>
+          <p style={{ color: "#cbd5e1", lineHeight: 1.7, margin: "0 0 14px" }}>
+            現在のAbility定義から生成した登録SQLです。Ability追加時は、この表示を確認すると
+            SQL更新漏れを見つけやすくなります。
+          </p>
+          <h3 style={{ color: "#93c5fd", fontSize: "15px", margin: "0 0 8px" }}>
+            Seed SQL
+          </h3>
+          <pre style={preStyle}>{seedSql}</pre>
+          <h3
+            style={{
+              color: "#93c5fd",
+              fontSize: "15px",
+              margin: "16px 0 8px"
+            }}
+          >
+            Postcheck SQL
+          </h3>
+          <pre style={preStyle}>{postcheckSql}</pre>
         </section>
       </div>
     </main>

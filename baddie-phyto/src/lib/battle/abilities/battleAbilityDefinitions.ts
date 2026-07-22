@@ -30,6 +30,7 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   face_down_soul: {
     id: "face_down_soul",
     label: "裏向きソウル",
+    databaseDescription: "対象カードをこのカードのソウルへ裏向きで入れるAbility。",
     actionId: "use_face_down_soul",
     targetDefinitionId: "one_own_card_from_face_down_soul_sources",
     executorId: "add_selected_card_to_source_soul_face_down",
@@ -46,6 +47,8 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   biri_kinata_face_down_use: {
     id: "biri_kinata_face_down_use",
     label: "裏向き使用",
+    databaseDescription:
+      "相手ドロップのカード1枚を選び、裏向きで相手Centerへ置く通知型Ability。",
     actionId: "use_biri_kinata_face_down",
     targetDefinitionId: "one_opponent_drop_card",
     executorId: "place_opponent_drop_card_to_opponent_center_face_down",
@@ -68,6 +71,7 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   levantine_item_limit_unlimited: {
     id: "levantine_item_limit_unlimited",
     label: "アイテム制限解除",
+    databaseDescription: "この対戦中、アイテム枚数制限を解除するAbility。",
     getAutomaticCommands: ({ state, card, abilityIds }) => {
       if (!abilityIds.includes("levantine_item_limit_unlimited")) return [];
       if (!BATTLE_ZONE_IDS.has(card.zoneId)) return [];
@@ -89,11 +93,14 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   },
   hyakugan_yamigedo: {
     id: "hyakugan_yamigedo",
-    label: "ヒャクガンヤミゲドウ"
+    label: "ヒャクガンヤミゲドウ",
+    databaseDescription: "ヒャクガンヤミゲドウ関連Abilityの親識別子。"
   },
   ten_no_hanshin_composite: {
     id: "ten_no_hanshin_composite",
     label: "天の半身",
+    databaseDescription:
+      "同じゾーン内の地の半身と組み合わせて、ヒャクガンヤミゲドウとして配置するAbility。",
     actionId: "use_hyakugan_yamigedo_composite",
     targetDefinitionId: "matching_hyakugan_half_same_container",
     executorId: "place_hyakugan_composite",
@@ -109,6 +116,8 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   chi_no_hanshin_composite: {
     id: "chi_no_hanshin_composite",
     label: "地の半身",
+    databaseDescription:
+      "同じゾーン内の天の半身と組み合わせて、ヒャクガンヤミゲドウとして配置するAbility。",
     actionId: "use_hyakugan_yamigedo_composite",
     targetDefinitionId: "matching_hyakugan_half_same_container",
     executorId: "place_hyakugan_composite",
