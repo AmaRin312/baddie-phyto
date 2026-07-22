@@ -3726,7 +3726,7 @@ select {
 
 .dm-import-ability-row {
   display: grid;
-  grid-template-columns: minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(140px, 0.7fr) auto minmax(140px, 0.7fr) minmax(220px, 1fr) auto;
   gap: 10px;
   align-items: center;
   border: 1px solid #dbeafe;

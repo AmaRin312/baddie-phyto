@@ -6,6 +6,7 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import { isBattleAbilityId } from "@/lib/battle/abilities/abilityTypes";
 import {
   CARD_CSV_EXAMPLE_TEMPLATE,
   CARD_CSV_TEMPLATE,
@@ -379,6 +380,17 @@ export default function CardCsvImportPage() {
                 onClick={() => void copyAbilityKey(ability.behavior_key)}
               >
                 <b>{ability.behavior_key}</b>
+                <span
+                  className={
+                    isBattleAbilityId(ability.behavior_key)
+                      ? "dm-ability-support-badge supported"
+                      : "dm-ability-support-badge unsupported"
+                  }
+                >
+                  {isBattleAbilityId(ability.behavior_key)
+                    ? "Battle対応"
+                    : "Battle未対応"}
+                </span>
                 <span>{ability.name}</span>
                 <small>{ability.description ?? "-"}</small>
                 {copiedAbilityKey === ability.behavior_key && <em>コピーしました</em>}
