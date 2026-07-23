@@ -278,6 +278,9 @@ export default function CardCsvImportPage() {
         <Link href="/cards/import/history" className="dm-button secondary">
           インポート履歴
         </Link>
+        <Link href="/cards/import/excel-zip" className="dm-button secondary">
+          Excel＋画像ZIP
+        </Link>
         <Link href="/cards/export" className="dm-button secondary">
           CSVエクスポート
         </Link>

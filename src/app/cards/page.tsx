@@ -117,6 +117,9 @@ export default function CardsPage() {
         <Link href="/cards/import" className="dm-button secondary">
           CSVインポート
         </Link>
+        <Link href="/cards/import/excel-zip" className="dm-button secondary">
+          Excel＋画像ZIP
+        </Link>
         <Link href="/cards/export" className="dm-button secondary">
           CSVエクスポート
         </Link>
