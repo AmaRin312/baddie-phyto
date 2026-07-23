@@ -194,6 +194,25 @@ async function extractZipEntries(file: File, issues: ExcelZipImportIssue[]) {
     }
   });
 
+  entries.forEach((entry) => {
+    const normalizedPath = entry.name.replace(/\\/g, "/");
+    const isExpectedWorkbook = !entry.dir && normalizedPath === "cards.xlsx";
+    const isExpectedImagesDirectory = entry.dir && normalizedPath === "images/";
+    const isExpectedImageFile = !entry.dir && normalizedPath.startsWith("images/");
+
+    if (isExpectedWorkbook || isExpectedImagesDirectory || isExpectedImageFile) {
+      return;
+    }
+
+    issues.push(
+      issue(
+        "warning",
+        "zip",
+        `ZIP内に想定外の${entry.dir ? "フォルダ" : "ファイル"}があります。今回は無視します: ${entry.name}`
+      )
+    );
+  });
+
   const workbookEntries = entries.filter((entry) => !entry.dir && entry.name === "cards.xlsx");
   if (workbookEntries.length !== 1) {
     issues.push(issue("error", "zip", "ZIP直下に cards.xlsx を1つだけ置いてください。"));
@@ -291,6 +310,7 @@ function groupRows(
   byName.forEach((groupRowsForName, name) => {
     const groupIssues: ExcelZipImportIssue[] = [];
     const identities = new Map<string, number[]>();
+    const firstRow = groupRowsForName[0];
 
     groupRowsForName.forEach((row) => {
       const identity = createExcelZipCardIdentity(row);
@@ -321,7 +341,6 @@ function groupRows(
       );
     }
 
-    const firstRow = groupRowsForName[0];
     const abilityBehaviorKey = firstRow.ability
       ? abilityLookup.get(firstRow.ability.toLowerCase())?.behavior_key ?? null
       : null;
