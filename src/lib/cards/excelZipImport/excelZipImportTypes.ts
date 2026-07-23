@@ -29,6 +29,14 @@ export const EXCEL_ZIP_IMPORT_COLUMNS = [
   "is_active"
 ] as const;
 
+export const EXCEL_ZIP_IMPORT_LIMITS = {
+  maxZipSizeBytes: 100 * 1024 * 1024,
+  maxFileCount: 600,
+  maxRowCount: 3000,
+  maxImageSizeBytes: 15 * 1024 * 1024,
+  allowedImageExtensions: ["jpg", "jpeg", "png", "webp"]
+} as const;
+
 export type ExcelZipImportColumn = (typeof EXCEL_ZIP_IMPORT_COLUMNS)[number];
 
 export type ExcelZipImportIssueLevel = "error" | "warning";

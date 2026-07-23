@@ -16,6 +16,7 @@ import {
 } from "@/lib/cards/excelZipImport/excelZipImportNormalization";
 import {
   EXCEL_ZIP_IMPORT_COLUMNS,
+  EXCEL_ZIP_IMPORT_LIMITS,
   type ExcelZipCardGroup,
   type ExcelZipImageEntry,
   type ExcelZipImportColumn,
@@ -25,11 +26,9 @@ import {
 } from "@/lib/cards/excelZipImport/excelZipImportTypes";
 import type { AbilityRecord, CardRecord } from "@/types/baddiePhyto";
 
-const MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024;
-const MAX_FILE_COUNT = 600;
-const MAX_ROW_COUNT = 3000;
-const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
-const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set<string>(
+  EXCEL_ZIP_IMPORT_LIMITS.allowedImageExtensions
+);
 
 function issue(
   level: ExcelZipImportIssue["level"],
@@ -171,16 +170,22 @@ function buildRawRows(rows: unknown[][], issues: ExcelZipImportIssue[]) {
 }
 
 async function extractZipEntries(file: File, issues: ExcelZipImportIssue[]) {
-  if (file.size > MAX_ZIP_SIZE_BYTES) {
-    issues.push(issue("error", "zip", "ZIPサイズが大きすぎます。100MB以下にしてください。"));
+  if (file.size > EXCEL_ZIP_IMPORT_LIMITS.maxZipSizeBytes) {
+    issues.push(
+      issue(
+        "error",
+        "zip",
+        `ZIPサイズが大きすぎます。${Math.floor(EXCEL_ZIP_IMPORT_LIMITS.maxZipSizeBytes / 1024 / 1024)}MB以下にしてください。`
+      )
+    );
     return { workbook: null, images: [] as ExcelZipImageEntry[] };
   }
 
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files);
 
-  if (entries.length > MAX_FILE_COUNT) {
-    issues.push(issue("error", "zip", `ZIP内のファイル数が多すぎます。上限: ${MAX_FILE_COUNT}`));
+  if (entries.length > EXCEL_ZIP_IMPORT_LIMITS.maxFileCount) {
+    issues.push(issue("error", "zip", `ZIP内のファイル数が多すぎます。上限: ${EXCEL_ZIP_IMPORT_LIMITS.maxFileCount}`));
   }
 
   entries.forEach((entry) => {
@@ -233,7 +238,7 @@ async function extractZipEntries(file: File, issues: ExcelZipImportIssue[]) {
     }
 
     const blob = await entry.async("blob");
-    if (blob.size > MAX_IMAGE_SIZE_BYTES) {
+    if (blob.size > EXCEL_ZIP_IMPORT_LIMITS.maxImageSizeBytes) {
       issues.push(issue("error", "image", `画像サイズが大きすぎます: ${fileName}`));
       continue;
     }
@@ -415,8 +420,8 @@ export async function previewExcelZipCardImport(file: File): Promise<{
     if (workbookRows.length < 2) {
       issues.push(issue("error", "excel", "cards.xlsx は1行目説明、2行目システム列名、3行目以降データの形式にしてください。"));
     }
-    if (workbookRows.length - 2 > MAX_ROW_COUNT) {
-      issues.push(issue("error", "excel", `Excelのデータ行が多すぎます。上限: ${MAX_ROW_COUNT}`));
+    if (workbookRows.length - 2 > EXCEL_ZIP_IMPORT_LIMITS.maxRowCount) {
+      issues.push(issue("error", "excel", `Excelのデータ行が多すぎます。上限: ${EXCEL_ZIP_IMPORT_LIMITS.maxRowCount}`));
     }
 
     const rawRows = buildRawRows(workbookRows, issues);

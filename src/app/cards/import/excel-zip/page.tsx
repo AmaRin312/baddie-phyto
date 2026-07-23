@@ -10,7 +10,10 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { executeExcelZipCardImport } from "@/lib/cards/excelZipImport/executeExcelZipImport";
 import { previewExcelZipCardImport } from "@/lib/cards/excelZipImport/parseExcelZipImport";
-import { EXCEL_ZIP_IMPORT_COLUMNS } from "@/lib/cards/excelZipImport/excelZipImportTypes";
+import {
+  EXCEL_ZIP_IMPORT_COLUMNS,
+  EXCEL_ZIP_IMPORT_LIMITS
+} from "@/lib/cards/excelZipImport/excelZipImportTypes";
 import type {
   ExcelZipCardGroupStatus,
   ExcelZipImportIssue,
@@ -345,6 +348,18 @@ export default function ExcelZipCardImportPage() {
             {loading && <p>ZIPとExcelを確認しています...</p>}
             {message && <p className="dm-form-error">{message}</p>}
           </div>
+        </AppCard>
+
+        <AppCard title="取込上限" description="検証時に使う上限です。大きすぎるZIPや画像は登録前に止めます。">
+          <ul>
+            <li>ZIPサイズ: {formatBytes(EXCEL_ZIP_IMPORT_LIMITS.maxZipSizeBytes)} 以下</li>
+            <li>ZIP内ファイル数: {EXCEL_ZIP_IMPORT_LIMITS.maxFileCount} 件以下</li>
+            <li>Excelデータ行: {EXCEL_ZIP_IMPORT_LIMITS.maxRowCount} 行以下</li>
+            <li>画像1枚: {formatBytes(EXCEL_ZIP_IMPORT_LIMITS.maxImageSizeBytes)} 以下</li>
+            <li>
+              対応画像: {EXCEL_ZIP_IMPORT_LIMITS.allowedImageExtensions.join(" / ")}
+            </li>
+          </ul>
         </AppCard>
 
         <AppCard
