@@ -37,6 +37,7 @@ Options:
                       Without this option, the script only previews.
   --limit-cards <n>   Limit imported cards per run.
   --output <path>     Save JSON report.
+  --replace-images    Remove existing images for imported cards before uploading official card images.
   --help              Show this help.
 
 Environment:
@@ -62,6 +63,7 @@ function parseArgs(argv) {
     apply: false,
     limitCards: null,
     output: null,
+    replaceImages: false,
     help: false
   };
 
@@ -73,6 +75,8 @@ function parseArgs(argv) {
       args.help = true;
     } else if (arg === "--apply") {
       args.apply = true;
+    } else if (arg === "--replace-images") {
+      args.replaceImages = true;
     } else if (arg === "--pack" && next) {
       args.packUrls.push(next);
       index += 1;
@@ -382,6 +386,108 @@ function extractImageUrls(html, detailUrl, cardName) {
   return urls.slice(0, MAX_IMAGES_PER_CARD);
 }
 
+function stripHtml(value) {
+  return normalizeText(
+    String(value ?? "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:p|div|li|tr|th|td|dt|dd|h[1-6])>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+  );
+}
+
+function extractFirstMatch(html, regex) {
+  const match = regex.exec(html);
+  return match?.[1] ? stripHtml(match[1]) : "";
+}
+
+function extractOfficialDlValue(html, className) {
+  return extractFirstMatch(
+    html,
+    new RegExp(`<dl[^>]*class=["'][^"']*${className}[^"']*["'][\\s\\S]*?<dd[^>]*>([\\s\\S]*?)<\\/dd>`, "i")
+  );
+}
+
+function parseOfficialCardType(value) {
+  if (value.includes("必殺モンスター")) return "impact_monster";
+  if (value.includes("モンスター")) return "monster";
+  if (value.includes("魔法")) return "spell";
+  if (value.includes("アイテム")) return "item";
+  if (value.includes("必殺技")) return "impact";
+  if (value.includes("フラッグ")) return "flag_card";
+  return "other";
+}
+
+function splitOfficialList(value) {
+  return normalizeText(value)
+    .split(/[、,／/|・\s]+/)
+    .map(normalizeText)
+    .filter(Boolean)
+    .filter((item) => item !== "-");
+}
+
+function extractOfficialCardName(lines) {
+  const titleLine = lines.find((line) => line.includes("カード情報｜カードリスト"));
+  if (titleLine) {
+    return normalizeText(titleLine.replace(/\s*カード情報｜カードリスト.*$/, ""));
+  }
+
+  return "";
+}
+
+function extractOfficialCardCodeFromDetail(lines) {
+  const cardCodeLine = lines.find((line) => /^[A-Z0-9][A-Z0-9-]*\/[A-Z0-9-]+/.test(line));
+  return cardCodeLine?.match(/^([A-Z0-9][A-Z0-9-]*\/[A-Z0-9-]+)/)?.[1] ?? null;
+}
+
+function extractStatsFromHtml(html) {
+  const statusMatch = /<table[^>]*class=["'][^"']*status[^"']*["'][\s\S]*?<tr[^>]*>[\s\S]*?<\/tr>\s*<tr[^>]*>([\s\S]*?)<\/tr>/i.exec(
+    html
+  );
+  const cells = statusMatch?.[1]
+    ? [...statusMatch[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((match) => stripHtml(match[1]))
+    : [];
+
+  return {
+    power: parseNullableInteger(cells[0] ?? ""),
+    critical: parseNullableInteger(cells[1] ?? ""),
+    defense: parseNullableInteger(cells[2] ?? "")
+  };
+}
+
+function extractCardTextFromHtml(html) {
+  const rawEffect = extractFirstMatch(html, /<div[^>]*class=["'][^"']*effect[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+  if (!rawEffect || rawEffect === "-") return "";
+
+  return rawEffect
+    .split(/\n+/)
+    .map(normalizeText)
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractOfficialImageUrls(html, detailUrl, cardName) {
+  const urls = [];
+  const regex = /<img\b([^>]*\bclass=["'][^"']*\bcardimage\b[^"']*["'][^>]*)>/gi;
+  let match = regex.exec(html);
+
+  while (match) {
+    const tag = match[0] ?? "";
+    const srcMatch = /\bsrc=["']([^"']+)["']/i.exec(tag);
+    const altMatch = /\balt=["']([^"']*)["']/i.exec(tag);
+    const rawSrc = decodeHtml(srcMatch?.[1] ?? "").trim();
+    const alt = normalizeText(altMatch?.[1] ?? "");
+    if (rawSrc && (!cardName || alt.includes(cardName) || cardName.includes(alt) || tag.includes("changeVariation"))) {
+      const absoluteUrl = new URL(rawSrc, detailUrl).toString();
+      if (!urls.includes(absoluteUrl)) urls.push(absoluteUrl);
+    }
+    match = regex.exec(html);
+  }
+
+  return urls.slice(0, MAX_IMAGES_PER_CARD);
+}
+
 function sanitizeFilePart(value) {
   const safeValue = normalizeText(value)
     .normalize("NFKD")
@@ -453,10 +559,10 @@ async function collectDetailUrls(packUrl) {
   return Array.from(urls).slice(0, MAX_CARDS_PER_PACK);
 }
 
-async function fetchOfficialCard(detailUrl, pack) {
+async function fetchOfficialCardFromDetail(detailUrl, pack) {
   const html = await fetchHtml(detailUrl);
   const lines = htmlToLines(html);
-  const name = extractCardName(lines);
+  const name = extractOfficialCardName(lines);
   if (!name) throw new Error("カード名を解析できませんでした。");
 
   const cardCodeForEra = extractCardCodeFromDetail(lines);
@@ -494,6 +600,50 @@ async function fetchOfficialCard(detailUrl, pack) {
     is_original: false,
     is_active: true,
     imageUrls: extractImageUrls(html, detailUrl, name)
+  };
+}
+
+async function fetchOfficialCard(detailUrl, pack) {
+  const html = await fetchHtml(detailUrl);
+  const lines = htmlToLines(html);
+  const name = extractOfficialCardName(lines);
+  if (!name) throw new Error(`カード名を解析できませんでした: ${detailUrl}`);
+
+  const cardCodeForEra = extractOfficialCardCodeFromDetail(lines);
+  const worlds = splitOfficialList(extractOfficialDlValue(html, "world"));
+  const cardTypeText = extractOfficialDlValue(html, "type");
+  const races = splitOfficialList(extractOfficialDlValue(html, "attribute"));
+  const stats = extractStatsFromHtml(html);
+  const cardType = parseOfficialCardType(cardTypeText);
+
+  return {
+    sourceUrl: detailUrl,
+    cardKey: detailUrl,
+    cardNumber: null,
+    name,
+    card_type: CARD_TYPE_VALUES.has(cardType) ? cardType : "other",
+    orientation: "vertical",
+    worlds,
+    races,
+    size: parseNullableInteger(extractOfficialDlValue(html, "size")),
+    power: stats.power,
+    defense: stats.defense,
+    critical: stats.critical,
+    card_text: extractCardTextFromHtml(html),
+    set_code: pack.setCode,
+    set_name: pack.setName,
+    era_key: inferEraKeyFromCode(cardCodeForEra),
+    rarity: null,
+    is_dragon: races.some((race) => race.includes("ドラゴン") || race.includes("竜")),
+    is_hyakki: races.some((race) => race.includes("百鬼")),
+    is_corner_king: races.some((race) => race.includes("角王")),
+    is_chaos: races.some((race) => race.includes("カオス")) || name.includes("the Chaos"),
+    is_generic: worlds.some((world) => world.includes("ジェネリック")),
+    is_heaven: races.some((race) => race.includes("天国")) || name.includes("楽園天国"),
+    is_hell: races.some((race) => race.includes("地獄")) || name.includes("灼熱地獄"),
+    is_original: false,
+    is_active: true,
+    imageUrls: extractOfficialImageUrls(html, detailUrl, name)
   };
 }
 
@@ -540,7 +690,7 @@ function createCardPayload(id, row) {
     power: row.power,
     defense: row.defense,
     critical: row.critical,
-    card_text: row.card_text,
+    card_text: row.card_text ?? "",
     card_type: row.card_type,
     is_dragon: row.is_dragon,
     is_hyakki: row.is_hyakki,
@@ -552,6 +702,13 @@ function createCardPayload(id, row) {
     is_original: row.is_original,
     is_active: row.is_active
   };
+}
+
+async function updateCardFromOfficialRow(supabase, cardId, row) {
+  const { id: _id, ...payload } = createCardPayload(cardId, row);
+  const { data, error } = await supabase.from("cards").update(payload).eq("id", cardId).select("*").single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 async function findOrCreateCard(supabase, row, dryRun) {
@@ -571,8 +728,22 @@ async function findOrCreateCard(supabase, row, dryRun) {
   if (exactMatches.length > 1) {
     throw new Error(`同じ内容の既存カードが複数見つかりました: ${row.name}`);
   }
-  if (sameNameCards.length > 0) {
-    throw new Error(`同名カードがありますが内容が一致しません。確認してください: ${row.name}`);
+  if (sameNameCards.length === 1) {
+    if (dryRun) {
+      return {
+        card: { ...sameNameCards[0], ...createCardPayload(sameNameCards[0].id, row) },
+        created: false,
+        wouldCreate: false
+      };
+    }
+    return {
+      card: await updateCardFromOfficialRow(supabase, sameNameCards[0].id, row),
+      created: false,
+      wouldCreate: false
+    };
+  }
+  if (sameNameCards.length > 1) {
+    throw new Error(`同名カードが複数あるため自動更新できません。確認してください: ${row.name}`);
   }
 
   const cardId = randomUUID();
@@ -588,7 +759,6 @@ async function findOrCreateCard(supabase, row, dryRun) {
   if (insertError) throw new Error(insertError.message);
   return { card: inserted, created: true, wouldCreate: false };
 }
-
 async function ensureCardSet(supabase, row, dryRun) {
   const { data: existingSet, error: existingError } = await supabase
     .from("card_sets")
@@ -696,10 +866,37 @@ async function imagePathExists(supabase, cardId, imagePath) {
   return Boolean(data);
 }
 
-async function uploadImagesForCard(supabase, row, cardId, ownerId, dryRun) {
+async function deleteExistingImagesForCard(supabase, cardId, dryRun) {
+  if (dryRun || !supabase) return { deleted: 0, issues: [] };
+
+  const { data, error } = await supabase.from("card_images").select("id,image_path").eq("card_id", cardId);
+  if (error) throw new Error(error.message);
+
+  const images = data ?? [];
+  const paths = images.map((image) => image.image_path).filter(Boolean);
+  const issues = [];
+
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from(BUCKET_NAME).remove(paths);
+    if (storageError) issues.push(storageError.message);
+  }
+
+  const { error: deleteError } = await supabase.from("card_images").delete().eq("card_id", cardId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  return { deleted: images.length, issues };
+}
+
+async function uploadImagesForCard(supabase, row, cardId, ownerId, dryRun, replaceImages = false) {
   let added = 0;
   let skipped = 0;
   const issues = [];
+
+  if (replaceImages) {
+    const deleteResult = await deleteExistingImagesForCard(supabase, cardId, dryRun);
+    for (const issue of deleteResult.issues) issues.push(`既存画像削除: ${issue}`);
+  }
+
   let hasExistingImages = dryRun || !supabase ? false : (await countExistingImages(supabase, cardId)) > 0;
 
   for (const [index, imageUrl] of row.imageUrls.entries()) {
@@ -862,7 +1059,8 @@ async function importCards(input) {
         row,
         cardResult.card.id,
         input.ownerId,
-        input.dryRun
+        input.dryRun,
+        input.replaceImages
       );
 
       if (cardResult.created || cardResult.wouldCreate) report.newCardCount += 1;
@@ -921,6 +1119,7 @@ async function main() {
     supabase,
     ownerId,
     dryRun,
+    replaceImages: args.replaceImages,
     cards: fetched.cards,
     initialIssues: fetched.issues
   });
@@ -957,3 +1156,4 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
