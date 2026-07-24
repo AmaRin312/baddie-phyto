@@ -24,8 +24,33 @@ export type CreateCardInput = {
   isGeneric: boolean;
   isHeaven?: boolean;
   isHell?: boolean;
+  isOriginal?: boolean;
   isActive?: boolean;
 };
+
+async function ensureFlagForFlagCard(card: CardRecord) {
+  if (card.card_type !== "flag_card") return { error: null };
+
+  const { data: existingFlag, error: loadError } = await supabase
+    .from("flags")
+    .select("id")
+    .eq("card_id", card.id)
+    .maybeSingle();
+
+  if (loadError) return { error: loadError };
+  if (existingFlag) return { error: null };
+
+  return await supabase.from("flags").insert({
+    name: card.name,
+    card_id: card.id,
+    usable_worlds: card.worlds ?? [],
+    initial_life: 10,
+    initial_hand: 6,
+    initial_gauge: 2,
+    can_be_selected_as_flag: true,
+    is_active: card.is_active
+  });
+}
 
 export async function loadCards(options?: { activeOnly?: boolean }) {
   let query = supabase.from("cards").select("*").order("name");
@@ -66,7 +91,7 @@ export async function loadCard(cardId: string) {
 }
 
 export async function createCard(input: CreateCardInput) {
-  return await supabase
+  const result = await supabase
     .from("cards")
     .insert({
       name: input.name,
@@ -86,14 +111,22 @@ export async function createCard(input: CreateCardInput) {
       is_generic: input.isGeneric,
       is_heaven: input.isHeaven ?? false,
       is_hell: input.isHell ?? false,
+      is_original: input.isOriginal ?? false,
       is_active: input.isActive ?? true
     })
     .select("*")
     .single<CardRecord>();
+
+  if (!result.error && result.data) {
+    const flagResult = await ensureFlagForFlagCard(result.data);
+    if (flagResult.error) return { ...result, error: flagResult.error };
+  }
+
+  return result;
 }
 
 export async function updateCard(cardId: string, input: CreateCardInput) {
-  return await supabase
+  const result = await supabase
     .from("cards")
     .update({
       name: input.name,
@@ -113,11 +146,19 @@ export async function updateCard(cardId: string, input: CreateCardInput) {
       is_generic: input.isGeneric,
       is_heaven: input.isHeaven ?? false,
       is_hell: input.isHell ?? false,
+      is_original: input.isOriginal ?? false,
       is_active: input.isActive ?? true
     })
     .eq("id", cardId)
     .select("*")
     .single<CardRecord>();
+
+  if (!result.error && result.data) {
+    const flagResult = await ensureFlagForFlagCard(result.data);
+    if (flagResult.error) return { ...result, error: flagResult.error };
+  }
+
+  return result;
 }
 
 export async function setCardActive(cardId: string, isActive: boolean) {

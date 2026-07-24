@@ -254,138 +254,6 @@ function extractTotalPages(html) {
   return Math.max(1, Math.ceil(total / end));
 }
 
-function parseCardType(value) {
-  if (value.includes("必殺モンスター")) return "impact_monster";
-  if (value.includes("モンスター")) return "monster";
-  if (value.includes("魔法")) return "spell";
-  if (value.includes("アイテム")) return "item";
-  if (value.includes("必殺技")) return "impact";
-  if (value.includes("フラッグ")) return "flag_card";
-  return "other";
-}
-
-function splitList(value) {
-  return normalizeText(value)
-    .split(/[、,／/|｜]/)
-    .map(normalizeText)
-    .filter(Boolean)
-    .filter((item) => item !== "-");
-}
-
-function parseNullableInteger(value) {
-  const normalized = normalizeText(value);
-  if (!normalized || normalized === "-") return null;
-  const match = /\d+/.exec(normalized);
-  return match ? Number.parseInt(match[0], 10) : null;
-}
-
-function getNextValue(lines, label) {
-  const index = lines.findIndex((line) => line === label || line.startsWith(`${label} `));
-  if (index < 0) return "";
-  const sameLineValue = lines[index]?.replace(label, "").trim();
-  if (sameLineValue) return sameLineValue;
-  return lines[index + 1] ?? "";
-}
-
-function extractCardName(lines) {
-  const candidate =
-    lines.find((line) => line.includes("カード情報")) ??
-    lines.find((line) => line.includes("（") && !line.includes("カードリスト")) ??
-    "";
-  return normalizeText(
-    candidate
-      .replace("カード情報｜カードリスト ｜ フューチャーカード バディファイト公式サイト", "")
-      .replace(/（[^）]*）.*$/, "")
-      .replace(/Image:.+$/, "")
-  );
-}
-
-function extractCardCodeFromDetail(lines) {
-  const cardCodeLine = lines.find((line) => /^[A-Z0-9][A-Z0-9-]*\/[A-Z0-9-]+/.test(line));
-  return cardCodeLine?.match(/^([A-Z0-9][A-Z0-9-]*\/[A-Z0-9-]+)/)?.[1] ?? null;
-}
-
-function extractStats(lines) {
-  const headerIndex = lines.findIndex(
-    (line) => line.includes("攻撃力") && line.includes("打撃力") && line.includes("防御力")
-  );
-  const valueLine = headerIndex >= 0 ? lines[headerIndex + 1] ?? "" : "";
-  const values = valueLine.split(/\s*\|\s*|\s+/).filter(Boolean);
-
-  return {
-    power: parseNullableInteger(values[0] ?? ""),
-    critical: parseNullableInteger(values[1] ?? ""),
-    defense: parseNullableInteger(values[2] ?? "")
-  };
-}
-
-function extractCardText(lines) {
-  const statsIndex = lines.findIndex(
-    (line) => line.includes("攻撃力") && line.includes("打撃力") && line.includes("防御力")
-  );
-  const startIndex = statsIndex >= 0 ? statsIndex + 2 : 0;
-  const stopIndex = lines.findIndex(
-    (line, index) =>
-      index > startIndex &&
-      (line.includes("前のカード") ||
-        line.includes("次のカード") ||
-        line.includes("収録カード商品") ||
-        line.includes("Q&A"))
-  );
-  const textLines = lines
-    .slice(startIndex, stopIndex >= 0 ? stopIndex : undefined)
-    .filter(
-      (line) =>
-        !line.startsWith("イラストレーター") &&
-        !line.includes("ワールド") &&
-        !line.includes("カード種別") &&
-        !line.includes("サイズ") &&
-        !line.includes("属性")
-    );
-
-  return textLines.length > 0 ? textLines.join("\n") : null;
-}
-
-function extractImageUrls(html, detailUrl, cardName) {
-  const urls = [];
-  const regex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
-  let match = regex.exec(html);
-
-  while (match) {
-    const tag = match[0] ?? "";
-    const rawSrc = decodeHtml(match[1] ?? "").trim();
-    if (!rawSrc) {
-      match = regex.exec(html);
-      continue;
-    }
-
-    const normalizedTag = normalizeText(tag.replace(/<[^>]+>/g, " "));
-    const absoluteUrl = new URL(rawSrc, detailUrl).toString();
-    const lower = absoluteUrl.toLowerCase();
-
-    if (
-      lower.endsWith(".svg") ||
-      lower.includes("logo") ||
-      lower.includes("bnr") ||
-      lower.includes("banner") ||
-      lower.includes("icon")
-    ) {
-      match = regex.exec(html);
-      continue;
-    }
-
-    if (!normalizedTag.includes(cardName) && !lower.includes("card") && !lower.includes("buddyfight")) {
-      match = regex.exec(html);
-      continue;
-    }
-
-    if (!urls.includes(absoluteUrl)) urls.push(absoluteUrl);
-    match = regex.exec(html);
-  }
-
-  return urls.slice(0, MAX_IMAGES_PER_CARD);
-}
-
 function stripHtml(value) {
   return normalizeText(
     String(value ?? "")
@@ -559,50 +427,6 @@ async function collectDetailUrls(packUrl) {
   return Array.from(urls).slice(0, MAX_CARDS_PER_PACK);
 }
 
-async function fetchOfficialCardFromDetail(detailUrl, pack) {
-  const html = await fetchHtml(detailUrl);
-  const lines = htmlToLines(html);
-  const name = extractOfficialCardName(lines);
-  if (!name) throw new Error("カード名を解析できませんでした。");
-
-  const cardCodeForEra = extractCardCodeFromDetail(lines);
-  const worlds = splitList(getNextValue(lines, "ワールド"));
-  const cardTypeText = getNextValue(lines, "カード種別");
-  const races = splitList(getNextValue(lines, "属性"));
-  const stats = extractStats(lines);
-  const cardType = parseCardType(cardTypeText);
-
-  return {
-    sourceUrl: detailUrl,
-    cardKey: detailUrl,
-    cardNumber: null,
-    name,
-    card_type: CARD_TYPE_VALUES.has(cardType) ? cardType : "other",
-    orientation: "vertical",
-    worlds,
-    races,
-    size: parseNullableInteger(getNextValue(lines, "サイズ")),
-    power: stats.power,
-    defense: stats.defense,
-    critical: stats.critical,
-    card_text: extractCardText(lines),
-    set_code: pack.setCode,
-    set_name: pack.setName,
-    era_key: inferEraKeyFromCode(cardCodeForEra),
-    rarity: null,
-    is_dragon: races.some((race) => race.includes("ドラゴン")),
-    is_hyakki: races.some((race) => race.includes("百鬼")),
-    is_corner_king: races.some((race) => race.includes("角王")),
-    is_chaos: races.some((race) => race.includes("カオス")) || name.includes("the Chaos"),
-    is_generic: worlds.some((world) => world.includes("ジェネリック")),
-    is_heaven: races.some((race) => race.includes("天国")) || name.includes("楽園天国"),
-    is_hell: races.some((race) => race.includes("地獄")) || name.includes("灼熱地獄"),
-    is_original: false,
-    is_active: true,
-    imageUrls: extractImageUrls(html, detailUrl, name)
-  };
-}
-
 async function fetchOfficialCard(detailUrl, pack) {
   const html = await fetchHtml(detailUrl);
   const lines = htmlToLines(html);
@@ -705,7 +529,8 @@ function createCardPayload(id, row) {
 }
 
 async function updateCardFromOfficialRow(supabase, cardId, row) {
-  const { id: _id, ...payload } = createCardPayload(cardId, row);
+  const payload = createCardPayload(cardId, row);
+  delete payload.id;
   const { data, error } = await supabase.from("cards").update(payload).eq("id", cardId).select("*").single();
   if (error) throw new Error(error.message);
   return data;
@@ -847,6 +672,33 @@ async function ensurePrinting(supabase, row, cardId, dryRun) {
   if (insertError) throw new Error(insertError.message);
 
   return { added: true, setCreated };
+}
+
+async function ensureFlagForFlagCard(supabase, row, cardId, dryRun) {
+  if (row.card_type !== "flag_card") return { added: false };
+  if (!supabase || dryRun) return { added: true };
+
+  const { data: existingFlag, error: loadError } = await supabase
+    .from("flags")
+    .select("id")
+    .eq("card_id", cardId)
+    .maybeSingle();
+  if (loadError) throw new Error(loadError.message);
+  if (existingFlag) return { added: false };
+
+  const { error: insertError } = await supabase.from("flags").insert({
+    name: row.name,
+    card_id: cardId,
+    usable_worlds: row.worlds ?? [],
+    initial_life: 10,
+    initial_hand: 6,
+    initial_gauge: 2,
+    can_be_selected_as_flag: true,
+    is_active: row.is_active
+  });
+  if (insertError) throw new Error(insertError.message);
+
+  return { added: true };
 }
 
 async function countExistingImages(supabase, cardId) {
@@ -1054,6 +906,7 @@ async function importCards(input) {
     try {
       const cardResult = await findOrCreateCard(input.supabase, row, input.dryRun);
       const printingResult = await ensurePrinting(input.supabase, row, cardResult.card.id, input.dryRun);
+      await ensureFlagForFlagCard(input.supabase, row, cardResult.card.id, input.dryRun);
       const imageResult = await uploadImagesForCard(
         input.supabase,
         row,
