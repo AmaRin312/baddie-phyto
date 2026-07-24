@@ -13,11 +13,13 @@ import type {
   DeckRecord,
   FlagWithCardRecord
 } from "@/types/baddiePhyto";
+import { getDeckVisibilityLabel } from "@/types/baddiePhyto";
 
 export default function DecksPage() {
   const [decks, setDecks] = useState<DeckRecord[]>([]);
   const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
@@ -25,10 +27,12 @@ export default function DecksPage() {
 
   useEffect(() => {
     async function loadPage() {
-      if (!(await getOrCreateProfile())) {
+      const profile = await getOrCreateProfile();
+      if (!profile) {
         window.location.href = "/login";
         return;
       }
+      setCurrentUserId(profile.id);
       const [deckResult, flagResult, cardResult] = await Promise.all([
         loadDecks(),
         loadFlags(),
@@ -60,21 +64,36 @@ export default function DecksPage() {
       ) : (
         <div className="dm-app-grid">
           {decks.map((deck) => {
-            const flag = flagMap.get(deck.flag_id);
+            const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
+            const isOwnDeck = deck.owner_id === currentUserId;
+            const canStartBattle = Boolean(deck.flag_id && deck.buddy_card_id);
             return (
               <AppCard
                 key={deck.id}
                 title={deck.name}
-                description={`フラッグ：${flag?.card?.name ?? "不明"}`}
+                description={`フラッグ：${flag?.card?.name ?? "未選択"}`}
               >
-                <p>バディ：{cardMap.get(deck.buddy_card_id)?.name ?? "不明"}</p>
+                <p>
+                  バディ：
+                  {deck.buddy_card_id
+                    ? cardMap.get(deck.buddy_card_id)?.name ?? "不明"
+                    : "未選択"}
+                </p>
+                <p>保存方法：{getDeckVisibilityLabel(deck.deck_visibility)}</p>
+                <p>所有：{isOwnDeck ? "自分" : "公開デッキ"}</p>
                 <div className="dm-dialog-actions">
                   <Link href={`/decks/${deck.id}`} className="dm-button secondary">
-                    編集
+                    {isOwnDeck ? "編集" : "閲覧"}
                   </Link>
-                  <Link href={`/battle?deckId=${deck.id}`} className="dm-button primary">
-                    Battle開始
-                  </Link>
+                  {canStartBattle ? (
+                    <Link href={`/battle?deckId=${deck.id}`} className="dm-button primary">
+                      Battle開始
+                    </Link>
+                  ) : (
+                    <span className="dm-button secondary is-disabled" aria-disabled="true">
+                      Battle開始には設定が必要
+                    </span>
+                  )}
                 </div>
               </AppCard>
             );

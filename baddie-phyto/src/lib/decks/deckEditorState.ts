@@ -58,7 +58,10 @@ export function setDeckCardDraftQuantity(
       cardId: input.cardId,
       quantity: nextQuantity,
       selectedImageId: input.selectedImageId ?? null,
-      sortOrder: drafts.length
+      sortOrder:
+        drafts.length === 0
+          ? 0
+          : Math.max(...drafts.map((draft) => draft.sortOrder)) + 1
     }
   ];
 }
@@ -77,6 +80,29 @@ export function setDeckCardDraftImage(
   );
 }
 
+export function reorderDeckCardDrafts(
+  drafts: DeckCardDraft[],
+  input: {
+    draggedCardId: string;
+    targetCardId: string;
+  }
+) {
+  if (input.draggedCardId === input.targetCardId) return drafts;
+
+  const draggedIndex = drafts.findIndex((draft) => draft.cardId === input.draggedCardId);
+  const targetIndex = drafts.findIndex((draft) => draft.cardId === input.targetCardId);
+  if (draggedIndex < 0 || targetIndex < 0) return drafts;
+
+  const next = [...drafts];
+  const [draggedDraft] = next.splice(draggedIndex, 1);
+  next.splice(targetIndex, 0, draggedDraft);
+
+  return next.map((draft, index) => ({
+    ...draft,
+    sortOrder: index
+  }));
+}
+
 export function areDeckCardDraftsEqual(
   left: DeckCardDraft[],
   right: DeckCardDraft[]
@@ -91,7 +117,8 @@ export function areDeckCardDraftsEqual(
     return (
       leftItem.cardId === rightItem.cardId &&
       leftItem.quantity === rightItem.quantity &&
-      leftItem.selectedImageId === rightItem.selectedImageId
+      leftItem.selectedImageId === rightItem.selectedImageId &&
+      leftItem.sortOrder === rightItem.sortOrder
     );
   });
 }

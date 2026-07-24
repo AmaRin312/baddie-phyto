@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { DeckCardRecord, DeckRecord } from "@/types/baddiePhyto";
+import type { DeckCardRecord, DeckRecord, DeckVisibility } from "@/types/baddiePhyto";
 
 export async function loadDecks() {
   return await supabase
@@ -30,26 +30,52 @@ export async function createDeck(input: {
   name: string;
   flagId: string;
   buddyCardId: string;
+  deckVisibility?: DeckVisibility;
 }) {
   return await supabase.rpc("create_deck", {
     p_name: input.name,
     p_flag_id: input.flagId,
-    p_buddy_card_id: input.buddyCardId
+    p_buddy_card_id: input.buddyCardId,
+    p_deck_visibility: input.deckVisibility ?? "private"
   });
+}
+
+export async function createDraftDeck(input?: {
+  name?: string;
+  deckVisibility?: DeckVisibility;
+}) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { data: null, error: userError ?? new Error("ログインが必要です。") };
+  }
+
+  return await supabase
+    .from("decks")
+    .insert({
+      owner_id: userData.user.id,
+      name: input?.name?.trim() || "無題のデッキ",
+      flag_id: null,
+      buddy_card_id: null,
+      deck_visibility: input?.deckVisibility ?? "private"
+    })
+    .select("id")
+    .single<{ id: string }>();
 }
 
 export async function updateDeckSettings(input: {
   deckId: string;
   name: string;
-  flagId: string;
-  buddyCardId: string;
+  flagId: string | null;
+  buddyCardId: string | null;
+  deckVisibility: DeckVisibility;
 }) {
   return await supabase
     .from("decks")
     .update({
       name: input.name,
       flag_id: input.flagId,
-      buddy_card_id: input.buddyCardId
+      buddy_card_id: input.buddyCardId,
+      deck_visibility: input.deckVisibility
     })
     .eq("id", input.deckId)
     .select("*")

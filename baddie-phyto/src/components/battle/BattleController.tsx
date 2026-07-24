@@ -395,6 +395,12 @@ export function BattleController() {
       return;
     }
 
+    if (!deckResult.data.flag_id || !deckResult.data.buddy_card_id) {
+      setMessage("Battle開始には、デッキ編集画面でフラッグとバディを選択してください。");
+      setLoading(false);
+      return;
+    }
+
     const flagResult = await loadFlag(deckResult.data.flag_id);
     if (flagResult.error || !flagResult.data) {
       console.error(flagResult.error);

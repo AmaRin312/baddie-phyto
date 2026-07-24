@@ -28,6 +28,7 @@ export type CardRecord = {
   is_generic: boolean;
   is_heaven: boolean;
   is_hell: boolean;
+  is_original: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -87,12 +88,15 @@ export type CardAbilityRecord = {
   updated_at: string;
 };
 
+export type DeckVisibility = "private" | "public" | "default";
+
 export type DeckRecord = {
   id: string;
   owner_id: string;
   name: string;
-  flag_id: string;
-  buddy_card_id: string;
+  flag_id: string | null;
+  buddy_card_id: string | null;
+  deck_visibility: DeckVisibility;
   created_at: string;
   updated_at: string;
 };
@@ -130,9 +134,38 @@ export const ORIENTATION_OPTIONS: ReadonlyArray<{
   { value: "mixed", label: "混在" }
 ];
 
+export const DECK_VISIBILITY_OPTIONS: ReadonlyArray<{
+  value: DeckVisibility;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "private",
+    label: "個人保存",
+    description: "自分だけが閲覧・編集できるデッキです。"
+  },
+  {
+    value: "public",
+    label: "ローカル保存（公開）",
+    description: "他ユーザーも閲覧できる自作デッキです。編集は作成者のみです。"
+  },
+  {
+    value: "default",
+    label: "デフォルトデッキ",
+    description: "全ユーザー向けの基礎デッキです。編集は作成者のみです。"
+  }
+];
+
 export function getCardTypeLabel(cardType: CardType) {
   return (
     CARD_TYPE_OPTIONS.find((option) => option.value === cardType)?.label ??
     cardType
+  );
+}
+
+export function getDeckVisibilityLabel(deckVisibility: DeckVisibility | null | undefined) {
+  return (
+    DECK_VISIBILITY_OPTIONS.find((option) => option.value === deckVisibility)?.label ??
+    "個人保存"
   );
 }

@@ -153,6 +153,15 @@ select {
 .dm-button.secondary:hover {
   box-shadow: 0 12px 24px rgba(59, 130, 246, 0.12);
 }
+
+.dm-button.is-disabled,
+.dm-button.is-disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
 .dm-title.small {
   font-size: clamp(34px, 5vw, 54px);
 }
@@ -617,6 +626,19 @@ select {
   color: #92400e;
 }
 
+.dm-card-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(254, 243, 199, 0.86);
+  color: #92400e;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .dm-card-admin-head {
   color: var(--dm-blue-dark);
   background: rgba(219, 234, 254, 0.78);
@@ -1075,6 +1097,61 @@ select {
   gap: 8px;
 }
 
+.dm-deck-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.dm-deck-visual-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: grab;
+}
+
+.dm-deck-visual-card:active {
+  cursor: grabbing;
+}
+
+.dm-deck-visual-card > article {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+}
+
+.dm-deck-visual-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.75);
+  outline-offset: 3px;
+}
+
+.dm-deck-visual-card.is-dragging {
+  opacity: 0.48;
+  filter: drop-shadow(0 12px 18px rgba(15, 23, 42, 0.24));
+}
+
+.dm-deck-visual-count {
+  position: absolute;
+  right: -5px;
+  top: -6px;
+  min-width: 24px;
+  border: 2px solid white;
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: white;
+  background: #2563eb;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+}
+
 .dm-deck-editor-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -1131,6 +1208,16 @@ select {
 
   .dm-deck-editor-side {
     position: static;
+  }
+
+  .dm-deck-visual-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .dm-deck-visual-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 .dm-settings-list {
