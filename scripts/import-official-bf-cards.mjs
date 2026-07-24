@@ -383,10 +383,15 @@ function extractImageUrls(html, detailUrl, cardName) {
 }
 
 function sanitizeFilePart(value) {
-  return normalizeText(value)
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/\s+/g, "_")
+  const safeValue = normalizeText(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
     .slice(0, 80);
+
+  return safeValue || "card";
 }
 
 function getExtensionFromContentType(contentType) {
