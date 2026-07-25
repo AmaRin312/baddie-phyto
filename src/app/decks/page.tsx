@@ -8,12 +8,15 @@ import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import { loadDecks } from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
-import type {
-  CardRecord,
-  DeckRecord,
-  FlagWithCardRecord
+import {
+  DECK_ERA_OPTIONS,
+  getDeckEraLabel,
+  getDeckVisibilityLabel,
+  type CardRecord,
+  type DeckEraKey,
+  type DeckRecord,
+  type FlagWithCardRecord
 } from "@/types/baddiePhyto";
-import { getDeckVisibilityLabel } from "@/types/baddiePhyto";
 
 export default function DecksPage() {
   const [decks, setDecks] = useState<DeckRecord[]>([]);
@@ -22,8 +25,13 @@ export default function DecksPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [eraFilter, setEraFilter] = useState<DeckEraKey | "">("");
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const filteredDecks = useMemo(() => {
+    if (!eraFilter) return decks;
+    return decks.filter((deck) => deck.era_key === eraFilter);
+  }, [decks, eraFilter]);
 
   useEffect(() => {
     async function loadPage() {
@@ -58,12 +66,28 @@ export default function DecksPage() {
           デッキ作成
         </Link>
       </div>
+      <AppCard title="デッキ検索" description="年代でデッキ一覧を絞り込みます。">
+        <label className="dm-inline-field">
+          年代
+          <select
+            value={eraFilter}
+            onChange={(event) => setEraFilter(event.target.value as DeckEraKey | "")}
+          >
+            <option value="">すべて</option>
+            {DECK_ERA_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </AppCard>
       {message && <p className="dm-form-message">{message}</p>}
       {loading ? (
         <AppCard title="読み込み中" description="デッキを取得しています。" />
       ) : (
         <div className="dm-app-grid">
-          {decks.map((deck) => {
+          {filteredDecks.map((deck) => {
             const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
             const isOwnDeck = deck.owner_id === currentUserId;
             const canStartBattle = Boolean(deck.flag_id && deck.buddy_card_id);
@@ -80,6 +104,7 @@ export default function DecksPage() {
                     : "未選択"}
                 </p>
                 <p>保存方法：{getDeckVisibilityLabel(deck.deck_visibility)}</p>
+                <p>年代：{getDeckEraLabel(deck.era_key)}</p>
                 <p>所有：{isOwnDeck ? "自分" : "公開デッキ"}</p>
                 <div className="dm-dialog-actions">
                   <Link href={`/decks/${deck.id}`} className="dm-button secondary">
@@ -98,6 +123,9 @@ export default function DecksPage() {
               </AppCard>
             );
           })}
+          {filteredDecks.length === 0 && (
+            <AppCard title="該当なし" description="条件に合うデッキがありません。" />
+          )}
         </div>
       )}
     </AppShell>
