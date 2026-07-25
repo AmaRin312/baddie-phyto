@@ -77,6 +77,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [savingDeck, setSavingDeck] = useState(false);
   const [detailCardId, setDetailCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
+  const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -371,6 +372,25 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDraggedDeckCardId(null);
   }
 
+  function handleSearchCardDropToDeck(targetCardId?: string) {
+    if (!canEditDeck || !draggedSearchCardId) return;
+    const card = cardMap.get(draggedSearchCardId);
+    if (!card) return;
+    const existing = draftDeckCardMap.get(card.id);
+    setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+
+    if (targetCardId && targetCardId !== card.id && !existing) {
+      setDraftDeckCards((current) =>
+        reorderDeckCardDrafts(current, {
+          draggedCardId: card.id,
+          targetCardId
+        })
+      );
+    }
+
+    setDraggedSearchCardId(null);
+  }
+
   return (
     <AppShell kicker="DECK EDIT" title={deck?.name ?? "デッキ編集"}>
       <div className="dm-page-actions">
@@ -533,7 +553,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   : "公開デッキを閲覧しています。並び替えや枚数変更はできません。"
               }
             >
-              <div className="dm-deck-visual-grid" aria-label="編集中デッキのカード一覧">
+              <div
+                className={`dm-deck-visual-grid${
+                  draggedSearchCardId ? " is-drop-target" : ""
+                }`}
+                aria-label="編集中デッキのカード一覧"
+                onDragOver={(event) => {
+                  if (!draggedSearchCardId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "copy";
+                }}
+                onDrop={(event) => {
+                  if (!draggedSearchCardId) return;
+                  event.preventDefault();
+                  handleSearchCardDropToDeck();
+                }}
+              >
                 {draftDeckCards.map((item) => {
                   const card = cardMap.get(item.cardId);
                   if (!card) return null;
@@ -557,15 +592,28 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         event.dataTransfer.setData("text/plain", item.cardId);
                       }}
                       onDragOver={(event) => {
+                        if (draggedSearchCardId) {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "copy";
+                          return;
+                        }
                         if (!draggedDeckCardId || draggedDeckCardId === item.cardId) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = "move";
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
+                        event.stopPropagation();
+                        if (draggedSearchCardId) {
+                          handleSearchCardDropToDeck(item.cardId);
+                          return;
+                        }
                         handleDeckCardDrop(item.cardId);
                       }}
-                      onDragEnd={() => setDraggedDeckCardId(null)}
+                      onDragEnd={() => {
+                        setDraggedDeckCardId(null);
+                        setDraggedSearchCardId(null);
+                      }}
                     >
                       <CardViewer
                         card={card}
@@ -660,8 +708,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     <button
                       key={card.id}
                       type="button"
-                      className="dm-deck-row dm-deck-row-button"
+                      className={`dm-deck-row dm-deck-row-button dm-deck-search-card${
+                        draggedSearchCardId === card.id ? " is-dragging" : ""
+                      }`}
+                      draggable={canEditDeck}
                       onClick={() => openCardDetail(card.id)}
+                      onDragStart={(event) => {
+                        if (!canEditDeck) {
+                          event.preventDefault();
+                          return;
+                        }
+                        setDraggedSearchCardId(card.id);
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData("text/plain", card.id);
+                      }}
+                      onDragEnd={() => setDraggedSearchCardId(null)}
                     >
                       <span className="dm-deck-card-cell">
                         <CardViewer
