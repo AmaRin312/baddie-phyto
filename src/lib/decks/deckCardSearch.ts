@@ -7,7 +7,7 @@ export const DECK_CARD_ERA_OPTIONS: ReadonlyArray<{
   value: DeckCardEraKey;
   label: string;
 }> = [
-  { value: "first", label: "1年目" },
+  { value: "first", label: "無印" },
   { value: "hundred", label: "100" },
   { value: "ddd", label: "DDD" },
   { value: "x", label: "X" },
@@ -59,6 +59,7 @@ export type DeckCardSearchFilters = {
   races: string[];
   eras: DeckCardEraKey[];
   setIds: string[];
+  originalMode: "all" | "official" | "original";
   attributes: DeckCardAttributeKey[];
 };
 
@@ -70,6 +71,7 @@ export const EMPTY_DECK_CARD_SEARCH_FILTERS: DeckCardSearchFilters = {
   races: [],
   eras: [],
   setIds: [],
+  originalMode: "all",
   attributes: []
 };
 
@@ -189,7 +191,6 @@ export function filterDeckCandidateCards(input: {
   const textKeyword = input.filters.cardText.trim().toLowerCase();
 
   return input.cards
-    .filter((card) => card.id !== input.selectedBuddyCardId)
     .filter((card) => card.id !== input.selectedFlagCardId)
     .filter((card) => !input.excludeInactive || card.is_active)
     .filter((card) => !input.excludeFlagCard || card.card_type !== "flag_card")
@@ -206,6 +207,11 @@ export function filterDeckCandidateCards(input: {
         input.filters.cardTypes.includes(card.card_type)
     )
     .filter((card) => hasAny(card.races, input.filters.races))
+    .filter((card) => {
+      if (input.filters.originalMode === "original") return card.is_original;
+      if (input.filters.originalMode === "official") return !card.is_original;
+      return true;
+    })
     .filter((card) => hasAllAttributes(card, input.filters.attributes))
     .filter((card) => {
       const cardPrintings = printingsByCard.get(card.id) ?? [];

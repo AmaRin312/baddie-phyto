@@ -56,6 +56,7 @@ export async function createDraftDeck(input?: {
       name: input?.name?.trim() || "無題のデッキ",
       flag_id: null,
       buddy_card_id: null,
+      selected_flag_image_id: null,
       deck_visibility: input?.deckVisibility ?? "private"
     })
     .select("id")
@@ -67,6 +68,7 @@ export async function updateDeckSettings(input: {
   name: string;
   flagId: string | null;
   buddyCardId: string | null;
+  selectedFlagImageId: string | null;
   deckVisibility: DeckVisibility;
 }) {
   return await supabase
@@ -75,6 +77,7 @@ export async function updateDeckSettings(input: {
       name: input.name,
       flag_id: input.flagId,
       buddy_card_id: input.buddyCardId,
+      selected_flag_image_id: input.selectedFlagImageId,
       deck_visibility: input.deckVisibility
     })
     .eq("id", input.deckId)

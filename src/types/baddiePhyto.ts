@@ -89,6 +89,7 @@ export type CardAbilityRecord = {
 };
 
 export type DeckVisibility = "private" | "public" | "default";
+
 export type DeckEraKey = "first" | "hundred" | "ddd" | "x" | "god";
 
 export type DeckRecord = {
@@ -97,8 +98,9 @@ export type DeckRecord = {
   name: string;
   flag_id: string | null;
   buddy_card_id: string | null;
+  selected_flag_image_id: string | null;
   deck_visibility: DeckVisibility;
-  era_key: DeckEraKey | null;
+  era_key?: DeckEraKey | null;
   created_at: string;
   updated_at: string;
 };
@@ -168,6 +170,7 @@ export const DECK_ERA_OPTIONS: ReadonlyArray<{
   { value: "x", label: "X" },
   { value: "god", label: "神" }
 ];
+
 export function getCardTypeLabel(cardType: CardType) {
   return (
     CARD_TYPE_OPTIONS.find((option) => option.value === cardType)?.label ??
@@ -182,6 +185,9 @@ export function getDeckVisibilityLabel(deckVisibility: DeckVisibility | null | u
   );
 }
 
-export function getDeckEraLabel(eraKey: DeckEraKey | "" | null | undefined) {
-  return DECK_ERA_OPTIONS.find((option) => option.value === eraKey)?.label ?? "未設定";
+export function getDeckEraLabel(deckEra: DeckEraKey | null | undefined) {
+  return (
+    DECK_ERA_OPTIONS.find((option) => option.value === deckEra)?.label ??
+    "未設定"
+  );
 }

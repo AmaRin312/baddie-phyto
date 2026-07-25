@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { DeckCardRecord, DeckEraKey, DeckRecord, DeckVisibility } from "@/types/baddiePhyto";
+import type { DeckCardRecord, DeckRecord, DeckVisibility } from "@/types/baddiePhyto";
 
 export async function loadDecks() {
   return await supabase
@@ -31,7 +31,6 @@ export async function createDeck(input: {
   flagId: string;
   buddyCardId: string;
   deckVisibility?: DeckVisibility;
-  eraKey?: DeckEraKey | null;
 }) {
   return await supabase.rpc("create_deck", {
     p_name: input.name,
@@ -44,7 +43,6 @@ export async function createDeck(input: {
 export async function createDraftDeck(input?: {
   name?: string;
   deckVisibility?: DeckVisibility;
-  eraKey?: DeckEraKey | null;
 }) {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
@@ -58,8 +56,8 @@ export async function createDraftDeck(input?: {
       name: input?.name?.trim() || "無題のデッキ",
       flag_id: null,
       buddy_card_id: null,
-      deck_visibility: input?.deckVisibility ?? "private",
-      era_key: input?.eraKey ?? null
+      selected_flag_image_id: null,
+      deck_visibility: input?.deckVisibility ?? "private"
     })
     .select("id")
     .single<{ id: string }>();
@@ -70,8 +68,8 @@ export async function updateDeckSettings(input: {
   name: string;
   flagId: string | null;
   buddyCardId: string | null;
+  selectedFlagImageId: string | null;
   deckVisibility: DeckVisibility;
-  eraKey?: DeckEraKey | null;
 }) {
   return await supabase
     .from("decks")
@@ -79,8 +77,8 @@ export async function updateDeckSettings(input: {
       name: input.name,
       flag_id: input.flagId,
       buddy_card_id: input.buddyCardId,
-      deck_visibility: input.deckVisibility,
-      era_key: input.eraKey ?? null
+      selected_flag_image_id: input.selectedFlagImageId,
+      deck_visibility: input.deckVisibility
     })
     .eq("id", input.deckId)
     .select("*")

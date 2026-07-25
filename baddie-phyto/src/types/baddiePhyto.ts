@@ -90,13 +90,17 @@ export type CardAbilityRecord = {
 
 export type DeckVisibility = "private" | "public" | "default";
 
+export type DeckEraKey = "first" | "hundred" | "ddd" | "x" | "god";
+
 export type DeckRecord = {
   id: string;
   owner_id: string;
   name: string;
   flag_id: string | null;
   buddy_card_id: string | null;
+  selected_flag_image_id: string | null;
   deck_visibility: DeckVisibility;
+  era_key?: DeckEraKey | null;
   created_at: string;
   updated_at: string;
 };
@@ -156,6 +160,17 @@ export const DECK_VISIBILITY_OPTIONS: ReadonlyArray<{
   }
 ];
 
+export const DECK_ERA_OPTIONS: ReadonlyArray<{
+  value: DeckEraKey;
+  label: string;
+}> = [
+  { value: "first", label: "無印" },
+  { value: "hundred", label: "100" },
+  { value: "ddd", label: "DDD" },
+  { value: "x", label: "X" },
+  { value: "god", label: "神" }
+];
+
 export function getCardTypeLabel(cardType: CardType) {
   return (
     CARD_TYPE_OPTIONS.find((option) => option.value === cardType)?.label ??
@@ -167,5 +182,12 @@ export function getDeckVisibilityLabel(deckVisibility: DeckVisibility | null | u
   return (
     DECK_VISIBILITY_OPTIONS.find((option) => option.value === deckVisibility)?.label ??
     "個人保存"
+  );
+}
+
+export function getDeckEraLabel(deckEra: DeckEraKey | null | undefined) {
+  return (
+    DECK_ERA_OPTIONS.find((option) => option.value === deckEra)?.label ??
+    "未設定"
   );
 }
