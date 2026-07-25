@@ -40,3 +40,7 @@ next-env.d.ts
 .parcel-cache/
 .turbo/
 .eslintcache
+
+# local duplicate/copy folders - do not edit for deployment
+Baddie Phyto/
+

@@ -27,3 +27,16 @@ npm run dev
 - デッキカード検索・除外検索・画像選択
 
 Abilityと対戦画面は次の段階で実装します。
+
+## プロジェクト構造の注意
+
+このRepositoryでVercelがビルドする本体は、Repository直下のファイルです。
+
+- 編集対象: `src/`, `scripts/`, `supabase/`, `package.json`
+- 編集しない: `Baddie Phyto/`（ローカルコピー）
+- 原則編集しない: `baddie-phyto/`（過去構成の重複フォルダ）
+
+デッキ作成画面など、サイトに反映したい変更は必ずRepository直下の`src/`へ入れてください。
+重複フォルダを触ると、ローカルでは変わったように見えてもVercelへ反映されないことがあります。
+
+

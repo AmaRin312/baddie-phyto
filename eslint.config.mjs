@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local duplicate/copy folders. The deployed app is the repository root.
+    "Baddie Phyto/**",
+    "baddie-phyto/**",
   ]),
 ]);
 
