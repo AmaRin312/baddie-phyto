@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --dm-bg-start: #f8fbff;
@@ -320,11 +320,18 @@ select {
   color: var(--dm-blue);
 }
 
+
+
 .dm-app-main {
   width: min(1120px, calc(100% - 48px));
   margin: 0 auto;
   padding: 42px 0;
 }
+
+.dm-app-main:has(.dm-deck-editor-layout.is-three-column) {
+  width: min(1780px, calc(100% - 24px));
+}
+
 
 .dm-app-heading {
   margin-bottom: 24px;
@@ -1155,12 +1162,12 @@ select {
 .dm-deck-editor-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 18px;
+  gap: 24px;
   align-items: start;
 }
 
 .dm-deck-editor-layout.is-three-column {
-  grid-template-columns: minmax(220px, 280px) minmax(720px, 2.5fr) minmax(280px, 340px);
+  grid-template-columns: minmax(220px, 270px) minmax(960px, 1fr) minmax(260px, 320px);
   height: calc(100vh - 210px);
   min-height: 620px;
   overflow: hidden;
@@ -1357,15 +1364,18 @@ select {
 
 @media (max-width: 980px) {
   .dm-deck-editor-layout {
-    grid-template-columns: 1fr;
-  }
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
 
   .dm-deck-editor-layout.is-three-column {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: minmax(220px, 270px) minmax(960px, 1fr) minmax(260px, 320px);
+  height: calc(100vh - 210px);
+  min-height: 620px;
+  overflow: hidden;
+}
 
   .dm-deck-editor-side {
     position: static;
@@ -4240,3 +4250,6 @@ select {
     grid-template-rows: auto;
   }
 }
+
+
+

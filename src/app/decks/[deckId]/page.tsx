@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -42,7 +42,6 @@ import {
   getDeckVisibilityLabel,
   type CardImageRecord,
   type CardRecord,
-  type CardType,
   type DeckCardRecord,
   type DeckRecord,
   type DeckVisibility,
@@ -51,42 +50,8 @@ import {
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
-const CARD_TYPE_ORDER: CardType[] = [
-  "monster",
-  "spell",
-  "item",
-  "impact",
-  "impact_monster",
-  "flag_card",
-  "other"
-];
-
 function getFlagName(flag?: FlagWithCardRecord | null) {
   return flag?.name || flag?.card?.name || "未選択";
-}
-
-function countByCardType(deckCards: DeckCardRecord[], cardMap: Map<string, CardRecord>) {
-  const counts = new Map<CardType, number>();
-  for (const item of deckCards) {
-    const card = cardMap.get(item.card_id);
-    if (!card) continue;
-    counts.set(card.card_type, (counts.get(card.card_type) ?? 0) + item.quantity);
-  }
-  return counts;
-}
-
-function countByWorld(deckCards: DeckCardRecord[], cardMap: Map<string, CardRecord>) {
-  const counts = new Map<string, number>();
-  for (const item of deckCards) {
-    const card = cardMap.get(item.card_id);
-    if (!card) continue;
-    for (const world of card.worlds) {
-      counts.set(world, (counts.get(world) ?? 0) + item.quantity);
-    }
-  }
-  return [...counts.entries()].sort((left, right) =>
-    left[0].localeCompare(right[0], "ja")
-  );
 }
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
@@ -226,7 +191,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   );
 
   const selectedFlag = flagMap.get(selectedFlagId) ?? null;
-  const selectedBuddy = cardMap.get(selectedBuddyCardId) ?? null;
   const detailCard = cardMap.get(detailCardId) ?? null;
   const detailDeckDraft = detailCard ? draftDeckCardMap.get(detailCard.id) : undefined;
   const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
@@ -255,24 +219,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   ]);
 
   const mainDeckTotal = draftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
-  const draftAsDeckCards = useMemo(
-    () =>
-      draftDeckCards.map(
-        (draft): DeckCardRecord => ({
-          id: draft.cardId,
-          deck_id: deckId,
-          card_id: draft.cardId,
-          selected_image_id: draft.selectedImageId,
-          quantity: draft.quantity,
-          sort_order: draft.sortOrder,
-          created_at: "",
-          updated_at: ""
-        })
-      ),
-    [deckId, draftDeckCards]
-  );
-  const typeCounts = countByCardType(draftAsDeckCards, cardMap);
-  const worldCounts = countByWorld(draftAsDeckCards, cardMap);
   const canEditDeck = Boolean(deck && currentUserId && deck.owner_id === currentUserId);
   const hasUnsavedChanges = deck
     ? deckName.trim() !== deck.name ||
@@ -431,16 +377,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 }}
               >
                 <label>
-                  デッキ名
-                  <input
-                    value={deckName}
-                    onChange={(event) => setDeckName(event.target.value)}
-                    disabled={!canEditDeck}
-                    placeholder="未入力なら「無題のデッキ」"
-                  />
-                </label>
-
-                <label>
                   フラッグ
                   <select
                     value={selectedFlagId}
@@ -470,6 +406,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       </option>
                     ))}
                   </select>
+                </label>
+
+                <div className="dm-deck-total-panel" aria-label="デッキ総枚数">
+                  <b>デッキ枚数</b>
+                  <span>{mainDeckTotal}枚</span>
+                </div>
+
+                <label>
+                  デッキ名
+                  <input
+                    value={deckName}
+                    onChange={(event) => setDeckName(event.target.value)}
+                    disabled={!canEditDeck}
+                    placeholder="未入力なら「無題のデッキ」"
+                  />
                 </label>
 
                 <label>
@@ -508,50 +459,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 </Button>
               </form>
             </AppCard>
-
-            <AppCard title="枚数表示" description="現在の編集中デッキ内容です。">
-              <div className="dm-deck-summary">
-                <p>
-                  <b>メインデッキ合計</b>
-                  <span>{mainDeckTotal}枚</span>
-                </p>
-                <p>
-                  <b>選択フラッグ</b>
-                  <span>{getFlagName(selectedFlag)}</span>
-                </p>
-                <p>
-                  <b>バディカード</b>
-                  <span>{selectedBuddy?.name ?? "未選択"}</span>
-                </p>
-              </div>
-            </AppCard>
-
-            <AppCard title="カードタイプ別" description="編集中 deck_cards の枚数です。">
-              <div className="dm-deck-summary-list">
-                {CARD_TYPE_ORDER.map((cardType) => (
-                  <p key={cardType}>
-                    <b>{getCardTypeLabel(cardType)}</b>
-                    <span>{typeCounts.get(cardType) ?? 0}枚</span>
-                  </p>
-                ))}
-              </div>
-            </AppCard>
-
-            <AppCard title="ワールド別" description="複数ワールドカードは各ワールドへ加算します。">
-              <div className="dm-deck-summary-list">
-                {worldCounts.map(([world, count]) => (
-                  <p key={world}>
-                    <b>{world}</b>
-                    <span>{count}枚</span>
-                  </p>
-                ))}
-                {worldCounts.length === 0 && (
-                  <p className="dm-muted-text">ワールド情報がありません。</p>
-                )}
-              </div>
-            </AppCard>
           </aside>
-
           <main className="dm-deck-editor-column dm-deck-editor-deck">
             <AppCard
               title="デッキ一覧"
@@ -840,3 +748,4 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     </AppShell>
   );
 }
+
