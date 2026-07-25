@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -42,51 +42,16 @@ import {
   getDeckVisibilityLabel,
   type CardImageRecord,
   type CardRecord,
-  type CardType,
   type DeckCardRecord,
-  type DeckVisibility,
   type DeckRecord,
+  type DeckVisibility,
   type FlagWithCardRecord
 } from "@/types/baddiePhyto";
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
-const CARD_TYPE_ORDER: CardType[] = [
-  "monster",
-  "spell",
-  "item",
-  "impact",
-  "impact_monster",
-  "flag_card",
-  "other"
-];
-
 function getFlagName(flag?: FlagWithCardRecord | null) {
   return flag?.name || flag?.card?.name || "未選択";
-}
-
-function countByCardType(deckCards: DeckCardRecord[], cardMap: Map<string, CardRecord>) {
-  const counts = new Map<CardType, number>();
-  for (const item of deckCards) {
-    const card = cardMap.get(item.card_id);
-    if (!card) continue;
-    counts.set(card.card_type, (counts.get(card.card_type) ?? 0) + item.quantity);
-  }
-  return counts;
-}
-
-function countByWorld(deckCards: DeckCardRecord[], cardMap: Map<string, CardRecord>) {
-  const counts = new Map<string, number>();
-  for (const item of deckCards) {
-    const card = cardMap.get(item.card_id);
-    if (!card) continue;
-    for (const world of card.worlds) {
-      counts.set(world, (counts.get(world) ?? 0) + item.quantity);
-    }
-  }
-  return [...counts.entries()].sort((left, right) =>
-    left[0].localeCompare(right[0], "ja")
-  );
 }
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
@@ -104,15 +69,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [savedDeckCards, setSavedDeckCards] = useState<DeckCardRecord[]>([]);
   const [draftDeckCards, setDraftDeckCards] = useState<DeckCardDraft[]>([]);
-  const [pendingSelectedImages, setPendingSelectedImages] = useState<Record<string, string>>(
-    {}
-  );
   const [searchFilters, setSearchFilters] = useState<DeckCardSearchFilters>(
     EMPTY_DECK_CARD_SEARCH_FILTERS
   );
   const [loading, setLoading] = useState(true);
   const [savingDeck, setSavingDeck] = useState(false);
-  const [selectedPreviewCardId, setSelectedPreviewCardId] = useState("");
+  const [detailCardId, setDetailCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
@@ -124,15 +86,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       cardResult,
       imageResult,
       printingSearchResult
-    ] =
-      await Promise.all([
-        loadDeck(currentDeckId),
-        loadDeckCards(currentDeckId),
-        loadFlags({ selectableOnly: true, activeOnly: true }),
-        loadCards(),
-        loadCardImages(),
-        loadDeckCardPrintingSearchData()
-      ]);
+    ] = await Promise.all([
+      loadDeck(currentDeckId),
+      loadDeckCards(currentDeckId),
+      loadFlags({ selectableOnly: true, activeOnly: true }),
+      loadCards(),
+      loadCardImages(),
+      loadDeckCardPrintingSearchData()
+    ]);
 
     if (
       deckResult.error ||
@@ -180,7 +141,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setImages(imageResult.data ?? []);
     setCardPrintings(printingSearchResult.printings);
     setCardSets(printingSearchResult.sets);
-    setPendingSelectedImages({});
     setLoading(false);
   }, []);
 
@@ -231,15 +191,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   );
 
   const selectedFlag = flagMap.get(selectedFlagId) ?? null;
-  const selectedBuddy = cardMap.get(selectedBuddyCardId) ?? null;
-  const selectedPreviewCard = cardMap.get(selectedPreviewCardId) ?? null;
+  const detailCard = cardMap.get(detailCardId) ?? null;
+  const detailDeckDraft = detailCard ? draftDeckCardMap.get(detailCard.id) : undefined;
   const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
 
   const buddyCandidates = useMemo(
-    () =>
-      cards.filter(
-        (card) => card.is_active && card.card_type !== "flag_card"
-      ),
+    () => cards.filter((card) => card.is_active && card.card_type !== "flag_card"),
     [cards]
   );
 
@@ -262,24 +219,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   ]);
 
   const mainDeckTotal = draftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
-  const draftAsDeckCards = useMemo(
-    () =>
-      draftDeckCards.map(
-        (draft): DeckCardRecord => ({
-          id: draft.cardId,
-          deck_id: deckId,
-          card_id: draft.cardId,
-          selected_image_id: draft.selectedImageId,
-          quantity: draft.quantity,
-          sort_order: draft.sortOrder,
-          created_at: "",
-          updated_at: ""
-        })
-      ),
-    [deckId, draftDeckCards]
-  );
-  const typeCounts = countByCardType(draftAsDeckCards, cardMap);
-  const worldCounts = countByWorld(draftAsDeckCards, cardMap);
   const canEditDeck = Boolean(deck && currentUserId && deck.owner_id === currentUserId);
   const hasUnsavedChanges = deck
     ? deckName.trim() !== deck.name ||
@@ -291,7 +230,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   async function handleSaveDeck() {
     if (!canEditDeck) {
-      setMessage("公開デッキは所有者だけが編集できます。");
+      setMessage("このデッキは所有者だけが編集できます。");
       return;
     }
     if (!deck) {
@@ -354,13 +293,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setMessage("デッキを保存しました。");
   }
 
-  function setLocalCardQuantity(
-    card: CardRecord,
-    quantity: number,
-    selectedImageId?: string | null
-  ) {
+  function setLocalCardQuantity(card: CardRecord, quantity: number) {
     if (!canEditDeck) {
-      setMessage("公開デッキは所有者だけが編集できます。");
+      setMessage("このデッキは所有者だけが編集できます。");
       return;
     }
     if (card.id === selectedBuddyCardId) {
@@ -375,19 +310,31 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDraftDeckCards((current) =>
       setDeckCardDraftQuantity(current, {
         cardId: card.id,
-        quantity,
-        selectedImageId
+        quantity
       })
     );
-    setPendingSelectedImages((current) => {
-      const next = { ...current };
-      delete next[card.id];
-      return next;
-    });
   }
 
   function getImageSelectValue(cardId: string) {
-    return pendingSelectedImages[cardId] ?? draftDeckCardMap.get(cardId)?.selectedImageId ?? "";
+    return draftDeckCardMap.get(cardId)?.selectedImageId ?? "";
+  }
+
+  function setDeckCardImage(cardId: string, selectedImageId: string | null) {
+    if (!canEditDeck) return;
+    setDraftDeckCards((current) =>
+      setDeckCardDraftImage(current, {
+        cardId,
+        selectedImageId
+      })
+    );
+  }
+
+  function openCardDetail(cardId: string) {
+    setDetailCardId(cardId);
+  }
+
+  function closeCardDetail() {
+    setDetailCardId("");
   }
 
   function handleDeckCardDrop(targetCardId: string) {
@@ -419,16 +366,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       {loading ? (
         <AppCard title="読み込み中" description="デッキ情報を取得しています。" />
       ) : deck ? (
-        <div className="dm-deck-editor-layout">
-          <div className="dm-deck-editor-side">
-            <AppCard
-              title="デッキ設定"
-              description={
-                canEditDeck
-                  ? "保存ボタンを押すまでSupabaseへ反映しません。"
-                  : "このデッキは閲覧のみです。編集できるのは作成者だけです。"
-              }
-            >
+        <div className="dm-deck-editor-layout is-three-column">
+          <aside className="dm-deck-editor-column dm-deck-editor-settings">
+            <AppCard title="デッキ設定" description="保存ボタンを押すまでSupabaseへ反映しません。">
               <form
                 className="dm-auth-form dm-card-form"
                 onSubmit={(event) => {
@@ -436,16 +376,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   void handleSaveDeck();
                 }}
               >
-                <label>
-                  デッキ名
-                  <input
-                    value={deckName}
-                    onChange={(event) => setDeckName(event.target.value)}
-                    disabled={!canEditDeck}
-                    placeholder="未入力なら「無題のデッキ」で保存"
-                  />
-                </label>
-
                 <label>
                   フラッグ
                   <select
@@ -478,6 +408,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </select>
                 </label>
 
+                <div className="dm-deck-total-panel" aria-label="デッキ総枚数">
+                  <b>デッキ枚数</b>
+                  <span>{mainDeckTotal}枚</span>
+                </div>
+
+                <label>
+                  デッキ名
+                  <input
+                    value={deckName}
+                    onChange={(event) => setDeckName(event.target.value)}
+                    disabled={!canEditDeck}
+                    placeholder="未入力なら「無題のデッキ」"
+                  />
+                </label>
+
                 <label>
                   保存方法
                   <select
@@ -495,7 +440,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </select>
                 </label>
                 <p className="dm-muted-text">
-                  {getDeckVisibilityLabel(deckVisibility)}：{
+                  {getDeckVisibilityLabel(deckVisibility)}：
+                  {
                     DECK_VISIBILITY_OPTIONS.find(
                       (option) => option.value === deckVisibility
                     )?.description
@@ -513,12 +459,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 </Button>
               </form>
             </AppCard>
-
+          </aside>
+          <main className="dm-deck-editor-column dm-deck-editor-deck">
             <AppCard
               title="デッキ一覧"
               description={
                 canEditDeck
-                  ? "編集中のローカルStateです。枚数変更は保存ボタンまでDBへ反映しません。"
+                  ? "編集中のローカルStateです。枚数変更・並び替えは保存ボタンまでDBへ反映しません。カードクリックで詳細と使用画像を選べます。"
                   : "公開デッキを閲覧しています。並び替えや枚数変更はできません。"
               }
             >
@@ -526,16 +473,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 {draftDeckCards.map((item) => {
                   const card = cardMap.get(item.cardId);
                   if (!card) return null;
-                  return Array.from({ length: item.quantity }, (_, copyIndex) => (
+                  return (
                     <button
-                      key={`${item.cardId}:${copyIndex}`}
+                      key={item.cardId}
                       type="button"
                       className={`dm-deck-visual-card${
                         draggedDeckCardId === item.cardId ? " is-dragging" : ""
                       }`}
                       draggable={canEditDeck}
-                      title={`${card.name} / ${getCardTypeLabel(card.card_type)} ${copyIndex + 1}/${item.quantity}`}
-                      onClick={() => setSelectedPreviewCardId(card.id)}
+                      title={`${card.name} / ${getCardTypeLabel(card.card_type)} ×${item.quantity}`}
+                      onClick={() => openCardDetail(card.id)}
                       onDragStart={(event) => {
                         if (!canEditDeck) {
                           event.preventDefault();
@@ -562,67 +509,48 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         selectedImageId={item.selectedImageId}
                         variant="compact"
                       />
-                      {copyIndex === 0 && item.quantity > 1 && (
-                        <span className="dm-deck-visual-count">×{item.quantity}</span>
-                      )}
+                      <span className="dm-deck-visual-count">×{item.quantity}</span>
                     </button>
-                  ));
+                  );
                 })}
                 {draftDeckCards.length === 0 && (
                   <p className="dm-muted-text">まだカードが追加されていません。</p>
                 )}
               </div>
+
               {draftDeckCards.length > 0 && (
                 <div className="dm-deck-list">
                   {draftDeckCards.map((item) => {
                     const card = cardMap.get(item.cardId);
                     if (!card) return null;
                     return (
-                      <div key={item.cardId} className="dm-deck-row">
+                      <button
+                        key={item.cardId}
+                        type="button"
+                        className="dm-deck-row dm-deck-row-button"
+                        onClick={() => openCardDetail(card.id)}
+                      >
                         <span className="dm-deck-card-cell">
-                          <span>
-                            {card.name} / {getCardTypeLabel(card.card_type)} ×{" "}
-                            {item.quantity}
-                          </span>
+                          {card.name} / {getCardTypeLabel(card.card_type)} ×{item.quantity}
                         </span>
-                        <div className="dm-deck-row-actions">
-                          <select
-                            value={getImageSelectValue(card.id)}
-                            disabled={!canEditDeck}
-                            onChange={(event) => {
-                              setPendingSelectedImages((current) => {
-                                const next = { ...current };
-                                delete next[card.id];
-                                return next;
-                              });
-                              setDraftDeckCards((current) =>
-                                setDeckCardDraftImage(current, {
-                                  cardId: card.id,
-                                  selectedImageId: event.target.value || null
-                                })
-                              );
-                            }}
-                          >
-                            <option value="">Default画像を使う</option>
-                            {(imagesByCard.get(card.id) ?? []).map((image, index) => (
-                              <option key={image.id} value={image.id}>
-                                {image.is_default
-                                  ? `画像${index + 1}（Default）`
-                                  : `画像${index + 1}`}
-                              </option>
-                            ))}
-                          </select>
+                        <span className="dm-deck-row-actions">
                           <Button
                             size="sm"
                             disabled={!canEditDeck}
-                            onClick={() => setLocalCardQuantity(card, item.quantity - 1)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setLocalCardQuantity(card, item.quantity - 1);
+                            }}
                           >
                             -
                           </Button>
                           <Button
                             size="sm"
                             disabled={!canEditDeck}
-                            onClick={() => setLocalCardQuantity(card, item.quantity + 1)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setLocalCardQuantity(card, item.quantity + 1);
+                            }}
                           >
                             +
                           </Button>
@@ -630,51 +558,26 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                             size="sm"
                             variant="danger"
                             disabled={!canEditDeck}
-                            onClick={() => setLocalCardQuantity(card, 0)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setLocalCardQuantity(card, 0);
+                            }}
                           >
                             削除
                           </Button>
-                        </div>
-                      </div>
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
               )}
             </AppCard>
+          </main>
 
-            <AppCard title="枚数表示" description="現在の編集中デッキ内容です。">
-              <div className="dm-deck-summary">
-                <p>
-                  <b>メインデッキ合計</b>
-                  <span>{mainDeckTotal}枚</span>
-                </p>
-                <p>
-                  <b>選択フラッグ</b>
-                  <span>{getFlagName(selectedFlag)}</span>
-                </p>
-                <p>
-                  <b>バディカード</b>
-                  <span>{selectedBuddy?.name ?? "未選択"}</span>
-                </p>
-              </div>
-            </AppCard>
-
-            <AppCard title="カードタイプ別" description="編集中 deck_cards の枚数です。">
-              <div className="dm-deck-summary-list">
-                {CARD_TYPE_ORDER.map((cardType) => (
-                  <p key={cardType}>
-                    <b>{getCardTypeLabel(cardType)}</b>
-                    <span>{typeCounts.get(cardType) ?? 0}枚</span>
-                  </p>
-                ))}
-              </div>
-            </AppCard>
-          </div>
-
-          <div className="dm-deck-editor-main">
+          <aside className="dm-deck-editor-column dm-deck-editor-search">
             <AppCard
               title="カード検索"
-              description="フラッグの使用可能ワールドでは候補を制限しません。同一カードの再録は1枚として表示します。"
+              description="使用画像はデッキ一覧のカード詳細から選択します。検索結果では画像選択を行いません。"
             >
               <form className="dm-auth-form dm-card-form">
                 <DeckCardSearchPanel
@@ -684,82 +587,44 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   sets={cardSets}
                   onChange={setSearchFilters}
                 />
-
               </form>
 
               <div className="dm-deck-list">
                 {filteredCards.map((card) => {
                   const existing = draftDeckCardMap.get(card.id);
                   return (
-                    <div
+                    <button
                       key={card.id}
-                      className="dm-deck-row"
-                      onClick={() => setSelectedPreviewCardId(card.id)}
+                      type="button"
+                      className="dm-deck-row dm-deck-row-button"
+                      onClick={() => openCardDetail(card.id)}
                     >
                       <span className="dm-deck-card-cell">
                         <CardViewer
                           card={card}
                           images={imagesByCard.get(card.id) ?? []}
-                          selectedImageId={getImageSelectValue(card.id) || null}
                           variant="compact"
                         />
                         <span>
                           {card.name} / {getCardTypeLabel(card.card_type)}
-                          {existing ? ` × ${existing.quantity}` : ""}
+                          {existing ? ` ×${existing.quantity}` : ""}
                           {!card.is_active ? "（無効）" : ""}
                         </span>
                       </span>
-                      <div className="dm-deck-row-actions">
-                        <select
-                          value={getImageSelectValue(card.id)}
-                          disabled={!canEditDeck}
-                          onChange={(event) => {
-                            const nextImageId = event.target.value;
-                            if (existing) {
-                              setPendingSelectedImages((current) => {
-                                const next = { ...current };
-                                delete next[card.id];
-                                return next;
-                              });
-                              setDraftDeckCards((current) =>
-                                setDeckCardDraftImage(current, {
-                                  cardId: card.id,
-                                  selectedImageId: nextImageId || null
-                                })
-                              );
-                              return;
-                            }
-                            setPendingSelectedImages((current) => ({
-                              ...current,
-                              [card.id]: nextImageId
-                            }));
-                          }}
-                        >
-                          <option value="">Default画像を使う</option>
-                          {(imagesByCard.get(card.id) ?? []).map((image, index) => (
-                            <option key={image.id} value={image.id}>
-                              {image.is_default
-                                ? `画像${index + 1}（Default）`
-                                : `画像${index + 1}`}
-                            </option>
-                          ))}
-                        </select>
+                      <span className="dm-deck-row-actions">
                         <Button
                           size="sm"
                           variant="primary"
                           disabled={!canEditDeck}
-                          onClick={() =>
-                            setLocalCardQuantity(
-                              card,
-                              (existing?.quantity ?? 0) + 1,
-                              getImageSelectValue(card.id) || null
-                            )
-                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+                          }}
                         >
                           追加
                         </Button>
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   );
                 })}
                 {filteredCards.length === 0 && (
@@ -767,45 +632,120 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 )}
               </div>
             </AppCard>
-
-            <AppCard title="ワールド別" description="複数ワールドカードは各ワールドに加算します。">
-              <div className="dm-deck-summary-list">
-                {worldCounts.map(([world, count]) => (
-                  <p key={world}>
-                    <b>{world}</b>
-                    <span>{count}枚</span>
-                  </p>
-                ))}
-                {worldCounts.length === 0 && (
-                  <p className="dm-muted-text">ワールド情報がありません。</p>
-                )}
-              </div>
-            </AppCard>
-
-            <AppCard title="カード詳細" description="検索結果をクリックすると表示します。">
-              {selectedPreviewCard ? (
-                <div className="dm-deck-card-detail">
-                  <CardViewer
-                    card={selectedPreviewCard}
-                    images={imagesByCard.get(selectedPreviewCard.id) ?? []}
-                    selectedImageId={getImageSelectValue(selectedPreviewCard.id) || null}
-                  />
-                  <p>
-                    <b>{selectedPreviewCard.name}</b>
-                  </p>
-                  <p>{selectedPreviewCard.card_text || "カードテキストなし"}</p>
-                </div>
-              ) : (
-                <p className="dm-muted-text">カードを選択してください。</p>
-              )}
-            </AppCard>
-          </div>
+          </aside>
         </div>
       ) : (
         <AppCard title="エラー" description={message || "デッキが見つかりません。"} />
       )}
 
       {message && deck && <p className="dm-form-message">{message}</p>}
+
+      {detailCard && (
+        <div className="dm-card-detail-modal-backdrop" role="presentation" onClick={closeCardDetail}>
+          <section
+            className="dm-card-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-card-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">CARD DETAIL</p>
+                <h2 id="deck-card-detail-title">{detailCard.name}</h2>
+              </div>
+              <button type="button" className="dm-dialog-close" onClick={closeCardDetail}>
+                ×
+              </button>
+            </header>
+
+            <div className="dm-card-detail-modal-body">
+              <CardViewer
+                card={detailCard}
+                images={imagesByCard.get(detailCard.id) ?? []}
+                selectedImageId={getImageSelectValue(detailCard.id) || null}
+              />
+
+              <div className="dm-card-detail-meta">
+                <p>
+                  <b>カードタイプ</b>
+                  <span>{getCardTypeLabel(detailCard.card_type)}</span>
+                </p>
+                <p>
+                  <b>ワールド</b>
+                  <span>{detailCard.worlds.join(" / ") || "-"}</span>
+                </p>
+                <p>
+                  <b>種族</b>
+                  <span>{detailCard.races.join(" / ") || "-"}</span>
+                </p>
+                <p>
+                  <b>カードテキスト</b>
+                  <span>{detailCard.card_text?.trim() || "-"}</span>
+                </p>
+
+                {detailDeckDraft ? (
+                  <>
+                    <label className="dm-card-detail-image-select">
+                      使用画像
+                      <select
+                        value={getImageSelectValue(detailCard.id)}
+                        disabled={!canEditDeck}
+                        onChange={(event) =>
+                          setDeckCardImage(detailCard.id, event.target.value || null)
+                        }
+                      >
+                        <option value="">Default画像を使う</option>
+                        {(imagesByCard.get(detailCard.id) ?? []).map((image, index) => (
+                          <option key={image.id} value={image.id}>
+                            {image.is_default
+                              ? `画像${index + 1}（Default）`
+                              : `画像${index + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="dm-dialog-actions">
+                      <Button
+                        size="sm"
+                        disabled={!canEditDeck}
+                        onClick={() => setLocalCardQuantity(detailCard, detailDeckDraft.quantity - 1)}
+                      >
+                        -1
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!canEditDeck}
+                        onClick={() => setLocalCardQuantity(detailCard, detailDeckDraft.quantity + 1)}
+                      >
+                        +1
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={!canEditDeck}
+                        onClick={() => setLocalCardQuantity(detailCard, 0)}
+                      >
+                        デッキから削除
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <Button
+                    variant="primary"
+                    disabled={!canEditDeck}
+                    onClick={() => setLocalCardQuantity(detailCard, 1)}
+                  >
+                    デッキへ追加
+                  </Button>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }
+
