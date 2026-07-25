@@ -553,6 +553,20 @@ async function findOrCreateCard(supabase, row, dryRun) {
   if (exactMatches.length > 1) {
     throw new Error(`同じ内容の既存カードが複数見つかりました: ${row.name}`);
   }
+  if (row.card_type === "flag_card") {
+    const sameNameFlagCards = sameNameCards.filter((card) => card.card_type === "flag_card");
+    if (sameNameFlagCards.length === 1) {
+      return {
+        card: sameNameFlagCards[0],
+        created: false,
+        wouldCreate: false,
+        reusedAsFlagArtwork: true
+      };
+    }
+    if (sameNameFlagCards.length > 1) {
+      throw new Error(`同名フラッグカードが複数あるため別イラストとして自動登録できません。確認してください: ${row.name}`);
+    }
+  }
   if (sameNameCards.length === 1) {
     if (dryRun) {
       return {

@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CardImageInput } from "@/components/cards/CardImageInput";
+import { CardViewer } from "@/components/cards/CardViewer";
 import { FlagAdminForm } from "@/components/flags/FlagAdminForm";
 import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
-import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import {
+  getOrCreateProfile,
+  type Profile
+} from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import {
   loadFlag,
@@ -14,7 +19,18 @@ import {
   updateFlag,
   type UpdateFlagInput
 } from "@/lib/flags/flagActions";
-import type { CardRecord, FlagWithCardRecord } from "@/types/baddiePhyto";
+import {
+  deleteCardImage,
+  getPublicCardImageUrl,
+  loadCardImages,
+  setDefaultCardImage,
+  uploadCardImage
+} from "@/lib/storage/cardImageStorage";
+import type {
+  CardImageRecord,
+  CardRecord,
+  FlagWithCardRecord
+} from "@/types/baddiePhyto";
 
 type FlagEditPageProps = { params: Promise<{ flagId: string }> };
 
@@ -24,11 +40,16 @@ function getFlagDisplayName(flag: FlagWithCardRecord) {
 
 export default function FlagEditPage({ params }: FlagEditPageProps) {
   const [flagId, setFlagId] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [flag, setFlag] = useState<FlagWithCardRecord | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [savingImageId, setSavingImageId] = useState("");
   const [message, setMessage] = useState("");
 
   async function reload(nextFlagId: string) {
@@ -56,7 +77,21 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
       );
     }
 
-    setFlag(flagResult.data as FlagWithCardRecord);
+    const nextFlag = flagResult.data as FlagWithCardRecord;
+    setFlag(nextFlag);
+
+    if (nextFlag.card_id) {
+      const imageResult = await loadCardImages(nextFlag.card_id);
+      if (imageResult.error) {
+        console.error(imageResult.error);
+        setMessage(`フラッグ画像の読み込みに失敗しました。${imageResult.error.message}`);
+        setImages([]);
+      } else {
+        setImages(imageResult.data ?? []);
+      }
+    } else {
+      setImages([]);
+    }
   }
 
   useEffect(() => {
@@ -71,6 +106,7 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
         return;
       }
 
+      setProfile(profile);
       setFlagId(resolvedFlagId);
       await reload(resolvedFlagId);
       setLoading(false);
@@ -118,6 +154,71 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
     setMessage("フラッグを無効化しました。");
   }
 
+  async function handleUploadImage() {
+    if (!profile || !flag?.card_id || !imageFile) return;
+
+    setUploading(true);
+    setMessage("");
+    const { error } = await uploadCardImage({
+      ownerId: profile.id,
+      cardId: flag.card_id,
+      file: imageFile
+    });
+    setUploading(false);
+
+    if (error) {
+      console.error(error);
+      setMessage(`フラッグ画像のアップロードに失敗しました。${error.message}`);
+      return;
+    }
+
+    setImageFile(null);
+    await reload(flag.id);
+    setMessage("フラッグの別イラストを登録しました。");
+  }
+
+  async function handleSetDefaultImage(image: CardImageRecord) {
+    if (!flag?.card_id) return;
+
+    setSavingImageId(image.id);
+    setMessage("");
+    const { error } = await setDefaultCardImage({
+      cardId: flag.card_id,
+      imageId: image.id
+    });
+    setSavingImageId("");
+
+    if (error) {
+      console.error(error);
+      setMessage(`Default画像の設定に失敗しました。${error.message}`);
+      return;
+    }
+
+    await reload(flag.id);
+    setMessage("フラッグのDefault画像を更新しました。");
+  }
+
+  async function handleDeleteImage(image: CardImageRecord) {
+    if (!flag || !window.confirm("このフラッグ画像を削除しますか？")) return;
+
+    setSavingImageId(image.id);
+    setMessage("");
+    const { error } = await deleteCardImage({
+      imageId: image.id,
+      imagePath: image.image_path,
+      thumbnailPath: image.thumbnail_path
+    });
+    setSavingImageId("");
+
+    if (error) {
+      console.error(error);
+      setMessage(`フラッグ画像の削除に失敗しました。${error.message}`);
+      return;
+    }
+
+    await reload(flag.id);
+    setMessage("フラッグ画像を削除しました。");
+  }
   return (
     <AppShell kicker="EDIT FLAG" title={flag ? getFlagDisplayName(flag) : "フラッグ編集"}>
       <div className="dm-page-actions">
@@ -173,6 +274,81 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
                 このフラッグは is_active=false の無効フラッグです。
               </p>
             )}
+          </AppCard>
+          <AppCard
+            title="フラッグ画像プレビュー"
+            description="紐づく flag_card の card_images を表示します。"
+          >
+            {flag.card ? (
+              <CardViewer card={flag.card} images={images} />
+            ) : (
+              <p className="dm-muted-text">
+                card_id が未設定のため、画像を登録するには先にフラッグカードを紐付けてください。
+              </p>
+            )}
+          </AppCard>
+
+          <AppCard
+            title="フラッグ別イラスト追加"
+            description="手動追加もインポート追加も同じ card_images として扱います。"
+          >
+            <CardImageInput
+              value={imageFile}
+              onChange={setImageFile}
+              onValidationError={setMessage}
+            />
+            <Button
+              variant="primary"
+              loading={uploading}
+              disabled={!flag.card_id || !imageFile}
+              onClick={handleUploadImage}
+            >
+              フラッグ画像をアップロード
+            </Button>
+          </AppCard>
+
+          <AppCard
+            title="登録済みフラッグ画像"
+            description="Default画像はデッキやViewerの未選択時に優先されます。"
+          >
+            <div className="dm-image-grid">
+              {images.map((image) => (
+                <div key={image.id} className="dm-image-item">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getPublicCardImageUrl(image.image_path) ?? ""}
+                    alt={getFlagDisplayName(flag)}
+                  />
+                  <p className="dm-card-image-selected">
+                    {image.is_default ? "Default画像" : "通常画像"}
+                  </p>
+                  <div className="dm-deck-row-actions">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={savingImageId === image.id && !image.is_default}
+                      disabled={image.is_default}
+                      onClick={() => handleSetDefaultImage(image)}
+                    >
+                      Defaultにする
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      loading={savingImageId === image.id}
+                      onClick={() => handleDeleteImage(image)}
+                    >
+                      削除
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {images.length === 0 && (
+                <p className="dm-muted-text">
+                  フラッグ画像は未登録です。画像なしの場合はHTMLカード表示にフォールバックします。
+                </p>
+              )}
+            </div>
           </AppCard>
         </div>
       ) : (

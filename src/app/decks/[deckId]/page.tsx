@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { DeckCardSearchPanel } from "@/components/decks/DeckCardSearchPanel";
@@ -75,6 +75,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [savingDeck, setSavingDeck] = useState(false);
   const [detailCardId, setDetailCardId] = useState("");
+  const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
@@ -193,6 +194,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const selectedFlag = flagMap.get(selectedFlagId) ?? null;
   const detailCard = cardMap.get(detailCardId) ?? null;
   const detailDeckDraft = detailCard ? draftDeckCardMap.get(detailCard.id) : undefined;
+  const selectedDeckDraft = selectedDeckCardId ? draftDeckCardMap.get(selectedDeckCardId) : undefined;
+  const selectedDeckCard = selectedDeckDraft ? cardMap.get(selectedDeckDraft.cardId) ?? null : null;
   const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
 
   const buddyCandidates = useMemo(
@@ -333,11 +336,34 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDetailCardId(cardId);
   }
 
+  function selectDeckCard(cardId: string) {
+    setSelectedDeckCardId(cardId);
+  }
+
   function closeCardDetail() {
     setDetailCardId("");
   }
 
-  function handleDeckCardDrop(targetCardId: string) {
+  function getDroppedSearchCardId(event: DragEvent) {
+    return event.dataTransfer.getData("application/x-baddie-card-id") || "";
+  }
+
+  function addCardToDeckById(cardId: string) {
+    const card = cardMap.get(cardId);
+    if (!card) return;
+    const existing = draftDeckCardMap.get(card.id);
+    setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+    setSelectedDeckCardId(card.id);
+  }
+
+  function handleDeckCardDrop(event: DragEvent, targetCardId: string) {
+    const droppedSearchCardId = getDroppedSearchCardId(event);
+    if (droppedSearchCardId) {
+      addCardToDeckById(droppedSearchCardId);
+      setDraggedDeckCardId(null);
+      return;
+    }
+
     if (!canEditDeck || !draggedDeckCardId) return;
     setDraftDeckCards((current) =>
       reorderDeckCardDrafts(current, {
@@ -345,6 +371,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         targetCardId
       })
     );
+    setDraggedDeckCardId(null);
+  }
+
+  function handleDeckAreaDrop(event: DragEvent) {
+    const droppedSearchCardId = getDroppedSearchCardId(event);
+    if (!droppedSearchCardId) return;
+    event.preventDefault();
+    addCardToDeckById(droppedSearchCardId);
     setDraggedDeckCardId(null);
   }
 
@@ -465,11 +499,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               title="デッキ一覧"
               description={
                 canEditDeck
-                  ? "編集中のローカルStateです。枚数変更・並び替えは保存ボタンまでDBへ反映しません。カードクリックで詳細と使用画像を選べます。"
+                  ? "編集中のローカルStateです。枚数変更・並び替えは保存ボタンまでDBへ反映しません。カードクリックで選択、ダブルクリックで詳細と使用画像を選べます。"
                   : "公開デッキを閲覧しています。並び替えや枚数変更はできません。"
               }
             >
-              <div className="dm-deck-visual-grid" aria-label="編集中デッキのカード一覧">
+              <div
+                className="dm-deck-visual-grid"
+                aria-label="編集中デッキのカード一覧"
+                onDragOver={(event) => {
+                  if (!canEditDeck) return;
+                  if (getDroppedSearchCardId(event)) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "copy";
+                  }
+                }}
+                onDrop={handleDeckAreaDrop}
+              >
                 {draftDeckCards.map((item) => {
                   const card = cardMap.get(item.cardId);
                   if (!card) return null;
@@ -477,12 +522,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     <button
                       key={item.cardId}
                       type="button"
-                      className={`dm-deck-visual-card${
-                        draggedDeckCardId === item.cardId ? " is-dragging" : ""
-                      }`}
+                      className={`dm-deck-visual-card${draggedDeckCardId === item.cardId ? " is-dragging" : ""}${selectedDeckCardId === item.cardId ? " is-selected" : ""}`}
                       draggable={canEditDeck}
                       title={`${card.name} / ${getCardTypeLabel(card.card_type)} ×${item.quantity}`}
-                      onClick={() => openCardDetail(card.id)}
+                      onClick={() => selectDeckCard(card.id)}
+                      onDoubleClick={() => openCardDetail(card.id)}
                       onDragStart={(event) => {
                         if (!canEditDeck) {
                           event.preventDefault();
@@ -493,13 +537,19 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         event.dataTransfer.setData("text/plain", item.cardId);
                       }}
                       onDragOver={(event) => {
+                        const droppedSearchCardId = getDroppedSearchCardId(event);
+                        if (droppedSearchCardId) {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "copy";
+                          return;
+                        }
                         if (!draggedDeckCardId || draggedDeckCardId === item.cardId) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = "move";
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
-                        handleDeckCardDrop(item.cardId);
+                        handleDeckCardDrop(event, item.cardId);
                       }}
                       onDragEnd={() => setDraggedDeckCardId(null)}
                     >
@@ -518,57 +568,52 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 )}
               </div>
 
-              {draftDeckCards.length > 0 && (
+              {selectedDeckDraft && selectedDeckCard && (
                 <div className="dm-deck-list">
-                  {draftDeckCards.map((item) => {
-                    const card = cardMap.get(item.cardId);
-                    if (!card) return null;
-                    return (
-                      <button
-                        key={item.cardId}
-                        type="button"
-                        className="dm-deck-row dm-deck-row-button"
-                        onClick={() => openCardDetail(card.id)}
+                  <button
+                    type="button"
+                    className="dm-deck-row dm-deck-row-button is-selected"
+                    onClick={() => selectDeckCard(selectedDeckCard.id)}
+                    onDoubleClick={() => openCardDetail(selectedDeckCard.id)}
+                  >
+                    <span className="dm-deck-card-cell">
+                      {selectedDeckCard.name} / {getCardTypeLabel(selectedDeckCard.card_type)} ×{selectedDeckDraft.quantity}
+                    </span>
+                    <span className="dm-deck-row-actions">
+                      <Button
+                        size="sm"
+                        disabled={!canEditDeck}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setLocalCardQuantity(selectedDeckCard, selectedDeckDraft.quantity - 1);
+                        }}
                       >
-                        <span className="dm-deck-card-cell">
-                          {card.name} / {getCardTypeLabel(card.card_type)} ×{item.quantity}
-                        </span>
-                        <span className="dm-deck-row-actions">
-                          <Button
-                            size="sm"
-                            disabled={!canEditDeck}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setLocalCardQuantity(card, item.quantity - 1);
-                            }}
-                          >
-                            -
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={!canEditDeck}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setLocalCardQuantity(card, item.quantity + 1);
-                            }}
-                          >
-                            +
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            disabled={!canEditDeck}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setLocalCardQuantity(card, 0);
-                            }}
-                          >
-                            削除
-                          </Button>
-                        </span>
-                      </button>
-                    );
-                  })}
+                        -
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!canEditDeck}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setLocalCardQuantity(selectedDeckCard, selectedDeckDraft.quantity + 1);
+                        }}
+                      >
+                        +
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={!canEditDeck}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setLocalCardQuantity(selectedDeckCard, 0);
+                          setSelectedDeckCardId("");
+                        }}
+                      >
+                        削除
+                      </Button>
+                    </span>
+                  </button>
                 </div>
               )}
             </AppCard>
@@ -597,7 +642,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       key={card.id}
                       type="button"
                       className="dm-deck-row dm-deck-row-button"
-                      onClick={() => openCardDetail(card.id)}
+                      draggable={canEditDeck}
+                      onClick={() => setMessage("")}
+                      onDoubleClick={() => openCardDetail(card.id)}
+                      onDragStart={(event) => {
+                        if (!canEditDeck) {
+                          event.preventDefault();
+                          return;
+                        }
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData("application/x-baddie-card-id", card.id);
+                        event.dataTransfer.setData("text/plain", card.id);
+                      }}
                     >
                       <span className="dm-deck-card-cell">
                         <CardViewer
@@ -748,4 +804,5 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     </AppShell>
   );
 }
+
 
