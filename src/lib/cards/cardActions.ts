@@ -164,3 +164,7 @@ export async function updateCard(cardId: string, input: CreateCardInput) {
 export async function setCardActive(cardId: string, isActive: boolean) {
   return await supabase.from("cards").update({ is_active: isActive }).eq("id", cardId);
 }
+
+export async function deleteCard(cardId: string) {
+  return await supabase.from("cards").delete().eq("id", cardId);
+}

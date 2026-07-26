@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CardAdminForm } from "@/components/cards/CardAdminForm";
 import { CardAbilityEditor } from "@/components/cards/CardAbilityEditor";
+import { CardAdminForm } from "@/components/cards/CardAdminForm";
 import { CardImageInput } from "@/components/cards/CardImageInput";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
@@ -14,6 +14,7 @@ import {
   type Profile
 } from "@/lib/auth/getOrCreateProfile";
 import {
+  deleteCard,
   loadCard,
   setCardActive,
   updateCard,
@@ -44,7 +45,8 @@ export default function CardEditPage({ params }: CardEditPageProps) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savingImageId, setSavingImageId] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [changingActive, setChangingActive] = useState(false);
+  const [deletingCard, setDeletingCard] = useState(false);
   const [message, setMessage] = useState("");
 
   async function reload(nextCardId: string) {
@@ -69,17 +71,17 @@ export default function CardEditPage({ params }: CardEditPageProps) {
 
   useEffect(() => {
     async function loadPage() {
-      const [{ cardId: resolvedCardId }, profile] = await Promise.all([
+      const [{ cardId: resolvedCardId }, nextProfile] = await Promise.all([
         params,
         getOrCreateProfile()
       ]);
 
-      if (!profile) {
+      if (!nextProfile) {
         window.location.href = "/login";
         return;
       }
 
-      setProfile(profile);
+      setProfile(nextProfile);
       setCardId(resolvedCardId);
       await reload(resolvedCardId);
       setLoading(false);
@@ -104,21 +106,59 @@ export default function CardEditPage({ params }: CardEditPageProps) {
     setMessage("カードを更新しました。");
   }
 
-  async function handleDeactivate() {
-    if (!card || !window.confirm(`「${card.name}」を無効化しますか？`)) return;
-    setDeleting(true);
+  async function handleSetActive(nextActive: boolean) {
+    if (!card) return;
+    const actionLabel = nextActive ? "有効化" : "無効化";
+    if (!window.confirm(`「${card.name}」を${actionLabel}しますか？`)) return;
+
+    setChangingActive(true);
     setMessage("");
-    const { error } = await setCardActive(card.id, false);
-    setDeleting(false);
+    const { error } = await setCardActive(card.id, nextActive);
+    setChangingActive(false);
 
     if (error) {
       console.error(error);
-      setMessage(`カードの無効化に失敗しました。${error.message}`);
+      setMessage(`カードの${actionLabel}に失敗しました。${error.message}`);
       return;
     }
 
     await reload(card.id);
-    setMessage("カードを無効化しました。");
+    setMessage(`カードを${actionLabel}しました。`);
+  }
+
+  async function handleDeleteCard() {
+    if (!card) return;
+    if (
+      !window.confirm(
+        `「${card.name}」を物理削除しますか？\nデッキや収録情報などで参照されている場合は削除できません。`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingCard(true);
+    setMessage("");
+    const { error } = await deleteCard(card.id);
+    setDeletingCard(false);
+
+    if (error) {
+      console.error(error);
+      setMessage(
+        `カード削除に失敗しました。デッキ・フラッグ・収録情報などで使用中の可能性があります。${error.message}`
+      );
+      return;
+    }
+
+    await Promise.all(
+      images.map((image) =>
+        deleteCardImage({
+          imageId: image.id,
+          imagePath: image.image_path,
+          thumbnailPath: image.thumbnail_path
+        })
+      )
+    );
+    window.location.href = "/cards";
   }
 
   async function handleUploadImage() {
@@ -204,7 +244,7 @@ export default function CardEditPage({ params }: CardEditPageProps) {
             }`}
           >
             <CardAdminForm
-              key={card.id}
+              key={`${card.id}:${card.updated_at}:${card.is_active}`}
               initialCard={card}
               submitLabel="カードを更新"
               loading={saving}
@@ -214,27 +254,30 @@ export default function CardEditPage({ params }: CardEditPageProps) {
 
           <AppCard
             title="カード表示プレビュー"
-            description="selected_image_id が無い場合はDefault画像、画像が無い場合はHTMLカード表示になります。"
+            description="Default画像があれば画像表示、画像がなければHTMLカード表示になります。"
           >
             <CardViewer card={card} images={images} />
-            {card.is_active ? (
+            <div className="dm-dialog-actions">
+              <Button
+                variant={card.is_active ? "danger" : "secondary"}
+                loading={changingActive}
+                onClick={() => handleSetActive(!card.is_active)}
+              >
+                {card.is_active ? "カードを無効化" : "カードを有効化"}
+              </Button>
               <Button
                 variant="danger"
-                loading={deleting}
-                onClick={handleDeactivate}
+                loading={deletingCard}
+                onClick={handleDeleteCard}
               >
-                論理削除する
+                カードを削除
               </Button>
-            ) : (
-              <p className="dm-muted-text">
-                このカードは is_active=false の無効カードです。
-              </p>
-            )}
+            </div>
           </AppCard>
 
           <AppCard
             title="画像アップロード"
-            description="Storage bucket card-images にアップロードし、card_images に登録します。thumbnail_path は今回は image_path と同じです。"
+            description="カード画像をStorageへアップロードし、card_imagesへ登録します。"
           >
             <CardImageInput
               value={imageFile}
@@ -253,7 +296,7 @@ export default function CardEditPage({ params }: CardEditPageProps) {
 
           <AppCard
             title="Ability紐付け"
-            description="abilities.behavior_key をカードへ紐付けます。Battleではこの紐付けを読み込んでAbilityを判定します。"
+            description="カードにAbilityを紐付けます。"
           >
             <CardAbilityEditor cardId={card.id} />
           </AppCard>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Button } from "@/components/common/button";
 import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
   DECK_CARD_ERA_OPTIONS,
@@ -116,7 +117,13 @@ export function DeckCardSearchPanel({
 
   const chips = [
     ...(filters.name.trim()
-      ? [{ key: "name", label: filters.name.trim(), onRemove: () => setFilters({ ...filters, name: "" }) }]
+      ? [
+          {
+            key: "name",
+            label: filters.name.trim(),
+            onRemove: () => setFilters({ ...filters, name: "" })
+          }
+        ]
       : []),
     ...(filters.cardText.trim()
       ? [
@@ -135,7 +142,8 @@ export function DeckCardSearchPanel({
     ...filters.cardTypes.map((cardType) => ({
       key: `type:${cardType}`,
       label: getCardTypeLabel(cardType),
-      onRemove: () => setArray("cardTypes", filters.cardTypes.filter((value) => value !== cardType))
+      onRemove: () =>
+        setArray("cardTypes", filters.cardTypes.filter((value) => value !== cardType))
     })),
     ...filters.races.map((race) => ({
       key: `race:${race}`,
@@ -179,166 +187,9 @@ export function DeckCardSearchPanel({
         />
       </label>
 
-      <section className="dm-deck-search-details">
-        <button
-          type="button"
-          className="dm-deck-search-details-toggle"
-          onClick={() => setDetailsOpen((current) => !current)}
-          aria-expanded={detailsOpen}
-        >
-          <span>{detailsOpen ? "▼" : "▶"} 詳細選択</span>
-        </button>
-
-        {detailsOpen && (
-          <div className="dm-deck-search-details-body">
-            <label className="dm-deck-search-name">
-              カードテキスト
-              <input
-                value={filters.cardText}
-                placeholder="カードテキストを入力"
-                onChange={(event) =>
-                  setFilters({ ...filters, cardText: event.target.value })
-                }
-              />
-            </label>
-
-            <SearchSection
-              sectionKey="worlds"
-              open={openSections.worlds}
-              onToggle={() => toggleSection("worlds")}
-            >
-              <div className="dm-checkbox-grid">
-                {worlds.map((world) => (
-                  <label key={world}>
-                    <input
-                      type="checkbox"
-                      checked={filters.worlds.includes(world)}
-                      onChange={() => setArray("worlds", toggleValue(filters.worlds, world))}
-                    />
-                    {world}
-                  </label>
-                ))}
-              </div>
-            </SearchSection>
-
-            <SearchSection
-              sectionKey="cardTypes"
-              open={openSections.cardTypes}
-              onToggle={() => toggleSection("cardTypes")}
-            >
-              <div className="dm-checkbox-grid">
-                {CARD_TYPE_OPTIONS.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      type="checkbox"
-                      checked={filters.cardTypes.includes(option.value)}
-                      onChange={() =>
-                        setArray("cardTypes", toggleValue<CardType>(filters.cardTypes, option.value))
-                      }
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </SearchSection>
-
-            <SearchSection
-              sectionKey="races"
-              open={openSections.races}
-              onToggle={() => toggleSection("races")}
-            >
-              <div className="dm-checkbox-grid">
-                {races.map((race) => (
-                  <label key={race}>
-                    <input
-                      type="checkbox"
-                      checked={filters.races.includes(race)}
-                      onChange={() => setArray("races", toggleValue(filters.races, race))}
-                    />
-                    {race}
-                  </label>
-                ))}
-              </div>
-            </SearchSection>
-
-            <SearchSection
-              sectionKey="eras"
-              open={openSections.eras}
-              onToggle={() => toggleSection("eras")}
-            >
-              <div className="dm-checkbox-grid">
-                {DECK_CARD_ERA_OPTIONS.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      type="checkbox"
-                      checked={filters.eras.includes(option.value)}
-                      onChange={() => toggleEra(option.value)}
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-
-              {filters.eras.length > 0 && (
-                <div className="dm-deck-search-sets">
-                  <h4>収録弾</h4>
-                  {DECK_CARD_ERA_OPTIONS.filter((option) =>
-                    filters.eras.includes(option.value)
-                  ).map((option) => (
-                    <div key={option.value} className="dm-deck-search-set-group">
-                      <b>{option.label}</b>
-                      <div className="dm-checkbox-grid">
-                        {(setsByEra.get(option.value) ?? []).map((set) => (
-                          <label key={set.id}>
-                            <input
-                              type="checkbox"
-                              checked={filters.setIds.includes(set.id)}
-                              onChange={() =>
-                                setArray("setIds", toggleValue(filters.setIds, set.id))
-                              }
-                            />
-                            {set.setCode}
-                          </label>
-                        ))}
-                        {(setsByEra.get(option.value) ?? []).length === 0 && (
-                          <span className="dm-muted-text">収録弾がありません。</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SearchSection>
-
-            <SearchSection
-              sectionKey="attributes"
-              open={openSections.attributes}
-              onToggle={() => toggleSection("attributes")}
-            >
-              <div className="dm-checkbox-grid">
-                {DECK_CARD_ATTRIBUTE_OPTIONS.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      type="checkbox"
-                      checked={filters.attributes.includes(option.value)}
-                      onChange={() =>
-                        setArray(
-                          "attributes",
-                          toggleValue<DeckCardAttributeKey>(
-                            filters.attributes,
-                            option.value
-                          )
-                        )
-                      }
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </SearchSection>
-          </div>
-        )}
-      </section>
+      <Button type="button" variant="secondary" onClick={() => setDetailsOpen(true)}>
+        詳細検索を開く
+      </Button>
 
       <div className="dm-deck-search-chips">
         <b>検索条件</b>
@@ -361,6 +212,200 @@ export function DeckCardSearchPanel({
           </button>
         )}
       </div>
+
+      {detailsOpen && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setDetailsOpen(false)}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-search-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-search-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">SEARCH FILTER</p>
+                <h2 id="deck-search-detail-title">詳細検索</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setDetailsOpen(false)}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="dm-deck-search-modal-body">
+              <label className="dm-deck-search-name">
+                カードテキスト
+                <input
+                  value={filters.cardText}
+                  placeholder="カードテキストを入力"
+                  onChange={(event) =>
+                    setFilters({ ...filters, cardText: event.target.value })
+                  }
+                />
+              </label>
+
+              <SearchSection
+                sectionKey="worlds"
+                open={openSections.worlds}
+                onToggle={() => toggleSection("worlds")}
+              >
+                <div className="dm-checkbox-grid">
+                  {worlds.map((world) => (
+                    <label key={world}>
+                      <input
+                        type="checkbox"
+                        checked={filters.worlds.includes(world)}
+                        onChange={() => setArray("worlds", toggleValue(filters.worlds, world))}
+                      />
+                      {world}
+                    </label>
+                  ))}
+                </div>
+              </SearchSection>
+
+              <SearchSection
+                sectionKey="cardTypes"
+                open={openSections.cardTypes}
+                onToggle={() => toggleSection("cardTypes")}
+              >
+                <div className="dm-checkbox-grid">
+                  {CARD_TYPE_OPTIONS.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={filters.cardTypes.includes(option.value)}
+                        onChange={() =>
+                          setArray(
+                            "cardTypes",
+                            toggleValue<CardType>(filters.cardTypes, option.value)
+                          )
+                        }
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </SearchSection>
+
+              <SearchSection
+                sectionKey="races"
+                open={openSections.races}
+                onToggle={() => toggleSection("races")}
+              >
+                <div className="dm-checkbox-grid">
+                  {races.map((race) => (
+                    <label key={race}>
+                      <input
+                        type="checkbox"
+                        checked={filters.races.includes(race)}
+                        onChange={() => setArray("races", toggleValue(filters.races, race))}
+                      />
+                      {race}
+                    </label>
+                  ))}
+                </div>
+              </SearchSection>
+
+              <SearchSection
+                sectionKey="eras"
+                open={openSections.eras}
+                onToggle={() => toggleSection("eras")}
+              >
+                <div className="dm-checkbox-grid">
+                  {DECK_CARD_ERA_OPTIONS.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={filters.eras.includes(option.value)}
+                        onChange={() => toggleEra(option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+
+                {filters.eras.length > 0 && (
+                  <div className="dm-deck-search-sets">
+                    <h4>収録弾</h4>
+                    {DECK_CARD_ERA_OPTIONS.filter((option) =>
+                      filters.eras.includes(option.value)
+                    ).map((option) => (
+                      <div key={option.value} className="dm-deck-search-set-group">
+                        <b>{option.label}</b>
+                        <div className="dm-checkbox-grid">
+                          {(setsByEra.get(option.value) ?? []).map((set) => (
+                            <label key={set.id}>
+                              <input
+                                type="checkbox"
+                                checked={filters.setIds.includes(set.id)}
+                                onChange={() =>
+                                  setArray("setIds", toggleValue(filters.setIds, set.id))
+                                }
+                              />
+                              {set.setCode}
+                            </label>
+                          ))}
+                          {(setsByEra.get(option.value) ?? []).length === 0 && (
+                            <span className="dm-muted-text">収録弾がありません。</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SearchSection>
+
+              <SearchSection
+                sectionKey="attributes"
+                open={openSections.attributes}
+                onToggle={() => toggleSection("attributes")}
+              >
+                <div className="dm-checkbox-grid">
+                  {DECK_CARD_ATTRIBUTE_OPTIONS.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={filters.attributes.includes(option.value)}
+                        onChange={() =>
+                          setArray(
+                            "attributes",
+                            toggleValue<DeckCardAttributeKey>(
+                              filters.attributes,
+                              option.value
+                            )
+                          )
+                        }
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </SearchSection>
+
+              <div className="dm-dialog-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setFilters(EMPTY_DECK_CARD_SEARCH_FILTERS)}
+                >
+                  条件をクリア
+                </Button>
+                <Button type="button" variant="primary" onClick={() => setDetailsOpen(false)}>
+                  閉じる
+                </Button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

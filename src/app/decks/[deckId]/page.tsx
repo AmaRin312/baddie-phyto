@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { DeckCardSearchPanel } from "@/components/decks/DeckCardSearchPanel";
@@ -50,6 +50,16 @@ import {
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
+const DECK_SEARCH_TYPE_ORDER: Record<CardRecord["card_type"], number> = {
+  monster: 0,
+  spell: 1,
+  item: 2,
+  impact: 3,
+  impact_monster: 4,
+  flag_card: 5,
+  other: 6
+};
+
 function getFlagName(flag?: FlagWithCardRecord | null) {
   return flag?.name || flag?.card?.name || "未選択";
 }
@@ -79,7 +89,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
+  const [flagPickerOpen, setFlagPickerOpen] = useState(false);
+  const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const deferredSearchFilters = useDeferredValue(searchFilters);
 
   const reload = useCallback(async (currentDeckId: string) => {
     const [
@@ -233,16 +246,25 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     return filterDeckCandidateCards({
       cards,
       printings: cardPrintings,
-      filters: searchFilters,
+      filters: deferredSearchFilters,
       selectedBuddyCardId: effectiveSelectedBuddyCardId,
       selectedFlagCardId: selectedFlag?.card_id,
       excludeInactive: false,
       excludeFlagCard: false
+    }).sort((left, right) => {
+      const typeDiff =
+        DECK_SEARCH_TYPE_ORDER[left.card_type] - DECK_SEARCH_TYPE_ORDER[right.card_type];
+      if (typeDiff !== 0) return typeDiff;
+      if (left.card_type === "monster" && right.card_type === "monster") {
+        const sizeDiff = (right.size ?? -1) - (left.size ?? -1);
+        if (sizeDiff !== 0) return sizeDiff;
+      }
+      return left.name.localeCompare(right.name, "ja");
     });
   }, [
     cardPrintings,
     cards,
-    searchFilters,
+    deferredSearchFilters,
     effectiveSelectedBuddyCardId,
     selectedFlag?.card_id
   ]);
@@ -462,21 +484,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               >
                 <label>
                   フラッグ
-                  <select
-                    value={selectedFlagId}
-                    onChange={(event) => {
-                      setSelectedFlagId(event.target.value);
-                      setSelectedFlagImageId("");
-                    }}
+                  <button
+                    type="button"
+                    className="dm-deck-picker-button"
+                    onClick={() => setFlagPickerOpen(true)}
                     disabled={!canEditDeck}
                   >
-                    <option value="">選択してください</option>
-                    {flags.map((flag) => (
-                      <option key={flag.id} value={flag.id}>
-                        {getFlagName(flag)}
-                      </option>
-                    ))}
-                  </select>
+                    <span>{selectedFlag ? getFlagName(selectedFlag) : "選択してください"}</span>
+                    <small>変更</small>
+                  </button>
                 </label>
 
                 {selectedFlagCard && (
@@ -500,18 +516,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                 <label>
                   バディ
-                  <select
-                    value={effectiveSelectedBuddyCardId}
-                    onChange={(event) => setSelectedBuddyCardId(event.target.value)}
+                  <button
+                    type="button"
+                    className="dm-deck-picker-button"
+                    onClick={() => setBuddyPickerOpen(true)}
                     disabled={!canEditDeck || buddyCandidates.length === 0}
                   >
-                    <option value="">デッキ内カードから選択</option>
-                    {buddyCandidates.map((card) => (
-                      <option key={card.id} value={card.id}>
-                        {card.name}
-                      </option>
-                    ))}
-                  </select>
+                    <span>{selectedBuddyCard?.name ?? "デッキ内カードから選択"}</span>
+                    <small>変更</small>
+                  </button>
                 </label>
 
                 {selectedBuddyCard && (
@@ -679,6 +692,38 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     {selectedDeckCard.name} / ×{selectedDeckDraft.quantity}
                   </b>
                   {effectiveSelectedBuddyCardId === selectedDeckCard.id && <span>バディ</span>}
+                  <div className="dm-deck-selected-actions">
+                    <Button
+                      size="sm"
+                      disabled={!canEditDeck}
+                      onClick={() =>
+                        setLocalCardQuantity(selectedDeckCard, selectedDeckDraft.quantity - 1)
+                      }
+                    >
+                      -1
+                    </Button>
+                    <strong>{selectedDeckDraft.quantity}枚</strong>
+                    <Button
+                      size="sm"
+                      disabled={!canEditDeck}
+                      onClick={() =>
+                        setLocalCardQuantity(selectedDeckCard, selectedDeckDraft.quantity + 1)
+                      }
+                    >
+                      +1
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={
+                        !canEditDeck ||
+                        selectedDeckCard.card_type === "flag_card" ||
+                        effectiveSelectedBuddyCardId === selectedDeckCard.id
+                      }
+                      onClick={() => setAsBuddy(selectedDeckCard.id)}
+                    >
+                      バディ
+                    </Button>
+                  </div>
                 </div>
               )}
             </AppCard>
@@ -758,6 +803,163 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       )}
 
       {message && deck && <p className="dm-form-message">{message}</p>}
+
+      {flagPickerOpen && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setFlagPickerOpen(false)}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-flag-picker-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">FLAG PICKER</p>
+                <h2 id="deck-flag-picker-title">フラッグを選択</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setFlagPickerOpen(false)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="dm-deck-picker-list">
+              <button
+                type="button"
+                className={`dm-deck-picker-option${!selectedFlagId ? " is-selected" : ""}`}
+                disabled={!canEditDeck}
+                onClick={() => {
+                  setSelectedFlagId("");
+                  setSelectedFlagImageId("");
+                  setFlagPickerOpen(false);
+                }}
+              >
+                <span>
+                  <b>未選択</b>
+                  <small>あとで選択します</small>
+                </span>
+              </button>
+              {flags.map((flag) => (
+                <button
+                  key={flag.id}
+                  type="button"
+                  className={`dm-deck-picker-option${
+                    selectedFlagId === flag.id ? " is-selected" : ""
+                  }`}
+                  disabled={!canEditDeck}
+                  onClick={() => {
+                    setSelectedFlagId(flag.id);
+                    setSelectedFlagImageId("");
+                    setFlagPickerOpen(false);
+                  }}
+                >
+                  {flag.card && (
+                    <CardViewer
+                      card={flag.card}
+                      images={imagesByCard.get(flag.card.id) ?? []}
+                      selectedImageId={null}
+                      variant="compact"
+                    />
+                  )}
+                  <span>
+                    <b>{getFlagName(flag)}</b>
+                    <small>
+                      手札{flag.initial_hand} / ゲージ{flag.initial_gauge} / ライフ
+                      {flag.initial_life}
+                    </small>
+                  </span>
+                </button>
+              ))}
+              {flags.length === 0 && (
+                <p className="dm-muted-text">選択できるフラッグがありません。</p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {buddyPickerOpen && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setBuddyPickerOpen(false)}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-buddy-picker-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">BUDDY PICKER</p>
+                <h2 id="deck-buddy-picker-title">バディを選択</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setBuddyPickerOpen(false)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="dm-deck-picker-list">
+              <button
+                type="button"
+                className={`dm-deck-picker-option${
+                  !effectiveSelectedBuddyCardId ? " is-selected" : ""
+                }`}
+                disabled={!canEditDeck}
+                onClick={() => {
+                  setSelectedBuddyCardId("");
+                  setBuddyPickerOpen(false);
+                }}
+              >
+                <span>
+                  <b>未選択</b>
+                  <small>デッキ内カードからあとで選択します</small>
+                </span>
+              </button>
+              {buddyCandidates.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={`dm-deck-picker-option${
+                    effectiveSelectedBuddyCardId === card.id ? " is-selected" : ""
+                  }`}
+                  disabled={!canEditDeck}
+                  onClick={() => {
+                    setSelectedBuddyCardId(card.id);
+                    setBuddyPickerOpen(false);
+                  }}
+                >
+                  <CardViewer
+                    card={card}
+                    images={imagesByCard.get(card.id) ?? []}
+                    selectedImageId={getImageSelectValue(card.id) || null}
+                    variant="compact"
+                  />
+                  <span>
+                    <b>{card.name}</b>
+                    <small>{getCardTypeLabel(card.card_type)}</small>
+                  </span>
+                </button>
+              ))}
+              {buddyCandidates.length === 0 && (
+                <p className="dm-muted-text">バディ候補はデッキへカードを追加すると表示されます。</p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {detailCard && (
         <div className="dm-card-detail-modal-backdrop" role="presentation" onClick={closeCardDetail}>

@@ -57,12 +57,8 @@ export function CardAdminForm({
   );
   const [size, setSize] = useState(optionalNumberToInput(initialCard?.size));
   const [power, setPower] = useState(optionalNumberToInput(initialCard?.power));
-  const [defense, setDefense] = useState(
-    optionalNumberToInput(initialCard?.defense)
-  );
-  const [critical, setCritical] = useState(
-    optionalNumberToInput(initialCard?.critical)
-  );
+  const [defense, setDefense] = useState(optionalNumberToInput(initialCard?.defense));
+  const [critical, setCritical] = useState(optionalNumberToInput(initialCard?.critical));
   const [cardText, setCardText] = useState(initialCard?.card_text ?? "");
   const [isDragon, setIsDragon] = useState(initialCard?.is_dragon ?? false);
   const [isCornerKing, setIsCornerKing] = useState(
@@ -73,6 +69,7 @@ export function CardAdminForm({
   const [isGeneric, setIsGeneric] = useState(initialCard?.is_generic ?? false);
   const [isHeaven, setIsHeaven] = useState(initialCard?.is_heaven ?? false);
   const [isHell, setIsHell] = useState(initialCard?.is_hell ?? false);
+  const [isOriginal, setIsOriginal] = useState(initialCard?.is_original ?? false);
   const [isActive, setIsActive] = useState(initialCard?.is_active ?? true);
   const [message, setMessage] = useState("");
 
@@ -106,6 +103,7 @@ export function CardAdminForm({
       isGeneric,
       isHeaven,
       isHell,
+      isOriginal,
       isActive
     });
   }
@@ -157,7 +155,7 @@ export function CardAdminForm({
         ワールド
         <input
           value={worldsText}
-          placeholder="例: ドラゴンワールド, スタードラゴンワールド"
+          placeholder="例：ドラゴンW, スタードラゴンW"
           onChange={(event) => setWorldsText(event.target.value)}
         />
       </label>
@@ -166,7 +164,7 @@ export function CardAdminForm({
         種族
         <input
           value={racesText}
-          placeholder="例: ドラゴン, 雷帝軍"
+          placeholder="例：ドラゴン, 雷帝軍"
           onChange={(event) => setRacesText(event.target.value)}
         />
       </label>
@@ -281,6 +279,14 @@ export function CardAdminForm({
             />
             灼熱地獄
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={isOriginal}
+              onChange={(event) => setIsOriginal(event.target.checked)}
+            />
+            オリカ
+          </label>
         </div>
       </fieldset>
 
@@ -294,8 +300,8 @@ export function CardAdminForm({
       </label>
 
       <div className="dm-card-form-preview">
-        <p>ワールド：{worlds.join("・") || "未入力"}</p>
-        <p>種族：{races.join("・") || "未入力"}</p>
+        <p>ワールド：{worlds.join(" / ") || "未入力"}</p>
+        <p>種族：{races.join(" / ") || "未入力"}</p>
       </div>
 
       <Button type="submit" variant="primary" loading={loading} fullWidth>

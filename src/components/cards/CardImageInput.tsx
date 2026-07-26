@@ -26,7 +26,7 @@ export function CardImageInput({
     if (!file) return;
 
     if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
-      onValidationError("PNG、JPEG、WebP形式の画像を選択してください。");
+      onValidationError("PNG / JPEG / WebP形式の画像を選択してください。");
       return;
     }
 
