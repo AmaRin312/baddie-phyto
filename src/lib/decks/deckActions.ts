@@ -140,6 +140,91 @@ export async function updateDeckSettings(input: {
     .single<DeckRecord>();
 }
 
+export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return {
+      data: null,
+      error: userError ?? new Error("ログインが必要です。")
+    };
+  }
+
+  const sourceDeckResult = await loadDeck(input.sourceDeckId);
+  if (sourceDeckResult.error || !sourceDeckResult.data) {
+    return {
+      data: null,
+      error: sourceDeckResult.error ?? new Error("コピー元デッキが見つかりません。")
+    };
+  }
+
+  const sourceDeckCardsResult = await loadDeckCards(input.sourceDeckId);
+  if (sourceDeckCardsResult.error) {
+    return {
+      data: null,
+      error: sourceDeckCardsResult.error
+    };
+  }
+
+  const sourceDeck = sourceDeckResult.data;
+  const baseInsert = {
+    owner_id: userData.user.id,
+    name: input.name?.trim() || `${sourceDeck.name} のコピー`,
+    flag_id: sourceDeck.flag_id,
+    buddy_card_id: sourceDeck.buddy_card_id,
+    selected_flag_image_id: sourceDeck.selected_flag_image_id,
+    deck_visibility: "private" as DeckVisibility,
+    era_key: sourceDeck.era_key ?? null
+  };
+
+  const insertWithBuddyImage = await supabase
+    .from("decks")
+    .insert({
+      ...baseInsert,
+      selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  const insertResult =
+    !insertWithBuddyImage.error ||
+    !isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id")
+      ? insertWithBuddyImage
+      : await supabase
+          .from("decks")
+          .insert(baseInsert)
+          .select("id")
+          .single<{ id: string }>();
+
+  if (insertResult.error || !insertResult.data) {
+    return {
+      data: null,
+      error: insertResult.error ?? new Error("デッキコピーの作成に失敗しました。")
+    };
+  }
+
+  for (const deckCard of sourceDeckCardsResult.data ?? []) {
+    const { error } = await setDeckCard({
+      deckId: insertResult.data.id,
+      cardId: deckCard.card_id,
+      quantity: deckCard.quantity,
+      sortOrder: deckCard.sort_order,
+      selectedImageId: deckCard.selected_image_id
+    });
+
+    if (error) {
+      return {
+        data: null,
+        error
+      };
+    }
+  }
+
+  return {
+    data: insertResult.data,
+    error: null
+  };
+}
+
 export async function setDeckCard(input: {
   deckId: string;
   cardId: string;

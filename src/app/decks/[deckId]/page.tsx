@@ -41,7 +41,6 @@ import {
   DECK_ERA_OPTIONS,
   DECK_VISIBILITY_OPTIONS,
   getCardTypeLabel,
-  getDeckVisibilityLabel,
   type DeckEraKey,
   type CardImageRecord,
   type CardRecord,
@@ -558,7 +557,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     {selectedFlagCard && (
                       <button
                         type="button"
-                    className="dm-deck-linked-card is-mini"
+                        className="dm-deck-linked-card is-mini"
                         title={`フラッグ: ${selectedFlagCard.name}`}
                         aria-label={`フラッグ画像: ${selectedFlagCard.name}`}
                         onClick={() => openCardDetail(selectedFlagCard.id)}
@@ -634,14 +633,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     ))}
                   </select>
                 </label>
-                <p className="dm-muted-text">
-                  {getDeckVisibilityLabel(deckVisibility)}：
-                  {
-                    DECK_VISIBILITY_OPTIONS.find(
-                      (option) => option.value === deckVisibility
-                    )?.description
-                  }
-                </p>
 
                 <Button
                   type="submit"

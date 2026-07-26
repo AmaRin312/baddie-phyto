@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
-import { loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
+import { copyDeck, loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import {
@@ -42,6 +43,7 @@ function findDisplayImageId(
 }
 
 export default function DecksPage() {
+  const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
   const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
   const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
@@ -51,6 +53,9 @@ export default function DecksPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [eraFilter, setEraFilter] = useState<DeckEraKey | "">("");
+  const [selectedDeckForAction, setSelectedDeckForAction] =
+    useState<DeckRecord | null>(null);
+  const [copyingDeck, setCopyingDeck] = useState(false);
 
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
@@ -143,6 +148,25 @@ export default function DecksPage() {
     void loadPage();
   }, []);
 
+  async function handleCopySelectedDeck() {
+    if (!selectedDeckForAction) return;
+    setCopyingDeck(true);
+    setMessage("");
+    const result = await copyDeck({
+      sourceDeckId: selectedDeckForAction.id
+    });
+    setCopyingDeck(false);
+
+    if (result.error || !result.data) {
+      console.error(result.error);
+      setMessage(`デッキのコピーに失敗しました。${result.error?.message ?? ""}`);
+      return;
+    }
+
+    setSelectedDeckForAction(null);
+    router.push(`/decks/${result.data.id}`);
+  }
+
   function renderDeckCard(deck: DeckRecord) {
     const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
     const flagCard = flag?.card ?? null;
@@ -164,7 +188,11 @@ export default function DecksPage() {
 
     return (
       <AppCard key={deck.id} title={deck.name}>
-        <div className="dm-deck-management-card">
+        <button
+          type="button"
+          className="dm-deck-management-card dm-deck-management-click-card"
+          onClick={() => setSelectedDeckForAction(deck)}
+        >
           <div className="dm-deck-management-images">
             <div>
               <span>ワールド</span>
@@ -194,12 +222,10 @@ export default function DecksPage() {
             </div>
           </div>
           <p className="dm-muted-text">年代：{getDeckEraLabel(deck.era_key)}</p>
-          <div className="dm-dialog-actions">
-            <Link href={`/decks/${deck.id}`} className="dm-button secondary">
-              {isOwnDeck ? "編集" : "閲覧"}
-            </Link>
-          </div>
-        </div>
+          <p className="dm-muted-text">
+            {isOwnDeck ? "クリックで編集確認" : "クリックでコピー確認"}
+          </p>
+        </button>
       </AppCard>
     );
   }
@@ -254,6 +280,86 @@ export default function DecksPage() {
               </div>
             </section>
           ))}
+        </div>
+      )}
+
+      {selectedDeckForAction && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setSelectedDeckForAction(null)}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-action-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-action-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">DECK ACTION</p>
+                <h2 id="deck-action-modal-title">{selectedDeckForAction.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setSelectedDeckForAction(null)}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="dm-card-detail-modal-body">
+              {selectedDeckForAction.owner_id === currentUserId ? (
+                <AppCard
+                  title="このデッキを編集しますか？"
+                  description="デッキ編集画面へ移動します。"
+                >
+                  <div className="dm-dialog-actions">
+                    <button
+                      type="button"
+                      className="dm-button secondary"
+                      onClick={() => setSelectedDeckForAction(null)}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      className="dm-button primary"
+                      onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
+                    >
+                      編集する
+                    </button>
+                  </div>
+                </AppCard>
+              ) : (
+                <AppCard
+                  title="このデッキをコピーして保存しますか？"
+                  description="共有デッキやサンプルデッキは、自分用にコピーしてから編集できます。"
+                >
+                  <div className="dm-dialog-actions">
+                    <button
+                      type="button"
+                      className="dm-button secondary"
+                      onClick={() => setSelectedDeckForAction(null)}
+                      disabled={copyingDeck}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      className="dm-button primary"
+                      onClick={() => void handleCopySelectedDeck()}
+                      disabled={copyingDeck}
+                    >
+                      {copyingDeck ? "コピー中..." : "コピーして保存"}
+                    </button>
+                  </div>
+                </AppCard>
+              )}
+            </div>
+          </section>
         </div>
       )}
     </AppShell>

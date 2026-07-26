@@ -1352,12 +1352,12 @@ select {
   min-width: 0;
   justify-content: center;
   gap: 0;
-  padding: 6px;
+  padding: 4px;
 }
 
 .dm-deck-linked-card.is-mini > article {
-  flex: 0 0 44px;
-  width: 44px;
+  flex: 0 0 34px;
+  width: 34px;
 }
 
 .dm-deck-linked-card span {
@@ -4494,12 +4494,21 @@ select {
 
 .dm-deck-management-sections {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .dm-deck-management-section {
   display: grid;
-  gap: 14px;
+  gap: 10px;
+}
+
+.dm-deck-management-section .dm-app-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.dm-deck-management-section .dm-card {
+  padding: 14px;
 }
 
 .dm-section-heading {
@@ -4512,7 +4521,7 @@ select {
 .dm-section-heading h2 {
   margin: 0;
   color: var(--dm-blue-dark);
-  font-size: clamp(22px, 2.2vw, 32px);
+  font-size: clamp(18px, 1.7vw, 24px);
 }
 
 .dm-section-heading p {
@@ -4530,18 +4539,33 @@ select {
 
 .dm-deck-management-card {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+}
+
+.dm-deck-management-click-card {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.dm-deck-management-click-card:hover {
+  transform: translateY(-1px);
 }
 
 .dm-deck-management-images {
   display: flex;
-  align-items: start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
 .dm-deck-management-images > div {
   min-width: 0;
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -4552,12 +4576,12 @@ select {
 }
 
 .dm-deck-management-images article {
-  width: 54px;
+  width: 38px;
 }
 
 .dm-deck-management-empty {
-  min-width: 54px;
-  min-height: 76px;
+  min-width: 38px;
+  min-height: 54px;
   border: 1px dashed rgba(147, 197, 253, 0.86);
   border-radius: 12px;
   display: grid;
@@ -4566,6 +4590,10 @@ select {
   background: rgba(239, 246, 255, 0.62);
   font-size: 11px;
   font-weight: 850;
+}
+
+.dm-deck-action-modal {
+  max-width: 560px;
 }
 
 .dm-deck-visual-card.is-selected {
