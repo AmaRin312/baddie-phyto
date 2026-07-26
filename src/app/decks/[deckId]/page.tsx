@@ -586,6 +586,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                           images={imagesByCard.get(selectedFlagCard.id) ?? []}
                           selectedImageId={selectedFlagImageId || null}
                           variant="compact"
+                          forcePortrait
                         />
                       </button>
                     )}
@@ -604,6 +605,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                           images={imagesByCard.get(selectedBuddyCard.id) ?? []}
                           selectedImageId={selectedBuddyImageId || null}
                           variant="compact"
+                          forcePortrait
                         />
                       </button>
                     )}
@@ -749,6 +751,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         images={imagesByCard.get(card.id) ?? []}
                         selectedImageId={item.selectedImageId}
                         variant="compact"
+                        forcePortrait
                       />
                       <span className="dm-deck-visual-count">×{item.quantity}</span>
                     </button>

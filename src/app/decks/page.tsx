@@ -42,11 +42,6 @@ function findDisplayImageId(
   return images.find((image) => image.is_default)?.id ?? null;
 }
 
-function getDeckCardLabel(deckCard: DeckCardRecord, cardMap: Map<string, CardRecord>) {
-  const card = cardMap.get(deckCard.card_id);
-  return card ? card.name : "未登録カード";
-}
-
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
@@ -192,20 +187,20 @@ export default function DecksPage() {
           return (
             <div key={deckCard.id} className="dm-deck-content-row">
               {card ? (
-                <CardViewer
-                  card={card}
-                  images={imagesByCard.get(card.id) ?? []}
-                  selectedImageId={selectedImageId}
-                  variant="compact"
-                  className="dm-deck-content-row-image"
-                />
+                <>
+                  <CardViewer
+                    card={card}
+                    images={imagesByCard.get(card.id) ?? []}
+                    selectedImageId={selectedImageId}
+                    variant="compact"
+                    className="dm-deck-content-row-image"
+                    forcePortrait
+                  />
+                  <span className="dm-deck-content-row-count">×{deckCard.quantity}</span>
+                </>
               ) : (
                 <span className="dm-deck-content-row-empty">?</span>
               )}
-              <div>
-                <b>{getDeckCardLabel(deckCard, cardMap)}</b>
-                <span>×{deckCard.quantity}</span>
-              </div>
             </div>
           );
         })}
@@ -256,6 +251,7 @@ export default function DecksPage() {
                   selectedImageId={flagImageId}
                   variant="compact"
                   className="dm-deck-management-image"
+                  forcePortrait
                 />
               ) : (
                 <span className="dm-deck-management-empty">未選択</span>
@@ -269,6 +265,7 @@ export default function DecksPage() {
                   selectedImageId={buddyImageId}
                   variant="compact"
                   className="dm-deck-management-image"
+                  forcePortrait
                 />
               ) : (
                 <span className="dm-deck-management-empty">未選択</span>

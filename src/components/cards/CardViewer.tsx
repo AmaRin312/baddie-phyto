@@ -9,6 +9,7 @@ type CardViewerProps = {
   className?: string;
   variant?: "viewer" | "compact" | "board";
   faceDown?: boolean;
+  forcePortrait?: boolean;
 };
 
 function formatValue(value: number | null) {
@@ -21,7 +22,8 @@ export function CardViewer({
   selectedImageId,
   className = "",
   variant = "viewer",
-  faceDown = false
+  faceDown = false,
+  forcePortrait = false
 }: CardViewerProps) {
   const displayCard = getDisplayCard({ card, images, selectedImageId });
   const rootClassName = [
@@ -43,12 +45,19 @@ export function CardViewer({
 
   const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
 
+  const imageClassName = [
+    styles.image,
+    forcePortrait && card.orientation === "horizontal" ? styles.forcePortraitImage : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   if (!displayCard.useHtmlCard && imageSrc) {
     return (
       <article className={rootClassName} aria-label={displayCard.name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          className={styles.image}
+          className={imageClassName}
           src={imageSrc}
           alt={displayCard.name}
         />
