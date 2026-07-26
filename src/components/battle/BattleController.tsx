@@ -410,10 +410,18 @@ export function BattleController() {
     }
 
     try {
+      const activeCardIds = new Set(
+        ((cardResult.data ?? []) as CardRecord[])
+          .filter((card) => card.is_active)
+          .map((card) => card.id)
+      );
+      const activeDeckCards = (deckCardsResult.data ?? []).filter((deckCard) =>
+        activeCardIds.has(deckCard.card_id)
+      );
       const resetSource: BattleResetSource = {
         flag: flagResult.data,
         buddyCardId: deckResult.data.buddy_card_id,
-        deckCards: deckCardsResult.data ?? []
+        deckCards: activeDeckCards
       };
       const freshBattleState = createInitialBattleState(resetSource);
       const savedBattleStateResult = await loadBattleState(roomId);

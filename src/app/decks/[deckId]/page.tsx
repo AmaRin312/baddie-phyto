@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { DeckCardSearchPanel } from "@/components/decks/DeckCardSearchPanel";
 import { AppCard } from "@/components/common/card/AppCard";
@@ -65,6 +66,7 @@ function getFlagName(flag?: FlagWithCardRecord | null) {
 }
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
+  const router = useRouter();
   const [deckId, setDeckId] = useState("");
   const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [deckName, setDeckName] = useState("");
@@ -218,7 +220,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     : null;
   const selectedDeckCard = selectedDeckCardId
     ? draftDeckCardMap.has(selectedDeckCardId)
-      ? cardMap.get(selectedDeckCardId) ?? null
+      ? cardMap.get(selectedDeckCardId)?.is_active
+        ? cardMap.get(selectedDeckCardId) ?? null
+        : null
       : null
     : null;
   const selectedDeckDraft = selectedDeckCardId
@@ -249,7 +253,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       filters: deferredSearchFilters,
       selectedBuddyCardId: effectiveSelectedBuddyCardId,
       selectedFlagCardId: selectedFlag?.card_id,
-      excludeInactive: false,
+      excludeInactive: true,
       excludeFlagCard: false
     }).sort((left, right) => {
       const typeDiff =
@@ -269,7 +273,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     selectedFlag?.card_id
   ]);
 
-  const mainDeckTotal = draftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
+  const visibleFilteredCards = useMemo(() => filteredCards.slice(0, 120), [filteredCards]);
+  const activeDraftDeckCards = useMemo(
+    () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
+    [cardMap, draftDeckCards]
+  );
+  const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
   const canEditDeck = Boolean(deck && currentUserId && deck.owner_id === currentUserId);
   const hasUnsavedChanges = deck
     ? deckName.trim() !== deck.name ||
@@ -341,9 +350,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
     }
 
-    await reload(deck.id);
     setSavingDeck(false);
-    setMessage("デッキを保存しました。");
+    router.push("/decks");
   }
 
   function setLocalCardQuantity(card: CardRecord, quantity: number) {
@@ -474,7 +482,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       ) : deck ? (
         <div className="dm-deck-editor-layout is-three-column">
           <aside className="dm-deck-editor-column dm-deck-editor-settings">
-            <AppCard title="デッキ設定" description="保存ボタンを押すまでSupabaseへ反映しません。">
+            <AppCard title="デッキ設定">
               <form
                 className="dm-auth-form dm-card-form"
                 onSubmit={(event) => {
@@ -495,25 +503,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </button>
                 </label>
 
-                {selectedFlagCard && (
-                  <button
-                    type="button"
-                    className="dm-deck-linked-card"
-                    onClick={() => openCardDetail(selectedFlagCard.id)}
-                  >
-                    <CardViewer
-                      card={selectedFlagCard}
-                      images={imagesByCard.get(selectedFlagCard.id) ?? []}
-                      selectedImageId={selectedFlagImageId || null}
-                      variant="compact"
-                    />
-                    <span>
-                      <b>{selectedFlagCard.name}</b>
-                      <small>フラッグ詳細・画像変更</small>
-                    </span>
-                  </button>
-                )}
-
                 <label>
                   バディ
                   <button
@@ -527,30 +516,48 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </button>
                 </label>
 
-                {selectedBuddyCard && (
-                  <button
-                    type="button"
-                    className="dm-deck-linked-card"
-                    onClick={() => selectDeckCard(selectedBuddyCard.id)}
-                    onDoubleClick={() => openCardDetail(selectedBuddyCard.id)}
-                  >
-                    <CardViewer
-                      card={selectedBuddyCard}
-                      images={imagesByCard.get(selectedBuddyCard.id) ?? []}
-                      selectedImageId={getImageSelectValue(selectedBuddyCard.id) || null}
-                      variant="compact"
-                    />
-                    <span>
-                      <b>{selectedBuddyCard.name}</b>
-                      <small>ダブルクリックで詳細・画像変更</small>
-                    </span>
-                  </button>
-                )}
+                {(selectedFlagCard || selectedBuddyCard) && (
+                  <div className="dm-deck-linked-card-strip">
+                    {selectedFlagCard && (
+                      <button
+                        type="button"
+                        className="dm-deck-linked-card is-mini"
+                        onClick={() => openCardDetail(selectedFlagCard.id)}
+                      >
+                        <CardViewer
+                          card={selectedFlagCard}
+                          images={imagesByCard.get(selectedFlagCard.id) ?? []}
+                          selectedImageId={selectedFlagImageId || null}
+                          variant="compact"
+                        />
+                        <span>
+                          <b>フラッグ</b>
+                          <small>{selectedFlagCard.name}</small>
+                        </span>
+                      </button>
+                    )}
 
-                <div className="dm-deck-total-panel" aria-label="デッキ総枚数">
-                  <b>デッキ枚数</b>
-                  <span>{mainDeckTotal}枚</span>
-                </div>
+                    {selectedBuddyCard && (
+                      <button
+                        type="button"
+                        className="dm-deck-linked-card is-mini"
+                        onClick={() => selectDeckCard(selectedBuddyCard.id)}
+                        onDoubleClick={() => openCardDetail(selectedBuddyCard.id)}
+                      >
+                        <CardViewer
+                          card={selectedBuddyCard}
+                          images={imagesByCard.get(selectedBuddyCard.id) ?? []}
+                          selectedImageId={getImageSelectValue(selectedBuddyCard.id) || null}
+                          variant="compact"
+                        />
+                        <span>
+                          <b>バディ</b>
+                          <small>{selectedBuddyCard.name}</small>
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <label>
                   デッキ名
@@ -608,6 +615,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   : "公開デッキを閲覧しています。並び替えや枚数変更はできません。"
               }
             >
+              <div className="dm-deck-list-header">
+                <span>デッキ内カード</span>
+                <div className="dm-deck-total-panel is-compact" aria-label="デッキ総枚数">
+                  <b>デッキ枚数</b>
+                  <span>{mainDeckTotal}枚</span>
+                </div>
+              </div>
               <div
                 className={`dm-deck-visual-grid${
                   draggedSearchCardId ? " is-drop-target" : ""
@@ -624,7 +638,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   handleSearchCardDropToDeck();
                 }}
               >
-                {draftDeckCards.map((item) => {
+                {activeDraftDeckCards.map((item) => {
                   const card = cardMap.get(item.cardId);
                   if (!card) return null;
                   return (
@@ -681,7 +695,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </button>
                   );
                 })}
-                {draftDeckCards.length === 0 && (
+                {activeDraftDeckCards.length === 0 && (
                   <p className="dm-muted-text">まだカードが追加されていません。</p>
                 )}
               </div>
@@ -742,7 +756,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               </form>
 
               <div className="dm-deck-list dm-deck-search-results">
-                {filteredCards.map((card) => {
+                {visibleFilteredCards.map((card) => {
                   const existing = draftDeckCardMap.get(card.id);
                   return (
                     <button
@@ -793,6 +807,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 })}
                 {filteredCards.length === 0 && (
                   <p className="dm-muted-text">条件に合うカードがありません。</p>
+                )}
+                {filteredCards.length > visibleFilteredCards.length && (
+                  <p className="dm-muted-text">
+                    表示を軽くするため、先頭{visibleFilteredCards.length}件のみ表示しています。
+                    カード名や詳細検索で絞り込んでください。
+                  </p>
                 )}
               </div>
             </AppCard>
