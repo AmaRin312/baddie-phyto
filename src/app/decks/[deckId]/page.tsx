@@ -69,7 +69,6 @@ function getFlagName(flag?: FlagWithCardRecord | null) {
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const router = useRouter();
-  const [deckId, setDeckId] = useState("");
   const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [deckName, setDeckName] = useState("");
   const [selectedFlagId, setSelectedFlagId] = useState("");
@@ -182,7 +181,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         return;
       }
       setCurrentUserId(profile.id);
-      setDeckId(resolvedDeckId);
       await reload(resolvedDeckId);
     }
     void loadPage();
@@ -511,15 +509,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     <AppShell kicker="DECK EDIT" title={deck?.name ?? "デッキ編集"}>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/decks" />
-        {deckId && selectedFlagId && selectedBuddyCardId ? (
-          <Link href={`/battle?deckId=${deckId}`} className="dm-button primary">
-            Battle開始
-          </Link>
-        ) : (
-          <span className="dm-button secondary is-disabled" aria-disabled="true">
-            Battle開始にはフラッグとバディが必要です
-          </span>
-        )}
+        <Link href="/battle" className="dm-button secondary">
+          対戦開始画面へ
+        </Link>
       </div>
 
       {loading ? (

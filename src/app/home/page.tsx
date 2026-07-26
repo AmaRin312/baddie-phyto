@@ -37,14 +37,29 @@ export default function HomePage() {
               プロフィール
             </Link>
           </AppCard>
-          <AppCard title="カード" description="Buddyfightカードを登録・管理します。">
-            <Link href="/cards" className="dm-button secondary">カード管理</Link>
+          <AppCard
+            title="対戦"
+            description="デッキを選択して、一人回しや対戦画面を開始します。"
+          >
+            <Link href="/battle" className="dm-button primary">
+              対戦開始
+            </Link>
           </AppCard>
-          <AppCard title="フラッグ" description="初期ライフ・手札・ゲージを管理します。">
-            <Link href="/flags" className="dm-button secondary">フラッグ管理</Link>
+          <AppCard
+            title="登録"
+            description="カード登録・画像管理・フラッグ登録をまとめて行います。"
+          >
+            <Link href="/register" className="dm-button secondary">
+              登録メニュー
+            </Link>
           </AppCard>
-          <AppCard title="デッキ" description="フラッグとバディを選んでデッキを作成します。">
-            <Link href="/decks" className="dm-button secondary">デッキ管理</Link>
+          <AppCard
+            title="デッキ"
+            description="デッキの作成・編集・共有デッキやサンプルデッキの確認を行います。"
+          >
+            <Link href="/decks" className="dm-button secondary">
+              デッキ管理
+            </Link>
           </AppCard>
         </div>
       )}

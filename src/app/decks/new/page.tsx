@@ -31,7 +31,7 @@ export default function NewDeckPage() {
     if (error || !data) {
       console.error(error);
       setMessage(
-        "デッキ作成を開始できませんでした。decks.flag_id / buddy_card_id をNULL許可にするSQLが未適用の可能性があります。"
+        "デッキ作成を開始できませんでした。ログイン状態、またはdecks.flag_id / buddy_card_idのNULL許可SQLを確認してください。"
       );
       setCreating(false);
       return;

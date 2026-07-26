@@ -6,6 +6,10 @@ import type {
   DeckVisibility
 } from "@/types/baddiePhyto";
 
+function isMissingColumnError(error: { code?: string; message: string }, columnName: string) {
+  return error.code === "PGRST204" || error.message.includes(columnName);
+}
+
 export async function loadDecks() {
   return await supabase
     .from("decks")
@@ -60,21 +64,37 @@ export async function createDraftDeck(input?: {
 }) {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
-    return { data: null, error: userError ?? new Error("ログインが必要です。") };
+    return {
+      data: null,
+      error: userError ?? new Error("ログインが必要です。")
+    };
+  }
+
+  const baseInsert = {
+    owner_id: userData.user.id,
+    name: input?.name?.trim() || "無題のデッキ",
+    flag_id: null,
+    buddy_card_id: null,
+    selected_flag_image_id: null,
+    deck_visibility: input?.deckVisibility ?? "private"
+  };
+
+  const result = await supabase
+    .from("decks")
+    .insert({
+      ...baseInsert,
+      era_key: input?.eraKey ?? null
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (!result.error || !isMissingColumnError(result.error, "era_key")) {
+    return result;
   }
 
   return await supabase
     .from("decks")
-    .insert({
-      owner_id: userData.user.id,
-      name: input?.name?.trim() || "無題のデッキ",
-      flag_id: null,
-      buddy_card_id: null,
-      selected_flag_image_id: null,
-      selected_buddy_image_id: null,
-      deck_visibility: input?.deckVisibility ?? "private",
-      era_key: input?.eraKey ?? null
-    })
+    .insert(baseInsert)
     .select("id")
     .single<{ id: string }>();
 }
@@ -89,17 +109,32 @@ export async function updateDeckSettings(input: {
   deckVisibility: DeckVisibility;
   eraKey: DeckEraKey | null;
 }) {
-  return await supabase
+  const baseUpdate = {
+    name: input.name,
+    flag_id: input.flagId,
+    buddy_card_id: input.buddyCardId,
+    selected_flag_image_id: input.selectedFlagImageId,
+    deck_visibility: input.deckVisibility,
+    era_key: input.eraKey
+  };
+
+  const result = await supabase
     .from("decks")
     .update({
-      name: input.name,
-      flag_id: input.flagId,
-      buddy_card_id: input.buddyCardId,
-      selected_flag_image_id: input.selectedFlagImageId,
-      selected_buddy_image_id: input.selectedBuddyImageId,
-      deck_visibility: input.deckVisibility,
-      era_key: input.eraKey
+      ...baseUpdate,
+      selected_buddy_image_id: input.selectedBuddyImageId
     })
+    .eq("id", input.deckId)
+    .select("*")
+    .single<DeckRecord>();
+
+  if (!result.error || !isMissingColumnError(result.error, "selected_buddy_image_id")) {
+    return result;
+  }
+
+  return await supabase
+    .from("decks")
+    .update(baseUpdate)
     .eq("id", input.deckId)
     .select("*")
     .single<DeckRecord>();

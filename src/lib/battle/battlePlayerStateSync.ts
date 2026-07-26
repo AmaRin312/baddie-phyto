@@ -211,3 +211,17 @@ export async function deleteSyncedPlayerBattleStates(roomId: string) {
   if (error) console.error(error);
   return { error };
 }
+
+export async function deleteSyncedPlayerBattleState(input: {
+  roomId: string;
+  seatKey: BattlePlayerSeat;
+}) {
+  const { error } = await supabase
+    .from("battle_player_states")
+    .delete()
+    .eq("room_id", input.roomId)
+    .eq("seat_key", input.seatKey);
+
+  if (error) console.error(error);
+  return { error };
+}

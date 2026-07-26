@@ -19,9 +19,9 @@ export function AppShell({ kicker, title, children }: AppShellProps) {
 
         <nav className="dm-app-nav">
           <Link href="/home">ホーム</Link>
-          <Link href="/cards">カード</Link>
-          <Link href="/flags">フラッグ</Link>
+          <Link href="/register">登録</Link>
           <Link href="/decks">デッキ</Link>
+          <Link href="/battle">対戦</Link>
         </nav>
       </header>
 

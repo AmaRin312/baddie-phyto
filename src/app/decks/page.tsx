@@ -160,7 +160,6 @@ export default function DecksPage() {
       buddyCard?.id,
       deck.selected_buddy_image_id ?? buddyDeckCard?.selected_image_id
     );
-    const canStartBattle = Boolean(deck.flag_id && deck.buddy_card_id);
     const isOwnDeck = deck.owner_id === currentUserId;
 
     return (
@@ -199,15 +198,6 @@ export default function DecksPage() {
             <Link href={`/decks/${deck.id}`} className="dm-button secondary">
               {isOwnDeck ? "編集" : "閲覧"}
             </Link>
-            {canStartBattle ? (
-              <Link href={`/battle?deckId=${deck.id}`} className="dm-button primary">
-                Battle開始
-              </Link>
-            ) : (
-              <span className="dm-button secondary is-disabled" aria-disabled="true">
-                Battle開始不可
-              </span>
-            )}
           </div>
         </div>
       </AppCard>
@@ -219,6 +209,9 @@ export default function DecksPage() {
       <div className="dm-page-actions">
         <Link href="/decks/new" className="dm-button primary">
           デッキ作成
+        </Link>
+        <Link href="/battle" className="dm-button secondary">
+          対戦開始へ
         </Link>
       </div>
 

@@ -23,6 +23,7 @@ import {
   isAreaStackZone
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
+import { disbandBattleRoom } from "@/lib/battle/battleRooms";
 import {
   createBattleAbilityNotification,
   loadPendingBattleAbilityNotifications,
@@ -40,6 +41,7 @@ import {
 import {
   BATTLE_PLAYER_SEATS,
   getBattleStatePlayerKeyForSeat,
+  deleteSyncedPlayerBattleState,
   deleteSyncedPlayerBattleStates,
   getOpponentSeat,
   getCurrentBattleUserId,
@@ -91,7 +93,7 @@ import type {
   BattleZoneId,
   PlayerState
 } from "@/types/battle";
-import type { CardImageRecord, CardRecord, DeckRecord } from "@/types/baddiePhyto";
+import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 import type { DeckPosition } from "@/lib/battle/battleActions";
 
 const MULTI_SELECT_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
@@ -247,11 +249,12 @@ export function BattleController() {
   const searchParams = useSearchParams();
   const deckId = searchParams.get("deckId");
   const roomId = searchParams.get("roomId") ?? deckId;
+  const battleMode = searchParams.get("mode") === "match" ? "match" : "solo";
+  const isRealtimeBattle = battleMode === "match";
   const selfSeat = normalizeBattlePlayerSeat(
     searchParams.get("seat") ?? searchParams.get("playerSeat")
   );
   const [battleState, setBattleState] = useState<BattleState | null>(null);
-  const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [cardAbilityMap, setCardAbilityMap] = useState<BattleCardAbilityMap>(
@@ -300,6 +303,7 @@ export function BattleController() {
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
+  const [opponentPresent, setOpponentPresent] = useState(false);
   const resetSourceRef = useRef<BattleResetSource | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
   const playerVersionsRef = useRef<Record<BattlePlayerSeat, number>>({
@@ -426,19 +430,26 @@ export function BattleController() {
       const freshBattleState = createInitialBattleState(resetSource);
       const savedBattleStateResult = await loadBattleState(roomId);
       const baseState = savedBattleStateResult.data ?? freshBattleState;
-      const syncedPlayersResult = selfSeat
+      const syncedPlayersResult = isRealtimeBattle && selfSeat
         ? await loadSyncedPlayerBattleStates(roomId)
         : { data: {}, error: null };
       const syncedSeats = syncedPlayersResult.data;
 
-      if (!selfSeat) {
+      if (isRealtimeBattle && !selfSeat) {
         setRealtimeStatus("idle");
         setSyncMessage(
           "Realtime固定席を特定できません。URLに ?seat=player1 または ?seat=player2 を付けるまで、席別同期保存は行いません。"
         );
       }
+      setOpponentPresent(
+        Boolean(
+          isRealtimeBattle &&
+            selfSeat &&
+            syncedSeats[getOpponentSeat(selfSeat)]
+        )
+      );
 
-      const initialState = selfSeat
+      const initialState = isRealtimeBattle && selfSeat
         ? mergePlayerStates(baseState, {
             self: syncedSeats[selfSeat]?.state ?? freshBattleState.players.self,
             opponent:
@@ -468,7 +479,7 @@ export function BattleController() {
         }
       }
 
-      if (selfSeat && !syncedSeats[selfSeat]) {
+      if (isRealtimeBattle && selfSeat && !syncedSeats[selfSeat]) {
         const result = await saveSyncedPlayerBattleState({
           roomId,
           seatKey: selfSeat,
@@ -484,7 +495,6 @@ export function BattleController() {
       }
 
       resetSourceRef.current = resetSource;
-      setDeck(deckResult.data);
       setCards((cardResult.data ?? []) as CardRecord[]);
       setImages(imageResult.data ?? []);
       setCardAbilityMap(abilityMapResult.data);
@@ -500,7 +510,7 @@ export function BattleController() {
     }
 
     setLoading(false);
-  }, [deckId, roomId, selfSeat]);
+  }, [deckId, isRealtimeBattle, roomId, selfSeat]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -513,7 +523,7 @@ export function BattleController() {
   const isBattleLoaded = battleState != null;
 
   useEffect(() => {
-    if (!roomId || !isBattleLoaded || !selfSeat) return;
+    if (!isRealtimeBattle || !roomId || !isBattleLoaded || !selfSeat) return;
 
     const channel = subscribeSyncedPlayerBattleStates({
       roomId,
@@ -529,6 +539,9 @@ export function BattleController() {
           seatKey: syncedPlayer.seatKey,
           selfSeat
         });
+        if (playerId === "opponent") {
+          setOpponentPresent(true);
+        }
         setBattleState((current) =>
           current
             ? mergePlayerStates(current, {
@@ -542,10 +555,10 @@ export function BattleController() {
     return () => {
       void unsubscribeSyncedPlayerBattleStates(channel);
     };
-  }, [isBattleLoaded, roomId, selfSeat]);
+  }, [isBattleLoaded, isRealtimeBattle, roomId, selfSeat]);
 
   useEffect(() => {
-    if (!roomId || !isBattleLoaded || !selfSeat) return;
+    if (!isRealtimeBattle || !roomId || !isBattleLoaded || !selfSeat) return;
 
     void loadPendingBattleAbilityNotifications({
       roomId,
@@ -591,7 +604,7 @@ export function BattleController() {
     return () => {
       void unsubscribeBattleAbilityNotifications(channel);
     };
-  }, [isBattleLoaded, roomId, selfSeat]);
+  }, [isBattleLoaded, isRealtimeBattle, roomId, selfSeat]);
 
   const cardMap = useMemo(
     () => new Map(cards.map((card) => [card.id, card])),
@@ -711,6 +724,11 @@ export function BattleController() {
     previousState: BattleState,
     nextState: BattleState
   ) {
+    if (!isRealtimeBattle) {
+      persistBattleState(nextState);
+      return;
+    }
+
     if (!roomId || !selfSeat) return;
     if (!hasSelfPlayerStateChanged(previousState, nextState)) return;
 
@@ -825,18 +843,32 @@ export function BattleController() {
   function handleResetBattleState() {
     if (!roomId || !resetSourceRef.current) return;
     const confirmed = window.confirm(
-      "対戦状態を初期状態へリセットします。現在の盤面は保存済み状態も含めて上書きされます。よろしいですか？"
+      "対戦盤面を初期状態へリセットします。現在の盤面は保存済み状態も含めて上書きされます。よろしいですか？"
     );
     if (!confirmed) return;
 
-    const nextState = {
-      ...createInitialBattleState(resetSourceRef.current),
-      version: (battleState?.version ?? 0) + 1
-    };
+    const freshBattleState = createInitialBattleState(resetSourceRef.current);
+    const nextState =
+      isRealtimeBattle && battleState
+        ? {
+            ...battleState,
+            players: {
+              ...battleState.players,
+              self: freshBattleState.players.self
+            },
+            activeViewerCardInstanceId: null,
+            deckLook: null,
+            version: (battleState.version ?? 0) + 1
+          }
+        : {
+            ...freshBattleState,
+            version: (battleState?.version ?? 0) + 1
+          };
     setBattleState(nextState);
-    persistBattleState(nextState);
-    if (battleState) {
+    if (isRealtimeBattle && battleState) {
       persistSelfPlayerState(battleState, nextState);
+    } else {
+      persistBattleState(nextState);
     }
     handleClearSelection();
     setDragSelection(null);
@@ -854,20 +886,30 @@ export function BattleController() {
   function handleDeleteRoomState() {
     if (!roomId) return;
     const confirmed = window.confirm(
-      "このルームの保存済みBattleStateを削除します。ページを離れると復元できません。よろしいですか？"
+      isRealtimeBattle
+        ? "部屋から退室します。自分の同期状態だけを削除して対戦開始画面へ戻ります。よろしいですか？"
+        : "一人回しから退室します。保存済みの盤面状態も削除します。よろしいですか？"
     );
     if (!confirmed) return;
 
-    void Promise.all([
-      deleteBattleState(roomId),
-      deleteSyncedPlayerBattleStates(roomId)
-    ]).then(([battleResult, playerResult]) => {
+    const deleteTask =
+      isRealtimeBattle && selfSeat
+        ? Promise.all([
+            disbandBattleRoom(roomId),
+            deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
+          ])
+        : Promise.all([
+            deleteBattleState(roomId),
+            deleteSyncedPlayerBattleStates(roomId)
+          ]);
+
+    void deleteTask.then(([battleResult, playerResult]) => {
       if (battleResult.error || playerResult.error) {
-        setMessage("ルーム削除に失敗しました。");
+        setMessage("退室処理に失敗しました。");
         return;
       }
 
-      window.location.href = "/decks";
+      window.location.href = "/battle";
     });
   }
 
@@ -2004,8 +2046,8 @@ export function BattleController() {
     return (
       <main className="bf-battle-loading">
         <p>{message}</p>
-        <Link href="/decks" className="dm-button primary">
-          デッキへ戻る
+        <Link href="/battle" className="dm-button primary">
+          対戦開始画面へ戻る
         </Link>
       </main>
     );
@@ -2032,11 +2074,10 @@ export function BattleController() {
 
         <nav className="bf-left-menu-nav">
           <Link href="/home">ホーム</Link>
-          <Link href="/cards">カード</Link>
-          <Link href="/flags">フラッグ</Link>
+          <Link href="/register">登録</Link>
           <Link href="/decks">デッキ</Link>
-          <Link href={deck ? `/battle?deckId=${deck.id}` : "/battle"} className="is-active">
-            対戦
+          <Link href="/battle" className="is-active">
+            デッキ変更
           </Link>
           <Link href="/profile">設定</Link>
         </nav>
@@ -2049,12 +2090,15 @@ export function BattleController() {
               ? ` / 保存中 ${savingSeatKeys.join(", ")}`
               : ""}
           </span>
+          {isRealtimeBattle && (
+            <span>{opponentPresent ? "対戦相手あり" : "対戦相手待ち"}</span>
+          )}
           {syncMessage && <span>{syncMessage}</span>}
           <button type="button" onClick={handleResetBattleState}>
-            対戦状態リセット
+            盤面リセット
           </button>
           <button type="button" onClick={handleDeleteRoomState}>
-            ルーム削除
+            退室
           </button>
         </div>
       </aside>
