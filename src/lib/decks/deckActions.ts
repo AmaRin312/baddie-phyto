@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
-import type { DeckCardRecord, DeckRecord, DeckVisibility } from "@/types/baddiePhyto";
+import type {
+  DeckCardRecord,
+  DeckEraKey,
+  DeckRecord,
+  DeckVisibility
+} from "@/types/baddiePhyto";
 
 export async function loadDecks() {
   return await supabase
@@ -26,6 +31,14 @@ export async function loadDeckCards(deckId: string) {
     .returns<DeckCardRecord[]>();
 }
 
+export async function loadAllDeckCards() {
+  return await supabase
+    .from("deck_cards")
+    .select("*")
+    .order("sort_order")
+    .returns<DeckCardRecord[]>();
+}
+
 export async function createDeck(input: {
   name: string;
   flagId: string;
@@ -43,6 +56,7 @@ export async function createDeck(input: {
 export async function createDraftDeck(input?: {
   name?: string;
   deckVisibility?: DeckVisibility;
+  eraKey?: DeckEraKey | null;
 }) {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
@@ -57,7 +71,9 @@ export async function createDraftDeck(input?: {
       flag_id: null,
       buddy_card_id: null,
       selected_flag_image_id: null,
-      deck_visibility: input?.deckVisibility ?? "private"
+      selected_buddy_image_id: null,
+      deck_visibility: input?.deckVisibility ?? "private",
+      era_key: input?.eraKey ?? null
     })
     .select("id")
     .single<{ id: string }>();
@@ -69,7 +85,9 @@ export async function updateDeckSettings(input: {
   flagId: string | null;
   buddyCardId: string | null;
   selectedFlagImageId: string | null;
+  selectedBuddyImageId: string | null;
   deckVisibility: DeckVisibility;
+  eraKey: DeckEraKey | null;
 }) {
   return await supabase
     .from("decks")
@@ -78,7 +96,9 @@ export async function updateDeckSettings(input: {
       flag_id: input.flagId,
       buddy_card_id: input.buddyCardId,
       selected_flag_image_id: input.selectedFlagImageId,
-      deck_visibility: input.deckVisibility
+      selected_buddy_image_id: input.selectedBuddyImageId,
+      deck_visibility: input.deckVisibility,
+      era_key: input.eraKey
     })
     .eq("id", input.deckId)
     .select("*")

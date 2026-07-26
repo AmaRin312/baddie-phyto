@@ -38,9 +38,11 @@ import {
   type DeckCardDraft
 } from "@/lib/decks/deckEditorState";
 import {
+  DECK_ERA_OPTIONS,
   DECK_VISIBILITY_OPTIONS,
   getCardTypeLabel,
   getDeckVisibilityLabel,
+  type DeckEraKey,
   type CardImageRecord,
   type CardRecord,
   type DeckCardRecord,
@@ -73,7 +75,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [selectedFlagId, setSelectedFlagId] = useState("");
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
   const [selectedBuddyCardId, setSelectedBuddyCardId] = useState("");
+  const [selectedBuddyImageId, setSelectedBuddyImageId] = useState("");
   const [deckVisibility, setDeckVisibility] = useState<DeckVisibility>("private");
+  const [deckEra, setDeckEra] = useState<DeckEraKey | "">("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
@@ -88,12 +92,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [savingDeck, setSavingDeck] = useState(false);
   const [detailCardId, setDetailCardId] = useState("");
+  const [previewCardId, setPreviewCardId] = useState("");
   const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
   const [flagPickerOpen, setFlagPickerOpen] = useState(false);
   const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [searchPage, setSearchPage] = useState(0);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -151,7 +157,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedFlagId(nextDeck.flag_id ?? "");
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
+    setSelectedBuddyImageId(nextDeck.selected_buddy_image_id ?? "");
     setDeckVisibility(nextDeck.deck_visibility ?? "private");
+    setDeckEra(nextDeck.era_key ?? "");
     const nextDeckCards = deckCardsResult.data ?? [];
     setSavedDeckCards(nextDeckCards);
     setDraftDeckCards(createDeckCardDrafts(nextDeckCards));
@@ -229,11 +237,19 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     ? draftDeckCardMap.get(selectedDeckCardId)
     : undefined;
   const detailCard = cardMap.get(detailCardId) ?? null;
+  const previewCard = cardMap.get(previewCardId) ?? null;
   const detailDeckDraft = detailCard ? draftDeckCardMap.get(detailCard.id) : undefined;
   const detailIsSelectedFlag = Boolean(
     detailCard && selectedFlagCard && detailCard.id === selectedFlagCard.id
   );
+  const detailIsSelectedBuddy = Boolean(
+    detailCard && effectiveSelectedBuddyCardId === detailCard.id
+  );
   const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
+  const preferredWorlds = useMemo(
+    () => new Set([...(selectedFlag?.usable_worlds ?? []), ...(selectedFlagCard?.worlds ?? [])]),
+    [selectedFlag, selectedFlagCard]
+  );
 
   const buddyCandidates = useMemo(
     () =>
@@ -256,6 +272,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       excludeInactive: true,
       excludeFlagCard: false
     }).sort((left, right) => {
+      const leftPreferred = left.worlds.some((world) => preferredWorlds.has(world));
+      const rightPreferred = right.worlds.some((world) => preferredWorlds.has(world));
+      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
       const typeDiff =
         DECK_SEARCH_TYPE_ORDER[left.card_type] - DECK_SEARCH_TYPE_ORDER[right.card_type];
       if (typeDiff !== 0) return typeDiff;
@@ -270,10 +289,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     cards,
     deferredSearchFilters,
     effectiveSelectedBuddyCardId,
+    preferredWorlds,
     selectedFlag?.card_id
   ]);
 
-  const visibleFilteredCards = useMemo(() => filteredCards.slice(0, 120), [filteredCards]);
+  const searchPageCount = Math.max(1, Math.ceil(filteredCards.length / 100));
+  const safeSearchPage = Math.min(searchPage, searchPageCount - 1);
+  const visibleFilteredCards = useMemo(
+    () => filteredCards.slice(safeSearchPage * 100, safeSearchPage * 100 + 100),
+    [filteredCards, safeSearchPage]
+  );
   const activeDraftDeckCards = useMemo(
     () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
     [cardMap, draftDeckCards]
@@ -285,7 +310,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       selectedFlagId !== (deck.flag_id ?? "") ||
       selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
       effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
+      selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
       deckVisibility !== (deck.deck_visibility ?? "private") ||
+      deckEra !== (deck.era_key ?? "") ||
       !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
     : false;
 
@@ -307,7 +334,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       flagId: selectedFlagId || null,
       buddyCardId: effectiveSelectedBuddyCardId || null,
       selectedFlagImageId: selectedFlagImageId || null,
-      deckVisibility
+      selectedBuddyImageId: selectedBuddyImageId || null,
+      deckVisibility,
+      eraKey: deckEra || null
     });
 
     if (settingsResult.error || !settingsResult.data) {
@@ -367,6 +396,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     if (quantity <= 0) {
       if (selectedBuddyCardId === card.id) {
         setSelectedBuddyCardId("");
+        setSelectedBuddyImageId("");
       }
       if (selectedDeckCardId === card.id) {
         setSelectedDeckCardId("");
@@ -388,6 +418,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     if (selectedFlagCard?.id === cardId) {
       return selectedFlagImageId;
     }
+    if (effectiveSelectedBuddyCardId === cardId) {
+      return selectedBuddyImageId;
+    }
     return getImageSelectValue(cardId);
   }
 
@@ -407,11 +440,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setSelectedFlagImageId(selectedImageId ?? "");
       return;
     }
+    if (effectiveSelectedBuddyCardId === cardId) {
+      setSelectedBuddyImageId(selectedImageId ?? "");
+      return;
+    }
     setDeckCardImage(cardId, selectedImageId);
   }
 
   function openCardDetail(cardId: string) {
     setDetailCardId(cardId);
+  }
+
+  function handleSearchFiltersChange(nextFilters: DeckCardSearchFilters) {
+    setSearchPage(0);
+    setSearchFilters(nextFilters);
   }
 
   function selectDeckCard(cardId: string) {
@@ -425,6 +467,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       return;
     }
     setSelectedBuddyCardId(cardId);
+    if (selectedBuddyCardId !== cardId) {
+      setSelectedBuddyImageId("");
+    }
     setMessage("バディを選択しました。保存ボタンで反映されます。");
   }
 
@@ -521,7 +566,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     {selectedFlagCard && (
                       <button
                         type="button"
-                        className="dm-deck-linked-card is-mini"
+                    className="dm-deck-linked-card is-mini"
+                        title={`フラッグ: ${selectedFlagCard.name}`}
+                        aria-label={`フラッグ画像: ${selectedFlagCard.name}`}
                         onClick={() => openCardDetail(selectedFlagCard.id)}
                       >
                         <CardViewer
@@ -530,10 +577,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                           selectedImageId={selectedFlagImageId || null}
                           variant="compact"
                         />
-                        <span>
-                          <b>フラッグ</b>
-                          <small>{selectedFlagCard.name}</small>
-                        </span>
                       </button>
                     )}
 
@@ -541,19 +584,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       <button
                         type="button"
                         className="dm-deck-linked-card is-mini"
+                        title={`バディ: ${selectedBuddyCard.name}`}
+                        aria-label={`バディ画像: ${selectedBuddyCard.name}`}
                         onClick={() => selectDeckCard(selectedBuddyCard.id)}
                         onDoubleClick={() => openCardDetail(selectedBuddyCard.id)}
                       >
                         <CardViewer
                           card={selectedBuddyCard}
                           images={imagesByCard.get(selectedBuddyCard.id) ?? []}
-                          selectedImageId={getImageSelectValue(selectedBuddyCard.id) || null}
+                          selectedImageId={selectedBuddyImageId || null}
                           variant="compact"
                         />
-                        <span>
-                          <b>バディ</b>
-                          <small>{selectedBuddyCard.name}</small>
-                        </span>
                       </button>
                     )}
                   </div>
@@ -567,6 +608,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     disabled={!canEditDeck}
                     placeholder="未入力なら「無題のデッキ」"
                   />
+                </label>
+
+                <label>
+                  年代
+                  <select
+                    value={deckEra}
+                    onChange={(event) => setDeckEra(event.target.value as DeckEraKey | "")}
+                    disabled={!canEditDeck}
+                  >
+                    <option value="">未設定</option>
+                    {DECK_ERA_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>
@@ -749,9 +806,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <DeckCardSearchPanel
                   filters={searchFilters}
                   worlds={searchOptions.worlds}
-                  races={searchOptions.races}
                   sets={cardSets}
-                  onChange={setSearchFilters}
+                  onChange={handleSearchFiltersChange}
                 />
               </form>
 
@@ -766,7 +822,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         draggedSearchCardId === card.id ? " is-dragging" : ""
                       }`}
                       draggable={canEditDeck}
-                      onClick={() => setSelectedDeckCardId("")}
+                      onClick={() => setPreviewCardId(card.id)}
                       onDragStart={(event) => {
                         if (!canEditDeck) {
                           event.preventDefault();
@@ -809,10 +865,31 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   <p className="dm-muted-text">条件に合うカードがありません。</p>
                 )}
                 {filteredCards.length > visibleFilteredCards.length && (
-                  <p className="dm-muted-text">
-                    表示を軽くするため、先頭{visibleFilteredCards.length}件のみ表示しています。
-                    カード名や詳細検索で絞り込んでください。
-                  </p>
+                  <div className="dm-deck-search-pagination">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={safeSearchPage === 0}
+                      onClick={() => setSearchPage((current) => Math.max(0, current - 1))}
+                    >
+                      前の100件
+                    </Button>
+                    <span>
+                      {safeSearchPage + 1} / {searchPageCount}ページ
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={safeSearchPage >= searchPageCount - 1}
+                      onClick={() =>
+                        setSearchPage((current) => Math.min(searchPageCount - 1, current + 1))
+                      }
+                    >
+                      次の100件
+                    </Button>
+                  </div>
                 )}
               </div>
             </AppCard>
@@ -858,6 +935,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 onClick={() => {
                   setSelectedFlagId("");
                   setSelectedFlagImageId("");
+                  setSearchPage(0);
                   setFlagPickerOpen(false);
                 }}
               >
@@ -877,6 +955,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   onClick={() => {
                     setSelectedFlagId(flag.id);
                     setSelectedFlagImageId("");
+                    setSearchPage(0);
                     setFlagPickerOpen(false);
                   }}
                 >
@@ -940,6 +1019,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 disabled={!canEditDeck}
                 onClick={() => {
                   setSelectedBuddyCardId("");
+                  setSelectedBuddyImageId("");
                   setBuddyPickerOpen(false);
                 }}
               >
@@ -958,6 +1038,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   disabled={!canEditDeck}
                   onClick={() => {
                     setSelectedBuddyCardId(card.id);
+                    setSelectedBuddyImageId("");
                     setBuddyPickerOpen(false);
                   }}
                 >
@@ -976,6 +1057,58 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               {buddyCandidates.length === 0 && (
                 <p className="dm-muted-text">バディ候補はデッキへカードを追加すると表示されます。</p>
               )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {previewCard && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setPreviewCardId("")}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-preview-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-search-preview-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">CARD PREVIEW</p>
+                <h2 id="deck-search-preview-title">{previewCard.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setPreviewCardId("")}
+              >
+                ×
+              </button>
+            </header>
+            <div className="dm-deck-preview-modal-body">
+              <CardViewer
+                card={previewCard}
+                images={imagesByCard.get(previewCard.id) ?? []}
+              />
+              <div className="dm-dialog-actions">
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={!canEditDeck}
+                  onClick={() => {
+                    setLocalCardQuantity(
+                      previewCard,
+                      (draftDeckCardMap.get(previewCard.id)?.quantity ?? 0) + 1
+                    );
+                    setPreviewCardId("");
+                  }}
+                >
+                  デッキへ追加
+                </Button>
+              </div>
             </div>
           </section>
         </div>
@@ -1072,6 +1205,28 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         </button>
                       ))}
                     </div>
+
+                    {detailIsSelectedBuddy && detailDeckDraft && (
+                      <label className="dm-card-detail-image-select">
+                        デッキ内カード画像
+                        <select
+                          value={getImageSelectValue(detailCard.id)}
+                          disabled={!canEditDeck}
+                          onChange={(event) =>
+                            setDeckCardImage(detailCard.id, event.target.value || null)
+                          }
+                        >
+                          <option value="">Default画像を使う</option>
+                          {(imagesByCard.get(detailCard.id) ?? []).map((image, index) => (
+                            <option key={image.id} value={image.id}>
+                              {image.is_default
+                                ? `画像${index + 1}（Default）`
+                                : `画像${index + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
 
                     {detailDeckDraft ? (
                       <div className="dm-dialog-actions">

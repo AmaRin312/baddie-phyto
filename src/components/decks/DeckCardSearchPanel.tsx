@@ -20,17 +20,15 @@ import {
 type DeckCardSearchPanelProps = {
   filters: DeckCardSearchFilters;
   worlds: string[];
-  races: string[];
   sets: DeckCardSetOption[];
   onChange: (filters: DeckCardSearchFilters) => void;
 };
 
-type DetailSectionKey = "worlds" | "cardTypes" | "races" | "eras" | "attributes";
+type DetailSectionKey = "worlds" | "cardTypes" | "eras" | "attributes";
 
 const DETAIL_SECTION_LABELS: Record<DetailSectionKey, string> = {
   worlds: "ワールド",
   cardTypes: "カードタイプ",
-  races: "種族",
   eras: "年代・収録弾",
   attributes: "属性"
 };
@@ -62,7 +60,6 @@ function SearchSection(props: {
 export function DeckCardSearchPanel({
   filters,
   worlds,
-  races,
   sets,
   onChange
 }: DeckCardSearchPanelProps) {
@@ -70,7 +67,6 @@ export function DeckCardSearchPanel({
   const [openSections, setOpenSections] = useState<Record<DetailSectionKey, boolean>>({
     worlds: false,
     cardTypes: false,
-    races: false,
     eras: false,
     attributes: false
   });
@@ -134,6 +130,15 @@ export function DeckCardSearchPanel({
           }
         ]
       : []),
+    ...(filters.races[0]?.trim()
+      ? [
+          {
+            key: "raceText",
+            label: `種族: ${filters.races[0].trim()}`,
+            onRemove: () => setFilters({ ...filters, races: [] })
+          }
+        ]
+      : []),
     ...filters.worlds.map((world) => ({
       key: `world:${world}`,
       label: world,
@@ -145,11 +150,6 @@ export function DeckCardSearchPanel({
       onRemove: () =>
         setArray("cardTypes", filters.cardTypes.filter((value) => value !== cardType))
     })),
-    ...filters.races.map((race) => ({
-      key: `race:${race}`,
-      label: race,
-      onRemove: () => setArray("races", filters.races.filter((value) => value !== race))
-    })),
     ...filters.eras.map((era) => ({
       key: `era:${era}`,
       label: DECK_CARD_ERA_OPTIONS.find((option) => option.value === era)?.label ?? era,
@@ -159,7 +159,7 @@ export function DeckCardSearchPanel({
       const set = sets.find((candidate) => candidate.id === setId);
       return {
         key: `set:${setId}`,
-        label: set?.setCode ?? setId,
+        label: set?.name ?? set?.setCode ?? setId,
         onRemove: () => setArray("setIds", filters.setIds.filter((value) => value !== setId))
       };
     }),
@@ -252,6 +252,20 @@ export function DeckCardSearchPanel({
                 />
               </label>
 
+              <label className="dm-deck-search-name">
+                種族
+                <input
+                  value={filters.races[0] ?? ""}
+                  placeholder="種族名を入力"
+                  onChange={(event) =>
+                    setFilters({
+                      ...filters,
+                      races: event.target.value.trim() ? [event.target.value] : []
+                    })
+                  }
+                />
+              </label>
+
               <SearchSection
                 sectionKey="worlds"
                 open={openSections.worlds}
@@ -296,25 +310,6 @@ export function DeckCardSearchPanel({
               </SearchSection>
 
               <SearchSection
-                sectionKey="races"
-                open={openSections.races}
-                onToggle={() => toggleSection("races")}
-              >
-                <div className="dm-checkbox-grid">
-                  {races.map((race) => (
-                    <label key={race}>
-                      <input
-                        type="checkbox"
-                        checked={filters.races.includes(race)}
-                        onChange={() => setArray("races", toggleValue(filters.races, race))}
-                      />
-                      {race}
-                    </label>
-                  ))}
-                </div>
-              </SearchSection>
-
-              <SearchSection
                 sectionKey="eras"
                 open={openSections.eras}
                 onToggle={() => toggleSection("eras")}
@@ -350,7 +345,7 @@ export function DeckCardSearchPanel({
                                   setArray("setIds", toggleValue(filters.setIds, set.id))
                                 }
                               />
-                              {set.setCode}
+                              {set.name ?? set.setCode}
                             </label>
                           ))}
                           {(setsByEra.get(option.value) ?? []).length === 0 && (

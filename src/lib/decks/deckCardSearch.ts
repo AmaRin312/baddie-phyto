@@ -124,7 +124,7 @@ export async function loadDeckCardPrintingSearchData(): Promise<{
   return {
     printings,
     sets: Array.from(setMap.values()).sort((left, right) =>
-      left.setCode.localeCompare(right.setCode, "ja")
+      (left.name ?? left.setCode).localeCompare(right.name ?? right.setCode, "ja")
     ),
     error: null
   };
@@ -132,21 +132,23 @@ export async function loadDeckCardPrintingSearchData(): Promise<{
 
 export function getDeckCardSearchOptions(cards: CardRecord[]) {
   const worlds = new Set<string>();
-  const races = new Set<string>();
 
   cards.forEach((card) => {
     card.worlds.forEach((world) => worlds.add(world));
-    card.races.forEach((race) => races.add(race));
   });
 
   return {
-    worlds: Array.from(worlds).sort((left, right) => left.localeCompare(right, "ja")),
-    races: Array.from(races).sort((left, right) => left.localeCompare(right, "ja"))
+    worlds: Array.from(worlds).sort((left, right) => left.localeCompare(right, "ja"))
   };
 }
 
 function hasAny<T>(source: readonly T[], selected: readonly T[]) {
   return selected.length === 0 || selected.some((value) => source.includes(value));
+}
+
+function hasRaceText(source: readonly string[], selected: readonly string[]) {
+  const keyword = selected[0]?.trim().toLowerCase() ?? "";
+  return !keyword || source.some((race) => race.toLowerCase().includes(keyword));
 }
 
 function hasAllAttributes(card: CardRecord, attributes: DeckCardAttributeKey[]) {
@@ -206,7 +208,7 @@ export function filterDeckCandidateCards(input: {
         input.filters.cardTypes.length === 0 ||
         input.filters.cardTypes.includes(card.card_type)
     )
-    .filter((card) => hasAny(card.races, input.filters.races))
+    .filter((card) => hasRaceText(card.races, input.filters.races))
     .filter((card) => {
       if (input.filters.originalMode === "original") return card.is_original;
       if (input.filters.originalMode === "official") return !card.is_original;
@@ -226,6 +228,5 @@ export function filterDeckCandidateCards(input: {
         }
       }
       return true;
-    })
-    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+    });
 }

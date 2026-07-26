@@ -99,6 +99,7 @@ export type DeckRecord = {
   flag_id: string | null;
   buddy_card_id: string | null;
   selected_flag_image_id: string | null;
+  selected_buddy_image_id?: string | null;
   deck_visibility: DeckVisibility;
   era_key?: DeckEraKey | null;
   created_at: string;
@@ -150,7 +151,7 @@ export const DECK_VISIBILITY_OPTIONS: ReadonlyArray<{
   },
   {
     value: "public",
-    label: "ローカル保存（公開）",
+    label: "共有デッキ",
     description: "他ユーザーも閲覧できる自作デッキです。編集は作成者のみです。"
   },
   {
