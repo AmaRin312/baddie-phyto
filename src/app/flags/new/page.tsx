@@ -6,7 +6,7 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
+import { createCard, loadCards } from "@/lib/cards/cardActions";
 import { createFlag, type CreateFlagInput } from "@/lib/flags/flagActions";
 import type { CardRecord } from "@/types/baddiePhyto";
 
@@ -40,16 +40,51 @@ export default function NewFlagPage() {
   }, []);
 
   async function handleSubmit(input: CreateFlagInput) {
-    if (!input.cardId) {
-      setMessage("フラッグカードを選択してください。");
-      return;
-    }
-
     setSaving(true);
     setMessage("");
+    let cardId = input.cardId;
+
+    if (!cardId) {
+      const flagCardName = input.name?.trim() || input.usableWorlds[0]?.trim();
+      if (!flagCardName) {
+        setSaving(false);
+        setMessage("既存カードを選ばない場合は、管理名または使用可能ワールドを入力してください。");
+        return;
+      }
+
+      const cardResult = await createCard({
+        name: flagCardName,
+        worlds: input.usableWorlds,
+        races: [],
+        orientation: "vertical",
+        size: null,
+        power: null,
+        defense: null,
+        critical: null,
+        cardText: null,
+        cardType: "flag_card",
+        isDragon: false,
+        isCornerKing: false,
+        isHyakki: false,
+        isChaos: false,
+        isGeneric: false,
+        isActive: input.isActive ?? true,
+        autoCreateFlag: false
+      });
+
+      if (cardResult.error || !cardResult.data) {
+        setSaving(false);
+        console.error(cardResult.error);
+        setMessage(`フラッグカード作成に失敗しました。${cardResult.error?.message ?? ""}`);
+        return;
+      }
+
+      cardId = cardResult.data.id;
+    }
+
     const { error } = await createFlag({
       ...input,
-      cardId: input.cardId
+      cardId
     });
     setSaving(false);
 
@@ -72,18 +107,17 @@ export default function NewFlagPage() {
       ) : (
         <AppCard
           title="フラッグ情報"
-          description="cards.card_type = flag_card かつ有効なカードを、ゲーム開始フラッグとして flags に紐付けます。"
+          description="既存のフラッグカードを選ぶか、未選択のまま管理名と使用可能ワールドから新しいフラッグカードを作成できます。"
         >
           <FlagAdminForm
             cards={cards}
             submitLabel="フラッグを登録"
             loading={saving}
-            requireCard
             onSubmit={(input) => handleSubmit(input as CreateFlagInput)}
           />
           {cards.length === 0 && (
             <p className="dm-form-message">
-              有効なフラッグカードがありません。先にカード管理で card_type=flag_card のカードを登録してください。
+              有効なフラッグカード候補はありません。未選択のまま登録すると、新しいフラッグカードも同時に作成します。
             </p>
           )}
           {message && <p className="dm-form-message">{message}</p>}

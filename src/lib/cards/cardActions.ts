@@ -26,6 +26,7 @@ export type CreateCardInput = {
   isHell?: boolean;
   isOriginal?: boolean;
   isActive?: boolean;
+  autoCreateFlag?: boolean;
 };
 
 async function ensureFlagForFlagCard(card: CardRecord) {
@@ -117,7 +118,7 @@ export async function createCard(input: CreateCardInput) {
     .select("*")
     .single<CardRecord>();
 
-  if (!result.error && result.data) {
+  if ((input.autoCreateFlag ?? true) && !result.error && result.data) {
     const flagResult = await ensureFlagForFlagCard(result.data);
     if (flagResult.error) return { ...result, error: flagResult.error };
   }

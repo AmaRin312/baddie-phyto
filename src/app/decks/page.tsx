@@ -42,6 +42,11 @@ function findDisplayImageId(
   return images.find((image) => image.is_default)?.id ?? null;
 }
 
+function getDeckCardLabel(deckCard: DeckCardRecord, cardMap: Map<string, CardRecord>) {
+  const card = cardMap.get(deckCard.card_id);
+  return card ? card.name : "未登録カード";
+}
+
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
@@ -167,6 +172,47 @@ export default function DecksPage() {
     router.push(`/decks/${result.data.id}`);
   }
 
+  function renderDeckContentList(deck: DeckRecord) {
+    const contents = deckCardMap.get(deck.id) ?? [];
+
+    if (contents.length === 0) {
+      return <p className="dm-muted-text">デッキ内カードはまだありません。</p>;
+    }
+
+    return (
+      <div className="dm-deck-content-list">
+        {contents.map((deckCard) => {
+          const card = cardMap.get(deckCard.card_id) ?? null;
+          const selectedImageId = findDisplayImageId(
+            imagesByCard,
+            deckCard.card_id,
+            deckCard.selected_image_id
+          );
+
+          return (
+            <div key={deckCard.id} className="dm-deck-content-row">
+              {card ? (
+                <CardViewer
+                  card={card}
+                  images={imagesByCard.get(card.id) ?? []}
+                  selectedImageId={selectedImageId}
+                  variant="compact"
+                  className="dm-deck-content-row-image"
+                />
+              ) : (
+                <span className="dm-deck-content-row-empty">?</span>
+              )}
+              <div>
+                <b>{getDeckCardLabel(deckCard, cardMap)}</b>
+                <span>×{deckCard.quantity}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderDeckCard(deck: DeckRecord) {
     const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
     const flagCard = flag?.card ?? null;
@@ -184,49 +230,55 @@ export default function DecksPage() {
       buddyCard?.id,
       deck.selected_buddy_image_id ?? buddyDeckCard?.selected_image_id
     );
-    const isOwnDeck = deck.owner_id === currentUserId;
-
     return (
-      <AppCard key={deck.id} title={deck.name}>
+      <div
+        key={deck.id}
+        className="dm-deck-management-item"
+        onDoubleClick={() => setSelectedDeckForAction(deck)}
+      >
+      <AppCard title={deck.name}>
         <button
           type="button"
           className="dm-deck-management-card dm-deck-management-click-card"
-          onClick={() => setSelectedDeckForAction(deck)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              setSelectedDeckForAction(deck);
+            }
+          }}
+          title="ダブルクリックでデッキ内容を表示"
         >
           <div className="dm-deck-management-images">
             <div>
-              <span>ワールド</span>
               {flagCard ? (
                 <CardViewer
                   card={flagCard}
                   images={imagesByCard.get(flagCard.id) ?? []}
                   selectedImageId={flagImageId}
                   variant="compact"
+                  className="dm-deck-management-image"
                 />
               ) : (
                 <span className="dm-deck-management-empty">未選択</span>
               )}
             </div>
             <div>
-              <span>バディ</span>
               {buddyCard ? (
                 <CardViewer
                   card={buddyCard}
                   images={imagesByCard.get(buddyCard.id) ?? []}
                   selectedImageId={buddyImageId}
                   variant="compact"
+                  className="dm-deck-management-image"
                 />
               ) : (
                 <span className="dm-deck-management-empty">未選択</span>
               )}
             </div>
           </div>
-          <p className="dm-muted-text">年代：{getDeckEraLabel(deck.era_key)}</p>
-          <p className="dm-muted-text">
-            {isOwnDeck ? "クリックで編集確認" : "クリックでコピー確認"}
-          </p>
+          <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>
         </button>
       </AppCard>
+      </div>
     );
   }
 
@@ -311,52 +363,46 @@ export default function DecksPage() {
             </header>
 
             <div className="dm-card-detail-modal-body">
+              <AppCard title="デッキ内容一覧">
+                {renderDeckContentList(selectedDeckForAction)}
+              </AppCard>
+
               {selectedDeckForAction.owner_id === currentUserId ? (
-                <AppCard
-                  title="このデッキを編集しますか？"
-                  description="デッキ編集画面へ移動します。"
-                >
-                  <div className="dm-dialog-actions">
-                    <button
-                      type="button"
-                      className="dm-button secondary"
-                      onClick={() => setSelectedDeckForAction(null)}
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      type="button"
-                      className="dm-button primary"
-                      onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
-                    >
-                      編集する
-                    </button>
-                  </div>
-                </AppCard>
+                <div className="dm-dialog-actions">
+                  <button
+                    type="button"
+                    className="dm-button secondary"
+                    onClick={() => setSelectedDeckForAction(null)}
+                  >
+                    戻る
+                  </button>
+                  <button
+                    type="button"
+                    className="dm-button primary"
+                    onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
+                  >
+                    編集する
+                  </button>
+                </div>
               ) : (
-                <AppCard
-                  title="このデッキをコピーして保存しますか？"
-                  description="共有デッキやサンプルデッキは、自分用にコピーしてから編集できます。"
-                >
-                  <div className="dm-dialog-actions">
-                    <button
-                      type="button"
-                      className="dm-button secondary"
-                      onClick={() => setSelectedDeckForAction(null)}
-                      disabled={copyingDeck}
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      type="button"
-                      className="dm-button primary"
-                      onClick={() => void handleCopySelectedDeck()}
-                      disabled={copyingDeck}
-                    >
-                      {copyingDeck ? "コピー中..." : "コピーして保存"}
-                    </button>
-                  </div>
-                </AppCard>
+                <div className="dm-dialog-actions">
+                  <button
+                    type="button"
+                    className="dm-button secondary"
+                    onClick={() => setSelectedDeckForAction(null)}
+                    disabled={copyingDeck}
+                  >
+                    戻る
+                  </button>
+                  <button
+                    type="button"
+                    className="dm-button primary"
+                    onClick={() => void handleCopySelectedDeck()}
+                    disabled={copyingDeck}
+                  >
+                    {copyingDeck ? "コピー中..." : "コピーして保存"}
+                  </button>
+                </div>
               )}
             </div>
           </section>

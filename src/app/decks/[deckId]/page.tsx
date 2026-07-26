@@ -296,6 +296,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     () => filteredCards.slice(safeSearchPage * 100, safeSearchPage * 100 + 100),
     [filteredCards, safeSearchPage]
   );
+  const previewCardIndex = previewCardId
+    ? filteredCards.findIndex((card) => card.id === previewCardId)
+    : -1;
+  const previousPreviewCard =
+    previewCardIndex > 0 ? filteredCards[previewCardIndex - 1] : null;
+  const nextPreviewCard =
+    previewCardIndex >= 0 && previewCardIndex < filteredCards.length - 1
+      ? filteredCards[previewCardIndex + 1]
+      : null;
   const activeDraftDeckCards = useMemo(
     () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
     [cardMap, draftDeckCards]
@@ -472,6 +481,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   function closeCardDetail() {
     setDetailCardId("");
+  }
+
+  function moveSearchPreview(direction: "previous" | "next") {
+    const nextCard = direction === "previous" ? previousPreviewCard : nextPreviewCard;
+    if (!nextCard) return;
+    setPreviewCardId(nextCard.id);
+    const nextIndex = filteredCards.findIndex((card) => card.id === nextCard.id);
+    if (nextIndex >= 0) {
+      setSearchPage(Math.floor(nextIndex / 100));
+    }
   }
 
   function handleDeckCardDrop(targetCardId: string) {
@@ -1072,6 +1091,27 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               </button>
             </header>
             <div className="dm-deck-preview-modal-body">
+              <div className="dm-deck-preview-navigation" aria-label="検索結果の前後移動">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!previousPreviewCard}
+                  onClick={() => moveSearchPreview("previous")}
+                >
+                  ← 前のカード
+                </Button>
+                <span>
+                  {previewCardIndex >= 0 ? previewCardIndex + 1 : "-"} / {filteredCards.length}
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!nextPreviewCard}
+                  onClick={() => moveSearchPreview("next")}
+                >
+                  次のカード →
+                </Button>
+              </div>
               <CardViewer
                 card={previewCard}
                 images={imagesByCard.get(previewCard.id) ?? []}

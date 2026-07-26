@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { FlagRecord, FlagWithCardRecord } from "@/types/baddiePhyto";
 
 export type CreateFlagInput = {
-  cardId: string;
+  cardId: string | null;
   name?: string | null;
   usableWorlds: string[];
   initialLife: number;
