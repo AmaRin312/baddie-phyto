@@ -155,7 +155,7 @@ export const DECK_VISIBILITY_OPTIONS: ReadonlyArray<{
   },
   {
     value: "default",
-    label: "デフォルトデッキ",
+    label: "サンプルデッキ",
     description: "全ユーザー向けの基礎デッキです。編集は作成者のみです。"
   }
 ];
