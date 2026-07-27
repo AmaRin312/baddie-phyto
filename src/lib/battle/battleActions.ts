@@ -256,7 +256,9 @@ function getAreaStackId(card: BattleCard) {
 }
 
 function getAreaSlot(card: BattleCard): BattleAreaSlot | null {
-  return card.meta.areaSlot === 0 || card.meta.areaSlot === 1
+  return typeof card.meta.areaSlot === "number" &&
+    Number.isInteger(card.meta.areaSlot) &&
+    card.meta.areaSlot >= 0
     ? card.meta.areaSlot
     : null;
 }
@@ -488,7 +490,7 @@ export function getAreaStacks(cards: BattleCard[]): BattleAreaStack[] {
   for (const [index, card] of cards.entries()) {
     const stackId = getAreaStackId(card);
     const existingStack = stackMap.get(stackId);
-    const fallbackSlot = Math.min(index, 1) as BattleAreaSlot;
+    const fallbackSlot = index;
     const explicitSlot = getAreaSlot(card);
 
     stackMap.set(stackId, {
@@ -517,8 +519,26 @@ export function canMoveToZone(zoneId: BattleZoneId) {
 }
 
 function getAreaStackLimit(state: BattleState, zoneId: BattleZoneId) {
+  if (zoneId === "set") return 5;
   if (zoneId === "item" && state.ruleState.itemLimit == null) return Infinity;
   return 2;
+}
+
+function getNextAreaSlot(
+  state: BattleState,
+  zoneId: BattleZoneId,
+  areaStacks: BattleAreaStack[]
+): BattleAreaSlot | null {
+  const limit = getAreaStackLimit(state, zoneId);
+  if (areaStacks.length >= limit) return null;
+
+  const usedSlots = new Set(areaStacks.map((areaStack) => areaStack.areaSlot));
+  const finiteLimit = Number.isFinite(limit) ? limit : areaStacks.length + 1;
+  for (let slot = 0; slot < finiteLimit; slot += 1) {
+    if (!usedSlots.has(slot)) return slot;
+  }
+
+  return areaStacks.length;
 }
 
 export function canDragBattleCard(input: {
@@ -636,11 +656,8 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
             ) {
               return null;
             }
-            const areaSlot: BattleAreaSlot = areaStacks.some(
-              (areaStack) => areaStack.areaSlot === 0
-            )
-              ? 1
-              : 0;
+            const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+            if (areaSlot == null) return null;
             const stackId = `area-stack:${input.toZone}:${compositeId}`;
             return [...compositeCards]
               .sort((left, right) => {
@@ -705,13 +722,15 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   const targetAreaStacks = isAreaStackZone(input.toZone)
     ? getAreaStacks(toCards)
     : [];
-  const nextAreaSlot: BattleAreaSlot =
-    targetAreaStacks.some((areaStack) => areaStack.areaSlot === 0) ? 1 : 0;
+  const nextAreaSlot = isAreaStackZone(input.toZone)
+    ? getNextAreaSlot(state, input.toZone, targetAreaStacks)
+    : null;
+  if (isAreaStackZone(input.toZone) && nextAreaSlot == null) return state;
   const normalizedMovedCard = isAreaStackZone(input.toZone)
     ? withAreaStackData(
         revealNormalizedMovedCard,
         getAreaStackId(revealNormalizedMovedCard),
-        nextAreaSlot
+        nextAreaSlot ?? 0
       )
     : withoutAreaStackData(revealNormalizedMovedCard);
   const nextIndex = getMoveInsertIndex(input, toCards.length);
@@ -797,11 +816,8 @@ export function placeCardInAreaSlot(
   if (!removedCard) return state;
 
   const stackId = `area-stack:${input.toZone}:${removedCard.instanceId}`;
-  const areaSlot: BattleAreaSlot = areaStacks.some(
-    (areaStack) => areaStack.areaSlot === 0
-  )
-    ? 1
-    : 0;
+  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+  if (areaSlot == null) return state;
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
       ...removedCard,
@@ -859,6 +875,10 @@ export function placeOrStackAreaCard(
   }
 
   const stacks = getAreaStacks(state.players[source.playerId].zones[input.toZone].cards);
+  if (input.toZone === "set" && stacks.length < getAreaStackLimit(state, input.toZone)) {
+    return placeCardInAreaSlot(state, input);
+  }
+
   if (stacks.length === 0) {
     return placeCardInAreaSlot(state, input);
   }
@@ -1107,9 +1127,12 @@ function getAreaPlacementForSoulCard(
     };
   }
 
+  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+  if (areaSlot == null) return null;
+
   return {
     areaStackId: `area-stack:${input.toZone}:${input.sourceInstanceId}`,
-    areaSlot: areaStacks.some((areaStack) => areaStack.areaSlot === 0) ? 1 : 0
+    areaSlot
   };
 }
 
@@ -1424,6 +1447,10 @@ export function resolveBiriKinataNotification(
   const [removedCard] = dropCards.splice(targetIndex, 1);
   if (!removedCard) return state;
 
+  const centerStacks = getAreaStacks(self.zones.center.cards);
+  const centerAreaSlot = getNextAreaSlot(state, "center", centerStacks);
+  if (centerAreaSlot == null) return state;
+
   self.zones.center.cards.push(
     withAreaStackData(
       withoutDeckRevealData({
@@ -1436,11 +1463,7 @@ export function resolveBiriKinataNotification(
         }
       }),
       `area-stack:center:${removedCard.instanceId}`,
-      getAreaStacks(self.zones.center.cards).some(
-        (areaStack) => areaStack.areaSlot === 0
-      )
-        ? 1
-        : 0
+      centerAreaSlot
     )
   );
 
@@ -1466,11 +1489,8 @@ export function placeHyakuganComposite(
 
   const compositeId = `composite:hyakugan:${crypto.randomUUID()}`;
   const stackId = `area-stack:${input.toZone}:${compositeId}`;
-  const areaSlot: BattleAreaSlot = destinationStacks.some(
-    (areaStack) => areaStack.areaSlot === 0
-  )
-    ? 1
-    : 0;
+  const areaSlot = getNextAreaSlot(state, input.toZone, destinationStacks);
+  if (areaSlot == null) return state;
 
   const nextState = cloneBattleState(state);
   const player = nextState.players.self;

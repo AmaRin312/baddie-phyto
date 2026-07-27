@@ -4,7 +4,7 @@ export type BattlePlayerId = "self" | "opponent";
 
 export type BattleCardVisibility = "public" | "private" | "face_down";
 
-export type BattleAreaSlot = 0 | 1;
+export type BattleAreaSlot = number;
 
 export type BattleZoneId =
   | "deck"

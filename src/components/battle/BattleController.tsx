@@ -2116,7 +2116,7 @@ export function BattleController() {
     }
 
     const areaStacks = getAreaStacks(battleState.players.self.zones[toZone].cards);
-    if (areaStacks.length === 0) {
+    if (areaStacks.length === 0 || (toZone === "set" && areaStacks.length < 5)) {
       executePlacementToEmptyArea(source, toZone);
       setSelectionMode(null);
       return;

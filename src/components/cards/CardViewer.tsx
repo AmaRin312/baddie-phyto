@@ -11,6 +11,7 @@ type CardViewerProps = {
   faceDown?: boolean;
   forcePortrait?: boolean;
   faceDownImageUrl?: string | null;
+  preserveOrientation?: boolean;
 };
 
 function formatValue(value: number | null) {
@@ -25,7 +26,8 @@ export function CardViewer({
   variant = "viewer",
   faceDown = false,
   forcePortrait = false,
-  faceDownImageUrl = null
+  faceDownImageUrl = null,
+  preserveOrientation = false
 }: CardViewerProps) {
   const displayCard = getDisplayCard({ card, images, selectedImageId });
   const rootClassName = [
@@ -54,7 +56,9 @@ export function CardViewer({
   const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
 
   const shouldForcePortraitImage =
-    card.orientation === "horizontal" && (forcePortrait || variant !== "viewer");
+    card.orientation === "horizontal" &&
+    !preserveOrientation &&
+    (forcePortrait || variant !== "viewer");
   const imageClassName = [
     styles.image,
     shouldForcePortraitImage ? styles.forcePortraitImage : ""

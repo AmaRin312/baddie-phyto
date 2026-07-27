@@ -5445,7 +5445,7 @@ body:has(.bf-battle-app) {
     var(--bf-col-side);
   grid-template-rows: 20% 38% 42%;
   grid-template-areas:
-    "gauge resolution resolution resolution drop"
+    "gauge .          .          resolution drop"
     "gauge left       center     right      drop"
     ".     set        flag       buddy      deck";
 }
@@ -5475,7 +5475,7 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-gauge {
-  transform: translateX(-26px);
+  transform: translateX(-64px);
 }
 
 .bf-zone-gauge .bf-stack-zone {
@@ -5492,7 +5492,7 @@ body:has(.bf-battle-app) {
   transform:
     translate(
       calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 13px)
+      calc(var(--bf-gauge-row) * 15px)
     )
     rotate(-90deg);
 }
@@ -5501,7 +5501,7 @@ body:has(.bf-battle-app) {
   transform:
     translate(
       calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 13px)
+      calc(var(--bf-gauge-row) * 15px)
     )
     rotate(90deg);
 }
@@ -5510,7 +5510,7 @@ body:has(.bf-battle-app) {
   transform:
     translate(
       calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 13px)
+      calc(var(--bf-gauge-row) * 15px)
     )
     rotate(-90deg)
     scale(1.04);
@@ -5520,7 +5520,7 @@ body:has(.bf-battle-app) {
   transform:
     translate(
       calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 13px)
+      calc(var(--bf-gauge-row) * 15px)
     )
     rotate(90deg)
     scale(1.04);
@@ -5531,11 +5531,11 @@ body:has(.bf-battle-app) {
   align-self: center;
   justify-self: center;
   min-height: calc(var(--bf-battle-card-h) + 8px);
-  transform: translate(13%, -13%);
+  transform: translate(18%, -18%);
 }
 
 .bf-player-board.is-mirrored .bf-zone-item {
-  transform: translate(13%, -13%);
+  transform: translate(18%, -18%);
 }
 
 .bf-zone-flag,
@@ -5550,6 +5550,20 @@ body:has(.bf-battle-app) {
   gap: 2px;
   padding: 4px;
   justify-content: center;
+}
+
+.bf-area-stack-zone.is-set-area {
+  flex-direction: row-reverse;
+  justify-content: center;
+  min-width: 232px;
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card {
+  margin-left: -58px;
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:last-child {
+  margin-left: 0;
 }
 
 .bf-area-stack-card {
@@ -5568,6 +5582,13 @@ body:has(.bf-battle-app) {
 .bf-zone-resolution.is-drop-target,
 .bf-zone-resolution.is-placement-target {
   visibility: visible;
+}
+
+.bf-zone-resolution {
+  align-self: start;
+  justify-self: center;
+  min-height: var(--bf-battle-card-h);
+  transform: translateY(-50%);
 }
 
 .bf-right-panel {
@@ -5604,6 +5625,21 @@ body:has(.bf-battle-app) {
   width: 168px;
   height: 240px;
   margin-right: -82px;
+}
+
+.bf-card-button.is-rotated {
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
+  transform: none;
+}
+
+.bf-card-button.is-rotated.is-selected {
+  transform: scale(1.04);
+}
+
+.bf-player-board.is-mirrored .bf-card-button.is-rotated .bf-board-card,
+.bf-player-board.is-mirrored .bf-card-button.is-rotated .bp-board-card {
+  transform: rotate(180deg);
 }
 
 .dm-deck-supply-setting {

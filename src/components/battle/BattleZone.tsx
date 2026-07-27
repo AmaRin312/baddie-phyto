@@ -260,7 +260,7 @@ export function BattleZone({
           {cards.length === 0 && <div className="bf-empty-zone">空</div>}
         </div>
       ) : isAreaStackZone(zoneId) ? (
-        <div className="bf-area-stack-zone">
+        <div className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}>
           {areaStacks.map((areaStack) => {
             const areaTopCard = areaStack.topCard;
             const areaCardRecord = cardMap.get(areaTopCard.cardId);
@@ -342,6 +342,7 @@ export function BattleZone({
                     isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
                     variant="board"
                     sleeveImageUrl={sleeveImageUrl}
+                    preserveOrientation={areaIsRotated}
                   />
                 )}
                 {areaStack.cards.length > 1 && (
