@@ -5642,6 +5642,188 @@ body:has(.bf-battle-app) {
   transform: rotate(180deg);
 }
 
+/* Battle board absolute placement pass.
+   The board uses percentage anchors so card coordinates can be tuned visually. */
+.bf-player-board {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bf-zone {
+  position: absolute;
+  min-width: calc(var(--bf-battle-card-w) + 10px);
+  min-height: calc(var(--bf-battle-card-h) + 10px);
+}
+
+.bf-zone-gauge {
+  left: 6%;
+  top: 17%;
+  width: 132px;
+  height: 226px;
+  transform: none;
+}
+
+.bf-zone-gauge .bf-stack-zone {
+  width: 132px;
+  height: 226px;
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card {
+  top: 24px;
+  left: 24px;
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -60px),
+      calc(var(--bf-gauge-row) * 15px)
+    )
+    rotate(-90deg);
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -60px),
+      calc(var(--bf-gauge-row) * 15px)
+    )
+    rotate(90deg);
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -60px),
+      calc(var(--bf-gauge-row) * 15px)
+    )
+    rotate(-90deg)
+    scale(1.04);
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -60px),
+      calc(var(--bf-gauge-row) * 15px)
+    )
+    rotate(90deg)
+    scale(1.04);
+}
+
+.bf-zone-left {
+  left: 25%;
+  top: 31%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-zone-center {
+  left: 38%;
+  top: 21%;
+  width: 244px;
+  height: 174px;
+}
+
+.bf-zone-right {
+  left: 55%;
+  top: 31%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-zone-resolution {
+  left: 48%;
+  top: calc(var(--bf-battle-card-h) * -0.5);
+  width: 280px;
+  height: var(--bf-battle-card-h);
+  transform: none;
+}
+
+.bf-zone-drop {
+  right: 17%;
+  top: 35%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-zone-set {
+  left: 6%;
+  top: 70%;
+  width: 520px;
+  height: 174px;
+}
+
+.bf-zone-flag {
+  left: 40%;
+  top: 70%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-zone-item {
+  left: 39%;
+  top: 55%;
+  width: 244px;
+  height: 174px;
+  transform: none;
+}
+
+.bf-player-board.is-mirrored .bf-zone-item {
+  transform: none;
+}
+
+.bf-zone-buddy {
+  left: 58%;
+  top: 70%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-zone-deck {
+  right: 13%;
+  top: 70%;
+  width: 132px;
+  height: 174px;
+}
+
+.bf-area-stack-zone {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.bf-area-stack-zone:not(.is-set-area) {
+  gap: 4px;
+}
+
+.bf-area-stack-zone.is-set-area {
+  width: 100%;
+  min-width: 0;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card,
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:last-child {
+  margin-left: 0;
+}
+
+.bf-zone-item .bf-area-stack-zone {
+  justify-content: center;
+}
+
+.bf-card-button.is-rotated {
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
+}
+
+.bf-card-button.is-rotated .bp-board-card,
+.bf-card-button.is-rotated .bf-board-card {
+  width: 100%;
+  height: 100%;
+}
+
 .dm-deck-supply-setting {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
