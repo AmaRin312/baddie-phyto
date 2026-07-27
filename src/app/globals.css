@@ -5376,6 +5376,236 @@ select {
     scale(1.04);
 }
 
+/* Battle board fit and zone-position refinements */
+html:has(.bf-battle-app),
+body:has(.bf-battle-app) {
+  overflow: hidden;
+}
+
+.bf-battle-app {
+  --bf-sidebar-width: 128px;
+  --bf-right-panel-width: 650px;
+  --bf-col-gauge: 88px;
+  --bf-col-main: 150px;
+  --bf-col-side: 96px;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: 3px;
+  gap: 3px;
+  grid-template-columns:
+    var(--bf-sidebar-width)
+    minmax(520px, 1fr)
+    var(--bf-right-panel-width);
+  overflow: hidden;
+}
+
+.bf-left-menu {
+  min-height: calc(100dvh - 6px);
+  padding: 10px 8px;
+}
+
+.bf-left-menu-brand {
+  font-size: 20px;
+}
+
+.bf-left-menu-brand b {
+  margin-left: 34px;
+  font-size: 17px;
+}
+
+.bf-battle-danger-actions {
+  gap: 6px;
+  font-size: 11px;
+}
+
+.bf-battle-danger-actions button {
+  padding: 8px 6px;
+  font-size: 11px;
+}
+
+.bf-board-stage {
+  width: 100%;
+  height: calc(100dvh - 6px);
+  min-height: 0;
+  transform: none;
+}
+
+.bf-board-half {
+  min-height: 0;
+  padding: 6px;
+}
+
+.bf-player-board {
+  width: 100%;
+  grid-template-columns:
+    var(--bf-col-gauge)
+    var(--bf-col-main)
+    var(--bf-col-main)
+    var(--bf-col-main)
+    var(--bf-col-side);
+  grid-template-rows: 20% 38% 42%;
+  grid-template-areas:
+    "gauge resolution resolution resolution drop"
+    "gauge left       center     right      drop"
+    ".     set        flag       buddy      deck";
+}
+
+.bf-zone {
+  min-width: calc(var(--bf-battle-card-w) + 8px);
+  min-height: calc(var(--bf-battle-card-h) + 8px);
+  border-radius: 10px;
+}
+
+.bf-zone-left,
+.bf-zone-right {
+  align-self: center;
+  transform: none;
+}
+
+.bf-zone-center {
+  align-self: center;
+  transform: none;
+}
+
+.bf-zone-drop {
+  align-self: center;
+  min-height: calc(var(--bf-battle-card-h) + 8px);
+  max-height: calc(var(--bf-battle-card-h) + 8px);
+  transform: translateY(0);
+}
+
+.bf-zone-gauge {
+  transform: translateX(-26px);
+}
+
+.bf-zone-gauge .bf-stack-zone {
+  width: 128px;
+  height: 228px;
+  margin-top: 0;
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card {
+  top: 18px;
+  left: 44px;
+  width: 82px;
+  height: 116px;
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -58px),
+      calc(var(--bf-gauge-row) * 13px)
+    )
+    rotate(-90deg);
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -58px),
+      calc(var(--bf-gauge-row) * 13px)
+    )
+    rotate(90deg);
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -58px),
+      calc(var(--bf-gauge-row) * 13px)
+    )
+    rotate(-90deg)
+    scale(1.04);
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  transform:
+    translate(
+      calc(var(--bf-gauge-column) * -58px),
+      calc(var(--bf-gauge-row) * 13px)
+    )
+    rotate(90deg)
+    scale(1.04);
+}
+
+.bf-zone-item {
+  grid-area: flag;
+  align-self: center;
+  justify-self: center;
+  min-height: calc(var(--bf-battle-card-h) + 8px);
+  transform: translate(13%, -13%);
+}
+
+.bf-player-board.is-mirrored .bf-zone-item {
+  transform: translate(13%, -13%);
+}
+
+.bf-zone-flag,
+.bf-zone-buddy,
+.bf-zone-deck,
+.bf-zone-set {
+  min-height: calc(var(--bf-battle-card-h) + 8px);
+  transform: none;
+}
+
+.bf-area-stack-zone {
+  gap: 2px;
+  padding: 4px;
+  justify-content: center;
+}
+
+.bf-area-stack-card {
+  margin: 0;
+}
+
+.bf-area-new-slot-preview {
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
+}
+
+.bf-zone-resolution:not(:has(.bf-resolution-card)):not(.is-drop-target):not(.is-placement-target) {
+  visibility: hidden;
+}
+
+.bf-zone-resolution.is-drop-target,
+.bf-zone-resolution.is-placement-target {
+  visibility: visible;
+}
+
+.bf-right-panel {
+  min-height: calc(100dvh - 6px);
+  max-height: calc(100dvh - 6px);
+  grid-template-rows: 96px minmax(0, 1fr) 300px;
+  gap: 4px;
+}
+
+.bf-side-panel-card {
+  padding: 6px;
+}
+
+.bf-viewer-grid {
+  height: calc(100% - 26px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.bf-single-viewer {
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bf-single-viewer.is-empty {
+  border: 1px dashed rgba(147, 197, 253, 0.72);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.bf-hand-row.is-self .bf-hand-card-button {
+  width: 168px;
+  height: 240px;
+  margin-right: -82px;
+}
+
 .dm-deck-supply-setting {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

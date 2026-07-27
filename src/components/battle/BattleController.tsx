@@ -318,6 +318,7 @@ export function BattleController() {
   const [showAbilityNotificationList, setShowAbilityNotificationList] =
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
+  const [viewerInstanceIds, setViewerInstanceIds] = useState<string[]>([]);
   const [shortcutSettings, setShortcutSettings] = useState<
     Required<ShortcutSettings>
   >(mergeWithDefaultShortcuts(null));
@@ -794,6 +795,18 @@ export function BattleController() {
     battleState,
     battleState?.activeViewerCardInstanceId ?? null
   );
+  const viewerCards = useMemo(() => {
+    if (!battleState) return [];
+    const activeInstanceId = battleState.activeViewerCardInstanceId;
+    const instanceIds = [
+      ...(activeInstanceId ? [activeInstanceId] : []),
+      ...viewerInstanceIds
+    ];
+    const uniqueInstanceIds = Array.from(new Set(instanceIds)).slice(0, 2);
+    return uniqueInstanceIds
+      .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
+      .filter((card): card is BattleCard => card != null);
+  }, [battleState, viewerInstanceIds]);
   const activeAbilityNotification =
     activeAbilityNotificationId == null
       ? null
@@ -1286,6 +1299,14 @@ export function BattleController() {
 
   function setViewer(instanceId: string | null, input?: { force?: boolean }) {
     if (viewerPinned && !input?.force) return;
+    setViewerInstanceIds((currentInstanceIds) =>
+      instanceId
+        ? [
+            instanceId,
+            ...currentInstanceIds.filter((currentId) => currentId !== instanceId)
+          ].slice(0, 2)
+        : []
+    );
     executeCommand({
       type: "SET_VIEWER_CARD",
       payload: {
@@ -2334,6 +2355,7 @@ export function BattleController() {
       <BattleSidebar
         battleState={battleState}
         activeCard={activeCard}
+        viewerCards={viewerCards}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
         sleeveImageUrls={playerSleeveImageUrls}

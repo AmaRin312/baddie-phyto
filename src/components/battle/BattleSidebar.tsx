@@ -24,6 +24,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 type BattleSidebarProps = {
   battleState: BattleState;
   activeCard: BattleCard | null;
+  viewerCards: BattleCard[];
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
   sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
@@ -205,6 +206,7 @@ function HandCards({
 export function BattleSidebar({
   battleState,
   activeCard,
+  viewerCards,
   cardMap,
   imagesByCard,
   sleeveImageUrls,
@@ -226,10 +228,8 @@ export function BattleSidebar({
   onContextMenuSoulCard,
   onDropCard
 }: BattleSidebarProps) {
-  const activeCardRecord = activeCard ? cardMap.get(activeCard.cardId) : null;
-  const activeCompositeCards = activeCard
-    ? findCompositeGroupCardsInBattleState(battleState, activeCard)
-    : [];
+  const normalizedViewerCards =
+    viewerCards.length > 0 ? viewerCards.slice(0, 2) : activeCard ? [activeCard] : [];
 
   return (
     <aside className="bf-right-panel" aria-label="手札とビューアー">
@@ -268,22 +268,45 @@ export function BattleSidebar({
             📌
           </button>
         </div>
-        <div className="bf-single-viewer">
-          {activeCompositeCards.length > 1 ? (
-            <BattleCompositeCardView
-              cards={activeCompositeCards}
-              cardMap={cardMap}
-              imagesByCard={imagesByCard}
-              variant="viewer"
-            />
-          ) : activeCard && activeCardRecord ? (
-            <CardViewer
-              card={activeCardRecord}
-              images={imagesByCard.get(activeCardRecord.id) ?? []}
-              selectedImageId={activeCard.selectedImageId}
-            />
+        <div className="bf-viewer-grid">
+          {normalizedViewerCards.length > 0 ? (
+            normalizedViewerCards.map((viewerCard, viewerIndex) => {
+              const viewerCardRecord = cardMap.get(viewerCard.cardId);
+              const compositeCards = findCompositeGroupCardsInBattleState(
+                battleState,
+                viewerCard
+              );
+              if (!viewerCardRecord) return null;
+
+              return (
+                <div
+                  className="bf-single-viewer"
+                  key={`${viewerCard.instanceId}-${viewerIndex}`}
+                >
+                  {compositeCards.length > 1 ? (
+                    <BattleCompositeCardView
+                      cards={compositeCards}
+                      cardMap={cardMap}
+                      imagesByCard={imagesByCard}
+                      variant="viewer"
+                    />
+                  ) : (
+                    <CardViewer
+                      card={viewerCardRecord}
+                      images={imagesByCard.get(viewerCardRecord.id) ?? []}
+                      selectedImageId={viewerCard.selectedImageId}
+                    />
+                  )}
+                </div>
+              );
+            })
           ) : (
             <p className="bf-viewer-empty">カードをクリックすると表示します。</p>
+          )}
+          {normalizedViewerCards.length === 1 && (
+            <div className="bf-single-viewer is-empty">
+              <p className="bf-viewer-empty">2枚目</p>
+            </div>
           )}
         </div>
         <SoulCardList
