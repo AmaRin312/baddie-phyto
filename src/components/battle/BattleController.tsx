@@ -319,6 +319,7 @@ export function BattleController() {
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
   const [viewerInstanceIds, setViewerInstanceIds] = useState<string[]>([]);
+  const nextViewerSlotRef = useRef<0 | 1>(0);
   const [shortcutSettings, setShortcutSettings] = useState<
     Required<ShortcutSettings>
   >(mergeWithDefaultShortcuts(null));
@@ -798,10 +799,12 @@ export function BattleController() {
   const viewerCards = useMemo(() => {
     if (!battleState) return [];
     const activeInstanceId = battleState.activeViewerCardInstanceId;
-    const instanceIds = [
-      ...(activeInstanceId ? [activeInstanceId] : []),
-      ...viewerInstanceIds
-    ];
+    const instanceIds =
+      viewerInstanceIds.length > 0
+        ? viewerInstanceIds
+        : activeInstanceId
+          ? [activeInstanceId]
+          : [];
     const uniqueInstanceIds = Array.from(new Set(instanceIds)).slice(0, 2);
     return uniqueInstanceIds
       .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
@@ -1299,14 +1302,34 @@ export function BattleController() {
 
   function setViewer(instanceId: string | null, input?: { force?: boolean }) {
     if (viewerPinned && !input?.force) return;
-    setViewerInstanceIds((currentInstanceIds) =>
-      instanceId
-        ? [
-            instanceId,
-            ...currentInstanceIds.filter((currentId) => currentId !== instanceId)
-          ].slice(0, 2)
-        : []
-    );
+    setViewerInstanceIds((currentInstanceIds) => {
+      if (!instanceId) {
+        nextViewerSlotRef.current = 0;
+        return [];
+      }
+
+      if (currentInstanceIds.includes(instanceId)) {
+        return currentInstanceIds;
+      }
+
+      const nextSlot = nextViewerSlotRef.current;
+      if (currentInstanceIds.length === 0) {
+        nextViewerSlotRef.current = 1;
+        return [instanceId];
+      }
+
+      if (currentInstanceIds.length === 1) {
+        nextViewerSlotRef.current = nextSlot === 0 ? 1 : 0;
+        return nextSlot === 0
+          ? [instanceId, currentInstanceIds[0]]
+          : [currentInstanceIds[0], instanceId];
+      }
+
+      nextViewerSlotRef.current = nextSlot === 0 ? 1 : 0;
+      return nextSlot === 0
+        ? [instanceId, currentInstanceIds[1]]
+        : [currentInstanceIds[0], instanceId];
+    });
     executeCommand({
       type: "SET_VIEWER_CARD",
       payload: {
@@ -1319,6 +1342,7 @@ export function BattleController() {
     card: BattleCard,
     playerId: BattlePlayerId
   ) {
+    if (card.zoneId === "gauge") return false;
     if (card.visibility === "public") return true;
     if (playerId === "self" && card.zoneId === "hand") return true;
     return false;

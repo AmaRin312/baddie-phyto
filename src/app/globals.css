@@ -2165,7 +2165,7 @@ select {
 .bp-board-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -5658,8 +5658,8 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-gauge {
-  left: 4%;
-  top: 17%;
+  left: calc(4% + 40px);
+  top: calc(17% - 80px);
   width: 132px;
   height: 226px;
   transform: none;
@@ -5671,52 +5671,52 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-gauge .bf-card-button.is-gauge-card {
-  top: calc(24px + (var(--bf-gauge-row) * 15px));
-  left: 24px;
+  top: calc(24px + (var(--bf-gauge-row) * 17px)) !important;
+  left: 24px !important;
   transform:
-    rotate(-90deg);
+    rotate(-90deg) !important;
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
   transform:
-    rotate(90deg);
+    rotate(90deg) !important;
 }
 
 .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
     rotate(-90deg)
-    scale(1.04);
+    scale(1.04) !important;
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
     rotate(90deg)
-    scale(1.04);
+    scale(1.04) !important;
 }
 
 .bf-zone-left {
-  left: calc(40% - 208px);
-  top: 31%;
+  left: calc(40% - 108px);
+  top: calc(31% - 20px);
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-center {
-  left: calc(40% - 56px);
-  top: 21%;
+  left: calc(40% + 44px);
+  top: calc(21% - 20px);
   width: 244px;
   height: 174px;
 }
 
 .bf-zone-right {
-  left: calc(40% + 208px);
-  top: 31%;
+  left: calc(40% + 308px);
+  top: calc(31% - 20px);
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-resolution {
-  left: 47%;
+  left: calc(47% + 100px);
   top: -108px;
   width: 280px;
   height: 240px;
@@ -5730,29 +5730,29 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-drop {
-  right: calc(17% - 70px);
-  top: calc(35% - 30px);
+  right: calc(17% - 170px);
+  top: calc(35% - 60px);
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-set {
-  left: 6%;
+  left: calc(6% + 100px);
   top: calc(58% + 20px);
   width: 520px;
   height: 174px;
 }
 
 .bf-zone-flag {
-  left: 40%;
+  left: calc(40% + 100px);
   top: 58%;
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-item {
-  left: calc(40% - 56px);
-  top: calc(43% + 35px);
+  left: calc(40% + 44px);
+  top: calc(43% + 55px);
   width: 244px;
   height: 174px;
   transform: none;
@@ -5763,14 +5763,14 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-buddy {
-  left: 58%;
+  left: calc(58% + 100px);
   top: 58%;
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-deck {
-  right: 13%;
+  right: calc(13% - 100px);
   top: 58%;
   width: 132px;
   height: 174px;
@@ -5791,19 +5791,34 @@ body:has(.bf-battle-app) {
 .bf-area-stack-zone.is-set-area {
   width: 100%;
   min-width: 0;
-  flex-direction: row-reverse;
-  justify-content: flex-start;
+  position: relative;
+  display: block;
   gap: 0;
   transform: translateX(calc(-1 * (var(--bf-battle-card-w) + 20px)));
 }
 
 .bf-area-stack-zone.is-set-area .bf-area-stack-card,
 .bf-area-stack-zone.is-set-area .bf-area-stack-card:last-child {
-  margin-left: calc(-1 * (var(--bf-battle-card-w) - 20px));
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin-left: 0;
 }
 
-.bf-area-stack-zone.is-set-area .bf-area-stack-card:first-child {
-  margin-left: 0;
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:nth-child(2) {
+  right: calc(var(--bf-battle-card-w) - 20px);
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:nth-child(3) {
+  right: calc((var(--bf-battle-card-w) - 20px) * 2);
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:nth-child(4) {
+  right: calc((var(--bf-battle-card-w) - 20px) * 3);
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:nth-child(5) {
+  right: calc((var(--bf-battle-card-w) - 20px) * 4);
 }
 
 .bf-zone-item .bf-area-stack-zone {
@@ -5844,6 +5859,46 @@ body:has(.bf-battle-app) {
 
 .bf-board-half.is-opponent .bf-player-board-wrap {
   transform: translateX(-90px);
+}
+
+/* Battle DnD affordance cleanup.
+   During drag/placement, show zone names instead of visual zone frames. */
+.bf-zone.is-drop-target,
+.bf-zone.is-placement-target {
+  outline: none !important;
+  outline-offset: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.bf-zone.is-drop-target > .bf-zone-title,
+.bf-zone.is-placement-target > .bf-zone-title {
+  display: block;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  width: max-content;
+  max-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  transform: translate(-50%, -50%);
+}
+
+.bf-zone.is-drop-target:not(.is-placement-target) > .bf-zone-title::after {
+  content: "";
+}
+
+.bf-zone.is-placement-target > .bf-zone-title::after {
+  content: " / クリックで配置";
+}
+
+.bf-zone .bf-card-button.is-selected {
+  outline: none;
+  outline-offset: 0;
 }
 
 .dm-deck-supply-setting {

@@ -109,7 +109,6 @@ export function BattlePlayer({
             selectedInstanceIds={selectedInstanceIds}
             rotateCard
             stack
-            showCount
             onSelectCard={onSelectCard}
             onDoubleClickCard={onDoubleClickCard}
             onContextMenuCard={onContextMenuCard}
