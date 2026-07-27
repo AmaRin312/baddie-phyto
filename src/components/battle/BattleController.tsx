@@ -1397,7 +1397,7 @@ export function BattleController() {
   ) {
     const playerId = input?.playerId ?? "self";
     if (playerId !== "self") return;
-    if (!["center", "left", "right", "item"].includes(card.zoneId)) return;
+    if (!["center", "left", "right", "item", "buddy"].includes(card.zoneId)) return;
 
     executeShortcutCommand({
       type: "TOGGLE_CARD_ORIENTATION",
