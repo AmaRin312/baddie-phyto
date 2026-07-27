@@ -5658,7 +5658,7 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-gauge {
-  left: 6%;
+  left: 4%;
   top: 17%;
   width: 132px;
   height: 226px;
@@ -5695,21 +5695,21 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-left {
-  left: 25%;
+  left: calc(40% - 208px);
   top: 31%;
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-center {
-  left: 38%;
+  left: calc(40% - 56px);
   top: 21%;
   width: 244px;
   height: 174px;
 }
 
 .bf-zone-right {
-  left: 55%;
+  left: calc(40% + 208px);
   top: 31%;
   width: 132px;
   height: 174px;
@@ -5717,9 +5717,9 @@ body:has(.bf-battle-app) {
 
 .bf-zone-resolution {
   left: 47%;
-  top: -58px;
+  top: -108px;
   width: 280px;
-  height: 190px;
+  height: 240px;
   transform: none;
 }
 
@@ -5738,21 +5738,21 @@ body:has(.bf-battle-app) {
 
 .bf-zone-set {
   left: 6%;
-  top: 61%;
+  top: calc(58% + 20px);
   width: 520px;
   height: 174px;
 }
 
 .bf-zone-flag {
   left: 40%;
-  top: 62%;
+  top: 58%;
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-item {
-  left: 35.2%;
-  top: 38.5%;
+  left: calc(40% - 56px);
+  top: 43%;
   width: 244px;
   height: 174px;
   transform: none;
@@ -5764,14 +5764,14 @@ body:has(.bf-battle-app) {
 
 .bf-zone-buddy {
   left: 58%;
-  top: 62%;
+  top: 58%;
   width: 132px;
   height: 174px;
 }
 
 .bf-zone-deck {
   right: 13%;
-  top: 62%;
+  top: 58%;
   width: 132px;
   height: 174px;
 }
@@ -5793,11 +5793,15 @@ body:has(.bf-battle-app) {
   min-width: 0;
   flex-direction: row-reverse;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 0;
 }
 
 .bf-area-stack-zone.is-set-area .bf-area-stack-card,
 .bf-area-stack-zone.is-set-area .bf-area-stack-card:last-child {
+  margin-left: -20px;
+}
+
+.bf-area-stack-zone.is-set-area .bf-area-stack-card:first-child {
   margin-left: 0;
 }
 
@@ -5819,6 +5823,10 @@ body:has(.bf-battle-app) {
 .bf-board-half.is-opponent .bf-life-badge {
   top: auto;
   bottom: 14px;
+}
+
+.bf-board-half.is-opponent .bf-player-board-wrap {
+  transform: translateX(-90px);
 }
 
 .dm-deck-supply-setting {
