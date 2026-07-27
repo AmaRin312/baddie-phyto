@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { BattleZone } from "@/components/battle/BattleZone";
-import type { MouseEvent } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import type {
   BattleCard,
   BattleDropInput,
@@ -15,6 +15,8 @@ type BattlePlayerProps = {
   side: "self" | "opponent";
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrl?: string | null;
+  playmatImageUrl?: string | null;
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
   draggedSoulCard: BattleCard | null;
@@ -50,6 +52,8 @@ export function BattlePlayer({
   side,
   cardMap,
   imagesByCard,
+  sleeveImageUrl = null,
+  playmatImageUrl = null,
   draggedCard,
   draggedInstanceCount,
   draggedSoulCard,
@@ -66,9 +70,19 @@ export function BattlePlayer({
   onPlacementZoneClick
 }: BattlePlayerProps) {
   const isOpponent = side === "opponent";
+  const boardHalfStyle = playmatImageUrl
+    ? ({
+        "--bf-player-playmat-image": `url("${playmatImageUrl}")`
+      } as CSSProperties)
+    : undefined;
 
   return (
-    <section className={`bf-board-half ${isOpponent ? "is-opponent" : "is-self"}`}>
+    <section
+      className={`bf-board-half ${isOpponent ? "is-opponent" : "is-self"}${
+        playmatImageUrl ? " has-playmat" : ""
+      }`}
+      style={boardHalfStyle}
+    >
       <div className="bf-life-badge">
         LIFE {player.life.value}
       </div>
@@ -80,6 +94,7 @@ export function BattlePlayer({
             cards={player.zones.gauge.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -106,6 +121,7 @@ export function BattlePlayer({
             cards={player.zones.left.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -128,6 +144,7 @@ export function BattlePlayer({
             cards={player.zones.center.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -150,6 +167,7 @@ export function BattlePlayer({
             cards={player.zones.resolution.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -172,6 +190,7 @@ export function BattlePlayer({
             cards={player.zones.right.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -195,6 +214,7 @@ export function BattlePlayer({
             cards={player.zones.drop.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -220,6 +240,7 @@ export function BattlePlayer({
             cards={player.zones.set.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -245,6 +266,7 @@ export function BattlePlayer({
             cards={player.zones.flag.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -269,6 +291,7 @@ export function BattlePlayer({
             cards={player.zones.item.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -293,6 +316,7 @@ export function BattlePlayer({
             cards={player.zones.buddy.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -317,6 +341,7 @@ export function BattlePlayer({
             cards={player.zones.deck.cards}
             cardMap={cardMap}
             imagesByCard={imagesByCard}
+            sleeveImageUrl={sleeveImageUrl}
             playerId={player.id}
             draggedCard={draggedCard}
             draggedInstanceCount={draggedInstanceCount}
@@ -340,3 +365,4 @@ export function BattlePlayer({
     </section>
   );
 }
+

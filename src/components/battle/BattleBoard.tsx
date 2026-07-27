@@ -37,6 +37,8 @@ type BattleBoardProps = {
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
   placementTargetZones?: ReadonlySet<BattleZoneId>;
   placementTargetPlayerId?: "self" | "opponent";
+  sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
+  playmatImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
   onPlacementZoneClick?: (
     zoneId: BattleZoneId,
     event: MouseEvent<HTMLDivElement>,
@@ -61,6 +63,8 @@ export function BattleBoard({
   onDropCard,
   placementTargetZones,
   placementTargetPlayerId,
+  sleeveImageUrls,
+  playmatImageUrls,
   onPlacementZoneClick
 }: BattleBoardProps) {
   const isPlacementMode = placementTargetZones != null;
@@ -80,6 +84,8 @@ export function BattleBoard({
         player={battleState.players.opponent}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
+        sleeveImageUrl={sleeveImageUrls?.opponent ?? null}
+        playmatImageUrl={playmatImageUrls?.opponent ?? null}
         draggedCard={draggedCard}
         draggedInstanceCount={draggedInstanceCount}
         draggedSoulCard={draggedSoulCard}
@@ -100,6 +106,8 @@ export function BattleBoard({
         player={battleState.players.self}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
+        sleeveImageUrl={sleeveImageUrls?.self ?? null}
+        playmatImageUrl={playmatImageUrls?.self ?? null}
         draggedCard={draggedCard}
         draggedInstanceCount={draggedInstanceCount}
         draggedSoulCard={draggedSoulCard}

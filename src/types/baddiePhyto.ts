@@ -67,6 +67,27 @@ export type CardImageRecord = {
   created_at: string;
 };
 
+export type BattleSupplyType = "sleeve" | "playmat";
+
+export type BattleSupplyRecord = {
+  id: string;
+  owner_id: string;
+  supply_type: BattleSupplyType;
+  name: string;
+  image_path: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BattleSupplySettingsRecord = {
+  user_id: string;
+  sleeve_supply_id: string | null;
+  playmat_supply_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AbilityRecord = {
   id: string;
   name: string;
@@ -100,6 +121,8 @@ export type DeckRecord = {
   buddy_card_id: string | null;
   selected_flag_image_id: string | null;
   selected_buddy_image_id?: string | null;
+  sleeve_supply_id?: string | null;
+  playmat_supply_id?: string | null;
   deck_visibility: DeckVisibility;
   era_key?: DeckEraKey | null;
   created_at: string;

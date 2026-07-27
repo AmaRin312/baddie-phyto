@@ -10,6 +10,7 @@ type CardViewerProps = {
   variant?: "viewer" | "compact" | "board";
   faceDown?: boolean;
   forcePortrait?: boolean;
+  faceDownImageUrl?: string | null;
 };
 
 function formatValue(value: number | null) {
@@ -23,7 +24,8 @@ export function CardViewer({
   className = "",
   variant = "viewer",
   faceDown = false,
-  forcePortrait = false
+  forcePortrait = false,
+  faceDownImageUrl = null
 }: CardViewerProps) {
   const displayCard = getDisplayCard({ card, images, selectedImageId });
   const rootClassName = [
@@ -38,7 +40,12 @@ export function CardViewer({
   if (faceDown) {
     return (
       <article className={rootClassName} aria-label="裏向きカード">
-        <div className={styles.faceDown}>BF</div>
+        {faceDownImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className={styles.image} src={faceDownImageUrl} alt="裏向きカード" />
+        ) : (
+          <div className={styles.faceDown}>BF</div>
+        )}
       </article>
     );
   }

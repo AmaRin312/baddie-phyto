@@ -23,6 +23,7 @@ type BattleZoneProps = {
   cards: BattleCard[];
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrl?: string | null;
   rotateCard?: boolean;
   stack?: boolean;
   showCount?: boolean;
@@ -67,6 +68,7 @@ export function BattleZone({
   cards,
   cardMap,
   imagesByCard,
+  sleeveImageUrl = null,
   rotateCard = false,
   stack = false,
   showCount = false,
@@ -240,6 +242,7 @@ export function BattleZone({
                   selectedImageId={battleCard.selectedImageId}
                   isPublic={shouldShowFace(battleCard)}
                   variant="board"
+                  sleeveImageUrl={sleeveImageUrl}
                 />
               </button>
             );
@@ -328,6 +331,7 @@ export function BattleZone({
                     selectedImageId={areaTopCard.selectedImageId}
                     isPublic={shouldShowFace(areaTopCard)}
                     variant="board"
+                    sleeveImageUrl={sleeveImageUrl}
                   />
                 )}
                 {areaStack.cards.length > 1 && (
@@ -375,6 +379,7 @@ export function BattleZone({
                 selectedImageId={topCard.selectedImageId}
                 isPublic={shouldShowFace(topCard)}
                 variant="board"
+                sleeveImageUrl={sleeveImageUrl}
               />
             </button>
           ) : (
@@ -413,6 +418,7 @@ export function BattleZone({
                       selectedImageId={revealedCard.selectedImageId}
                       isPublic
                       variant="board"
+                      sleeveImageUrl={sleeveImageUrl}
                     />
                   </button>
                 );

@@ -60,6 +60,21 @@ export async function loadActiveBattleRooms() {
   return { data: data ?? [], error: null };
 }
 
+export async function loadBattleRoom(roomId: string) {
+  const { data, error } = await supabase
+    .from("battle_rooms")
+    .select("*")
+    .eq("room_id", roomId)
+    .maybeSingle<BattleRoomRecord>();
+
+  if (error) {
+    console.error(error);
+    return { data: null, error: error.message };
+  }
+
+  return { data, error: null };
+}
+
 export async function createBattleRoom(input: {
   deckId: string;
   name?: string;

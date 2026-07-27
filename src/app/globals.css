@@ -2575,6 +2575,20 @@ select {
   min-height: calc(100vh - 20px);
 }
 
+.bf-board-stage.has-playmat {
+  background:
+    linear-gradient(rgba(246, 250, 255, 0.2), rgba(255, 246, 246, 0.2)),
+    var(--bf-playmat-image) center / cover no-repeat;
+}
+
+.bf-board-stage.has-playmat .bf-board-half.is-opponent {
+  background: rgba(219, 234, 254, 0.28);
+}
+
+.bf-board-stage.has-playmat .bf-board-half.is-self {
+  background: rgba(254, 226, 226, 0.24);
+}
+
 .bf-board-half {
   position: relative;
   padding: 14px;
@@ -2586,6 +2600,24 @@ select {
 
 .bf-board-half.is-self {
   background: rgba(220, 38, 38, 0.05);
+}
+
+.bf-board-half.has-playmat {
+  background:
+    linear-gradient(rgba(248, 251, 255, 0.28), rgba(248, 251, 255, 0.28)),
+    var(--bf-player-playmat-image) center / cover no-repeat;
+}
+
+.bf-board-half.has-playmat.is-opponent {
+  background:
+    linear-gradient(rgba(219, 234, 254, 0.24), rgba(219, 234, 254, 0.24)),
+    var(--bf-player-playmat-image) center / cover no-repeat;
+}
+
+.bf-board-half.has-playmat.is-self {
+  background:
+    linear-gradient(rgba(254, 226, 226, 0.2), rgba(254, 226, 226, 0.2)),
+    var(--bf-player-playmat-image) center / cover no-repeat;
 }
 
 .bf-player-board-wrap {
@@ -4590,6 +4622,12 @@ select {
   transform: translateY(-1px);
 }
 
+.dm-deck-management-click-card.is-selected {
+  border-radius: 12px;
+  outline: 2px solid rgba(37, 99, 235, 0.78);
+  outline-offset: 4px;
+}
+
 .dm-deck-management-images {
   display: flex;
   align-items: center;
@@ -4905,4 +4943,193 @@ select {
 
 .dm-card-detail-modal .dm-dialog-actions {
   flex-wrap: wrap;
+}
+
+.dm-supply-current {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dm-supply-current > div {
+  display: grid;
+  gap: 8px;
+  color: var(--dm-blue-dark);
+}
+
+.dm-supply-preview {
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(239, 246, 255, 0.9);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
+}
+
+.dm-supply-preview.is-sleeve {
+  width: 92px;
+  aspect-ratio: 5 / 7;
+}
+
+.dm-supply-preview.is-playmat {
+  width: min(100%, 320px);
+  aspect-ratio: 16 / 9;
+}
+
+.dm-supply-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dm-supply-empty-preview {
+  display: grid;
+  place-items: center;
+  min-height: 112px;
+  border: 1px dashed rgba(147, 197, 253, 0.9);
+  border-radius: 16px;
+  color: var(--dm-muted);
+  background: rgba(239, 246, 255, 0.65);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.dm-supply-drop {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed rgba(147, 197, 253, 0.95);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(239, 246, 255, 0.58);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+  cursor: copy;
+}
+
+.dm-supply-drop:hover,
+.dm-supply-drop:focus-within {
+  border-color: rgba(37, 99, 235, 0.85);
+  background: rgba(219, 234, 254, 0.86);
+  transform: translateY(-1px);
+}
+
+.dm-supply-drop.has-file {
+  border-style: solid;
+  border-color: rgba(37, 99, 235, 0.72);
+  background: rgba(239, 246, 255, 0.9);
+}
+
+.dm-supply-drop input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dm-supply-drop b {
+  color: var(--dm-blue-dark);
+  font-size: 12px;
+}
+
+.dm-supply-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+.dm-supply-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(147, 197, 253, 0.75);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.dm-supply-card.is-selected {
+  outline: 3px solid rgba(37, 99, 235, 0.28);
+  border-color: rgba(37, 99, 235, 0.72);
+}
+
+.dm-supply-card-main {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  border: 0;
+  padding: 0;
+  color: var(--dm-blue-dark);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dm-supply-selected-badge {
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #1d4ed8;
+  background: rgba(219, 234, 254, 0.95);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.dm-supply-use {
+  justify-self: start;
+  border: 1px solid rgba(37, 99, 235, 0.42);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #1d4ed8;
+  background: rgba(239, 246, 255, 0.95);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dm-supply-use:hover:not(:disabled) {
+  background: rgba(219, 234, 254, 0.95);
+}
+
+.dm-supply-delete {
+  justify-self: start;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #dc2626;
+  background: rgba(254, 242, 242, 0.9);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dm-deck-supply-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.dm-deck-supply-preview {
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(239, 246, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
+}
+
+.dm-deck-supply-preview.is-sleeve {
+  width: 34px;
+  aspect-ratio: 5 / 7;
+}
+
+.dm-deck-supply-preview.is-playmat {
+  width: 58px;
+  aspect-ratio: 16 / 9;
+}
+
+.dm-deck-supply-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }

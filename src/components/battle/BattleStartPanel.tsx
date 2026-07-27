@@ -75,6 +75,7 @@ export function BattleStartPanel() {
   const [rooms, setRooms] = useState<BattleRoomRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [selectedDeckId, setSelectedDeckId] = useState("");
+  const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
   const [roomName, setRoomName] = useState("");
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
@@ -276,69 +277,101 @@ export function BattleStartPanel() {
       <div className="dm-deck-management-card">
         <div className="dm-deck-management-images">
           <div>
-            <span>フラッグ</span>
             {flagCard ? (
               <CardViewer
                 card={flagCard}
                 images={imagesByCard.get(flagCard.id) ?? []}
                 selectedImageId={flagImageId}
                 variant="compact"
+                forcePortrait
               />
             ) : (
               <span className="dm-deck-management-empty">未選択</span>
             )}
           </div>
           <div>
-            <span>バディ</span>
             {buddyCard ? (
               <CardViewer
                 card={buddyCard}
                 images={imagesByCard.get(buddyCard.id) ?? []}
                 selectedImageId={buddyImageId}
                 variant="compact"
+                forcePortrait
               />
             ) : (
               <span className="dm-deck-management-empty">未選択</span>
             )}
           </div>
         </div>
-        <p className="dm-muted-text">年代：{getDeckEraLabel(deck.era_key)}</p>
+        <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>
+      </div>
+    );
+  }
+
+  function renderDeckContentList(deck: DeckRecord) {
+    const contents = deckCardMap.get(deck.id) ?? [];
+
+    if (contents.length === 0) {
+      return <p className="dm-muted-text">デッキ内カードはまだありません。</p>;
+    }
+
+    return (
+      <div className="dm-deck-content-list">
+        {contents.map((deckCard) => {
+          const card = cardMap.get(deckCard.card_id) ?? null;
+          const selectedImageId = findDisplayImageId(
+            imagesByCard,
+            deckCard.card_id,
+            deckCard.selected_image_id
+          );
+
+          return (
+            <div key={deckCard.id} className="dm-deck-content-row">
+              {card ? (
+                <>
+                  <CardViewer
+                    card={card}
+                    images={imagesByCard.get(card.id) ?? []}
+                    selectedImageId={selectedImageId}
+                    variant="compact"
+                    className="dm-deck-content-row-image"
+                    forcePortrait
+                  />
+                  <span className="dm-deck-content-row-count">×{deckCard.quantity}</span>
+                </>
+              ) : (
+                <span className="dm-deck-content-row-empty">?</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   function renderDeck(deck: DeckRecord) {
-    const canStart = canStartDeck(deck);
-
     return (
-      <AppCard key={deck.id} title={deck.name}>
-        {renderDeckSummary(deck)}
-        <div className="dm-dialog-actions">
+      <div
+        key={deck.id}
+        className="dm-deck-management-item"
+        onDoubleClick={() => setPreviewDeck(deck)}
+      >
+        <AppCard title={deck.name}>
           <button
             type="button"
-            className="dm-button secondary"
+            className={`dm-deck-management-card dm-deck-management-click-card${
+              effectiveSelectedDeckId === deck.id ? " is-selected" : ""
+            }`}
             onClick={() => setSelectedDeckId(deck.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") setPreviewDeck(deck);
+            }}
+            title="クリックで選択、ダブルクリックでデッキ内容を表示"
           >
-            このデッキを選択
+            {renderDeckSummary(deck)}
           </button>
-          <Link href={`/decks/${deck.id}`} className="dm-button secondary">
-            デッキ確認
-          </Link>
-          {canStart ? (
-            <button
-              type="button"
-              className="dm-button primary"
-              onClick={() => startSolo(deck.id)}
-            >
-              一人回し開始
-            </button>
-          ) : (
-            <span className="dm-button secondary is-disabled" aria-disabled="true">
-              フラッグとバディが必要
-            </span>
-          )}
-        </div>
-      </AppCard>
+        </AppCard>
+      </div>
     );
   }
 
@@ -365,6 +398,22 @@ export function BattleStartPanel() {
           title="一人回し"
           description="選んだデッキで一人回しを開始します。Realtime同期は行いません。"
         >
+          <label className="dm-form-label" htmlFor="battle-solo-deck">
+            使用デッキ
+          </label>
+          <select
+            id="battle-solo-deck"
+            className="dm-input"
+            value={effectiveSelectedDeckId}
+            onChange={(event) => setSelectedDeckId(event.target.value)}
+          >
+            {visibleDecks.map((deck) => (
+              <option key={deck.id} value={deck.id}>
+                {deck.name}
+              </option>
+            ))}
+          </select>
+
           {selectedDeck ? (
             <>
               <h3>{selectedDeck.name}</h3>
@@ -467,7 +516,8 @@ export function BattleStartPanel() {
       {loading ? (
         <AppCard title="読み込み中" description="デッキを取得しています。" />
       ) : (
-        <div className="dm-app-grid">
+        <div className="dm-deck-management-section">
+          <div className="dm-app-grid">
           {visibleDecks.map(renderDeck)}
           {visibleDecks.length === 0 && (
             <AppCard
@@ -475,6 +525,61 @@ export function BattleStartPanel() {
               description="まずデッキを作成してください。"
             />
           )}
+          </div>
+        </div>
+      )}
+
+      {previewDeck && (
+        <div
+          className="dm-card-detail-modal-backdrop"
+          role="presentation"
+          onClick={() => setPreviewDeck(null)}
+        >
+          <section
+            className="dm-card-detail-modal dm-deck-action-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="battle-deck-preview-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div>
+                <p className="dm-kicker">DECK PREVIEW</p>
+                <h2 id="battle-deck-preview-title">{previewDeck.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="dm-dialog-close"
+                onClick={() => setPreviewDeck(null)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="dm-card-detail-modal-body">
+              <AppCard title="デッキ内容一覧">
+                {renderDeckContentList(previewDeck)}
+              </AppCard>
+              <div className="dm-dialog-actions">
+                <button
+                  type="button"
+                  className="dm-button secondary"
+                  onClick={() => setPreviewDeck(null)}
+                >
+                  戻る
+                </button>
+                <button
+                  type="button"
+                  className="dm-button primary"
+                  onClick={() => {
+                    setSelectedDeckId(previewDeck.id);
+                    setPreviewDeck(null);
+                  }}
+                >
+                  このデッキを選択
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </AppShell>

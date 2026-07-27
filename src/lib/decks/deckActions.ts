@@ -106,6 +106,8 @@ export async function updateDeckSettings(input: {
   buddyCardId: string | null;
   selectedFlagImageId: string | null;
   selectedBuddyImageId: string | null;
+  sleeveSupplyId: string | null;
+  playmatSupplyId: string | null;
   deckVisibility: DeckVisibility;
   eraKey: DeckEraKey | null;
 }) {
@@ -122,14 +124,40 @@ export async function updateDeckSettings(input: {
     .from("decks")
     .update({
       ...baseUpdate,
+      selected_buddy_image_id: input.selectedBuddyImageId,
+      sleeve_supply_id: input.sleeveSupplyId,
+      playmat_supply_id: input.playmatSupplyId
+    })
+    .eq("id", input.deckId)
+    .select("*")
+    .single<DeckRecord>();
+
+  if (
+    !result.error ||
+    !(
+      isMissingColumnError(result.error, "selected_buddy_image_id") ||
+      isMissingColumnError(result.error, "sleeve_supply_id") ||
+      isMissingColumnError(result.error, "playmat_supply_id")
+    )
+  ) {
+    return result;
+  }
+
+  const updateWithoutOptionalColumns = await supabase
+    .from("decks")
+    .update({
+      ...baseUpdate,
       selected_buddy_image_id: input.selectedBuddyImageId
     })
     .eq("id", input.deckId)
     .select("*")
     .single<DeckRecord>();
 
-  if (!result.error || !isMissingColumnError(result.error, "selected_buddy_image_id")) {
-    return result;
+  if (
+    !updateWithoutOptionalColumns.error ||
+    !isMissingColumnError(updateWithoutOptionalColumns.error, "selected_buddy_image_id")
+  ) {
+    return updateWithoutOptionalColumns;
   }
 
   return await supabase
@@ -180,14 +208,20 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
     .from("decks")
     .insert({
       ...baseInsert,
-      selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null
+      selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null,
+      sleeve_supply_id: sourceDeck.sleeve_supply_id ?? null,
+      playmat_supply_id: sourceDeck.playmat_supply_id ?? null
     })
     .select("id")
     .single<{ id: string }>();
 
   const insertResult =
     !insertWithBuddyImage.error ||
-    !isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id")
+    !(
+      isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id") ||
+      isMissingColumnError(insertWithBuddyImage.error, "sleeve_supply_id") ||
+      isMissingColumnError(insertWithBuddyImage.error, "playmat_supply_id")
+    )
       ? insertWithBuddyImage
       : await supabase
           .from("decks")

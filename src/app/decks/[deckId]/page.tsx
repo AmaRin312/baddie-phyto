@@ -20,6 +20,10 @@ import {
 import { loadFlags } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import {
+  getPublicSupplyImageUrl,
+  loadBattleSupplies
+} from "@/lib/supplies/supplyActions";
+import {
   EMPTY_DECK_CARD_SEARCH_FILTERS,
   filterDeckCandidateCards,
   getDeckCardSearchOptions,
@@ -41,6 +45,7 @@ import {
   DECK_ERA_OPTIONS,
   DECK_VISIBILITY_OPTIONS,
   getCardTypeLabel,
+  type BattleSupplyRecord,
   type DeckEraKey,
   type CardImageRecord,
   type CardRecord,
@@ -74,6 +79,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
   const [selectedBuddyCardId, setSelectedBuddyCardId] = useState("");
   const [selectedBuddyImageId, setSelectedBuddyImageId] = useState("");
+  const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
+  const [selectedPlaymatSupplyId, setSelectedPlaymatSupplyId] = useState("");
   const [deckVisibility, setDeckVisibility] = useState<DeckVisibility>("private");
   const [deckEra, setDeckEra] = useState<DeckEraKey | "">("");
   const [currentUserId, setCurrentUserId] = useState("");
@@ -82,6 +89,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [cardPrintings, setCardPrintings] = useState<CardPrintingSearchRecord[]>([]);
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
   const [savedDeckCards, setSavedDeckCards] = useState<DeckCardRecord[]>([]);
   const [draftDeckCards, setDraftDeckCards] = useState<DeckCardDraft[]>([]);
   const [searchFilters, setSearchFilters] = useState<DeckCardSearchFilters>(
@@ -107,14 +115,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       flagResult,
       cardResult,
       imageResult,
-      printingSearchResult
+      printingSearchResult,
+      supplyResult
     ] = await Promise.all([
       loadDeck(currentDeckId),
       loadDeckCards(currentDeckId),
       loadFlags({ selectableOnly: true, activeOnly: true }),
       loadCards(),
       loadCardImages(),
-      loadDeckCardPrintingSearchData()
+      loadDeckCardPrintingSearchData(),
+      loadBattleSupplies()
     ]);
 
     if (
@@ -124,6 +134,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       cardResult.error ||
       imageResult.error ||
       printingSearchResult.error ||
+      supplyResult.error ||
       !deckResult.data
     ) {
       console.error(
@@ -132,7 +143,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           flagResult.error ??
           cardResult.error ??
           imageResult.error ??
-          printingSearchResult.error
+          printingSearchResult.error ??
+          supplyResult.error
       );
       setMessage("デッキ情報の読み込みに失敗しました。");
       setLoading(false);
@@ -156,6 +168,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
     setSelectedBuddyImageId(nextDeck.selected_buddy_image_id ?? "");
+    setSelectedSleeveSupplyId(nextDeck.sleeve_supply_id ?? "");
+    setSelectedPlaymatSupplyId(nextDeck.playmat_supply_id ?? "");
     setDeckVisibility(nextDeck.deck_visibility ?? "private");
     setDeckEra(nextDeck.era_key ?? "");
     const nextDeckCards = deckCardsResult.data ?? [];
@@ -164,6 +178,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setFlags(nextFlags);
     setCards(nextCards);
     setImages(imageResult.data ?? []);
+    setBattleSupplies(supplyResult.data ?? []);
     setCardPrintings(printingSearchResult.printings);
     setCardSets(printingSearchResult.sets);
     setLoading(false);
@@ -223,6 +238,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const selectedBuddyCard = effectiveSelectedBuddyCardId
     ? cardMap.get(effectiveSelectedBuddyCardId) ?? null
     : null;
+  const sleeveSupplies = useMemo(
+    () => battleSupplies.filter((supply) => supply.supply_type === "sleeve"),
+    [battleSupplies]
+  );
+  const playmatSupplies = useMemo(
+    () => battleSupplies.filter((supply) => supply.supply_type === "playmat"),
+    [battleSupplies]
+  );
   const selectedDeckCard = selectedDeckCardId
     ? draftDeckCardMap.has(selectedDeckCardId)
       ? cardMap.get(selectedDeckCardId)?.is_active
@@ -317,6 +340,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
       effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
       selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
+      selectedSleeveSupplyId !== (deck.sleeve_supply_id ?? "") ||
+      selectedPlaymatSupplyId !== (deck.playmat_supply_id ?? "") ||
       deckVisibility !== (deck.deck_visibility ?? "private") ||
       deckEra !== (deck.era_key ?? "") ||
       !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
@@ -341,6 +366,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       buddyCardId: effectiveSelectedBuddyCardId || null,
       selectedFlagImageId: selectedFlagImageId || null,
       selectedBuddyImageId: selectedBuddyImageId || null,
+      sleeveSupplyId: selectedSleeveSupplyId || null,
+      playmatSupplyId: selectedPlaymatSupplyId || null,
       deckVisibility,
       eraKey: deckEra || null
     });
@@ -523,6 +550,47 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDraggedSearchCardId(null);
   }
 
+  function renderSupplySelect(input: {
+    label: string;
+    value: string;
+    supplies: BattleSupplyRecord[];
+    fallbackText: string;
+    onChange: (value: string) => void;
+  }) {
+    const selectedSupply =
+      input.supplies.find((supply) => supply.id === input.value) ?? null;
+    const imageUrl = getPublicSupplyImageUrl(selectedSupply?.image_path);
+
+    return (
+      <label>
+        {input.label}
+        <div className="dm-deck-supply-setting">
+          <select
+            value={input.value}
+            onChange={(event) => input.onChange(event.target.value)}
+            disabled={!canEditDeck}
+          >
+            <option value="">{input.fallbackText}</option>
+            {input.supplies.map((supply) => (
+              <option key={supply.id} value={supply.id}>
+                {supply.name}
+              </option>
+            ))}
+          </select>
+          {selectedSupply && imageUrl && (
+            <div
+              className={`dm-deck-supply-preview is-${selectedSupply.supply_type}`}
+              title={selectedSupply.name}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl} alt={selectedSupply.name} />
+            </div>
+          )}
+        </div>
+      </label>
+    );
+  }
+
   return (
     <AppShell kicker="DECK EDIT" title={deck?.name ?? "デッキ編集"}>
       <div className="dm-page-actions">
@@ -611,6 +679,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     )}
                   </div>
                 )}
+
+                {renderSupplySelect({
+                  label: "スリーブ",
+                  value: selectedSleeveSupplyId,
+                  supplies: sleeveSupplies,
+                  fallbackText: "ユーザー既定スリーブを使う",
+                  onChange: setSelectedSleeveSupplyId
+                })}
+
+                {renderSupplySelect({
+                  label: "プレイマット",
+                  value: selectedPlaymatSupplyId,
+                  supplies: playmatSupplies,
+                  fallbackText: "ユーザー既定プレイマットを使う",
+                  onChange: setSelectedPlaymatSupplyId
+                })}
 
                 <label>
                   デッキ名

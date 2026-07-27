@@ -7,13 +7,15 @@ type BoardCardProps = {
   selectedImageId?: string | null;
   isPublic?: boolean;
   variant?: "board";
+  sleeveImageUrl?: string | null;
 };
 
 export function BoardCard({
   card,
   images = [],
   selectedImageId,
-  isPublic = true
+  isPublic = true,
+  sleeveImageUrl = null
 }: BoardCardProps) {
   return (
     <div className="bp-board-card">
@@ -23,6 +25,7 @@ export function BoardCard({
         selectedImageId={selectedImageId}
         variant="board"
         faceDown={!isPublic}
+        faceDownImageUrl={sleeveImageUrl}
       />
     </div>
   );

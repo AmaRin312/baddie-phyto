@@ -23,7 +23,7 @@ import {
   isAreaStackZone
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
-import { disbandBattleRoom } from "@/lib/battle/battleRooms";
+import { disbandBattleRoom, loadBattleRoom } from "@/lib/battle/battleRooms";
 import {
   createBattleAbilityNotification,
   loadPendingBattleAbilityNotifications,
@@ -77,6 +77,11 @@ import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import { loadDeck, loadDeckCards } from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import {
+  getPublicSupplyImageUrl,
+  loadBattleSupplies,
+  loadBattleSupplySettings
+} from "@/lib/supplies/supplyActions";
 import { loadShortcutSettings } from "@/lib/shortcuts/shortcutSettings";
 import type { ShortcutActionId, ShortcutSettings } from "@/lib/shortcuts/shortcutTypes";
 import {
@@ -93,7 +98,13 @@ import type {
   BattleZoneId,
   PlayerState
 } from "@/types/battle";
-import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
+import type {
+  BattleSupplyRecord,
+  BattleSupplySettingsRecord,
+  CardImageRecord,
+  DeckRecord,
+  CardRecord
+} from "@/types/baddiePhyto";
 import type { DeckPosition } from "@/lib/battle/battleActions";
 
 const MULTI_SELECT_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
@@ -257,6 +268,16 @@ export function BattleController() {
   const [battleState, setBattleState] = useState<BattleState | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
+  const [battleSupplySettings, setBattleSupplySettings] =
+    useState<BattleSupplySettingsRecord | null>(null);
+  const [battleDeck, setBattleDeck] = useState<DeckRecord | null>(null);
+  const [playerSupplyDecks, setPlayerSupplyDecks] = useState<
+    Partial<Record<BattlePlayerId, DeckRecord>>
+  >({});
+  const [playerSupplySettings, setPlayerSupplySettings] = useState<
+    Partial<Record<BattlePlayerId, BattleSupplySettingsRecord | null>>
+  >({});
   const [cardAbilityMap, setCardAbilityMap] = useState<BattleCardAbilityMap>(
     () => new Map()
   );
@@ -368,7 +389,10 @@ export function BattleController() {
       cardResult,
       imageResult,
       shortcutResult,
-      abilityMapResult
+      abilityMapResult,
+      supplyResult,
+      supplySettingsResult,
+      roomResult
     ] =
       await Promise.all([
         loadDeck(deckId),
@@ -376,7 +400,10 @@ export function BattleController() {
         loadCards(),
         loadCardImages(),
         loadShortcutSettings(),
-        loadBattleCardAbilityMap()
+        loadBattleCardAbilityMap(),
+        loadBattleSupplies(),
+        loadBattleSupplySettings(profile.id),
+        isRealtimeBattle ? loadBattleRoom(roomId) : { data: null, error: null }
       ]);
 
     if (
@@ -497,6 +524,60 @@ export function BattleController() {
       resetSourceRef.current = resetSource;
       setCards((cardResult.data ?? []) as CardRecord[]);
       setImages(imageResult.data ?? []);
+      setBattleDeck(deckResult.data);
+      if (supplyResult.error) {
+        console.warn("Battle supplies are not available yet.", supplyResult.error);
+      } else {
+        setBattleSupplies(supplyResult.data ?? []);
+      }
+      if (supplySettingsResult.error) {
+        console.warn(
+          "Battle supply settings are not available yet.",
+          supplySettingsResult.error
+        );
+      } else {
+        setBattleSupplySettings(supplySettingsResult.data ?? null);
+      }
+      if (roomResult.error) {
+        console.warn("Battle room supply metadata is not available yet.", roomResult.error);
+      }
+      const selfSupplyDeck = deckResult.data;
+      const opponentDeckId =
+        isRealtimeBattle && selfSeat && roomResult.data
+          ? selfSeat === "player1"
+            ? roomResult.data.guest_deck_id
+            : roomResult.data.host_deck_id
+          : null;
+      const opponentDeckResult = opponentDeckId
+        ? await loadDeck(opponentDeckId)
+        : { data: null, error: null };
+      if (opponentDeckResult.error) {
+        console.warn("Opponent deck supply metadata is not available yet.", opponentDeckResult.error);
+      }
+      const opponentDeck = opponentDeckResult.data ?? null;
+      setPlayerSupplyDecks({
+        self: selfSupplyDeck,
+        ...(opponentDeck ? { opponent: opponentDeck } : {})
+      });
+      const selfSettingsResult = selfSupplyDeck.owner_id
+        ? await loadBattleSupplySettings(selfSupplyDeck.owner_id)
+        : { data: null, error: null };
+      const opponentSettingsResult = opponentDeck?.owner_id
+        ? await loadBattleSupplySettings(opponentDeck.owner_id)
+        : { data: null, error: null };
+      if (selfSettingsResult.error) {
+        console.warn("Self supply settings are not available yet.", selfSettingsResult.error);
+      }
+      if (opponentSettingsResult.error) {
+        console.warn(
+          "Opponent supply settings are not available yet.",
+          opponentSettingsResult.error
+        );
+      }
+      setPlayerSupplySettings({
+        self: selfSettingsResult.data ?? supplySettingsResult.data ?? null,
+        opponent: opponentSettingsResult.data ?? null
+      });
       setCardAbilityMap(abilityMapResult.data);
       setShortcutSettings(shortcutResult.data);
       setBattleState(initialState);
@@ -522,6 +603,55 @@ export function BattleController() {
 
   const isBattleLoaded = battleState != null;
 
+  const refreshOpponentSupplyMetadata = useCallback(async () => {
+    if (!isRealtimeBattle || !roomId || !selfSeat) return;
+
+    const roomResult = await loadBattleRoom(roomId);
+    if (roomResult.error || !roomResult.data) {
+      if (roomResult.error) {
+        console.warn("Battle room supply metadata refresh failed.", roomResult.error);
+      }
+      return;
+    }
+
+    const opponentDeckId =
+      selfSeat === "player1"
+        ? roomResult.data.guest_deck_id
+        : roomResult.data.host_deck_id;
+    if (!opponentDeckId) return;
+
+    const opponentDeckResult = await loadDeck(opponentDeckId);
+    if (opponentDeckResult.error || !opponentDeckResult.data) {
+      console.warn(
+        "Opponent deck supply metadata refresh failed.",
+        opponentDeckResult.error
+      );
+      return;
+    }
+
+    const opponentDeck = opponentDeckResult.data;
+    setPlayerSupplyDecks((current) => ({
+      ...current,
+      opponent: opponentDeck
+    }));
+
+    const opponentSettingsResult = await loadBattleSupplySettings(
+      opponentDeck.owner_id
+    );
+    if (opponentSettingsResult.error) {
+      console.warn(
+        "Opponent supply settings refresh failed.",
+        opponentSettingsResult.error
+      );
+      return;
+    }
+
+    setPlayerSupplySettings((current) => ({
+      ...current,
+      opponent: opponentSettingsResult.data ?? null
+    }));
+  }, [isRealtimeBattle, roomId, selfSeat]);
+
   useEffect(() => {
     if (!isRealtimeBattle || !roomId || !isBattleLoaded || !selfSeat) return;
 
@@ -541,6 +671,7 @@ export function BattleController() {
         });
         if (playerId === "opponent") {
           setOpponentPresent(true);
+          void refreshOpponentSupplyMetadata();
         }
         setBattleState((current) =>
           current
@@ -555,7 +686,13 @@ export function BattleController() {
     return () => {
       void unsubscribeSyncedPlayerBattleStates(channel);
     };
-  }, [isBattleLoaded, isRealtimeBattle, roomId, selfSeat]);
+  }, [
+    isBattleLoaded,
+    isRealtimeBattle,
+    refreshOpponentSupplyMetadata,
+    roomId,
+    selfSeat
+  ]);
 
   useEffect(() => {
     if (!isRealtimeBattle || !roomId || !isBattleLoaded || !selfSeat) return;
@@ -618,6 +755,38 @@ export function BattleController() {
     }
     return map;
   }, [images]);
+
+  const resolvePlayerSupplyImageUrl = useCallback((
+    playerId: BattlePlayerId,
+    supplyType: "sleeve" | "playmat"
+  ) => {
+    const deck = playerSupplyDecks[playerId] ?? (playerId === "self" ? battleDeck : null);
+    const settings =
+      playerSupplySettings[playerId] ??
+      (playerId === "self" ? battleSupplySettings : null);
+    const supplyId =
+      supplyType === "sleeve"
+        ? deck?.sleeve_supply_id || settings?.sleeve_supply_id || null
+        : deck?.playmat_supply_id || settings?.playmat_supply_id || null;
+    const supply = battleSupplies.find((item) => item.id === supplyId);
+    return getPublicSupplyImageUrl(supply?.image_path);
+  }, [battleDeck, battleSupplies, battleSupplySettings, playerSupplyDecks, playerSupplySettings]);
+
+  const playerSleeveImageUrls = useMemo(
+    () => ({
+      self: resolvePlayerSupplyImageUrl("self", "sleeve"),
+      opponent: resolvePlayerSupplyImageUrl("opponent", "sleeve")
+    }),
+    [resolvePlayerSupplyImageUrl]
+  );
+
+  const playerPlaymatImageUrls = useMemo(
+    () => ({
+      self: resolvePlayerSupplyImageUrl("self", "playmat"),
+      opponent: resolvePlayerSupplyImageUrl("opponent", "playmat")
+    }),
+    [resolvePlayerSupplyImageUrl]
+  );
 
   const activeCard = findBattleCardByInstanceId(
     battleState,
@@ -2076,6 +2245,7 @@ export function BattleController() {
           <Link href="/home">ホーム</Link>
           <Link href="/register">登録</Link>
           <Link href="/decks">デッキ</Link>
+          <Link href="/supplies">サプライ</Link>
           <Link href="/battle" className="is-active">
             デッキ変更
           </Link>
@@ -2107,6 +2277,8 @@ export function BattleController() {
         battleState={battleState}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
+        sleeveImageUrls={playerSleeveImageUrls}
+        playmatImageUrls={playerPlaymatImageUrls}
         draggedCard={dragSelection?.sourceCard ?? null}
         draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
         draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
