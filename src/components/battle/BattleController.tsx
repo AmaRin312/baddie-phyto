@@ -1585,22 +1585,31 @@ export function BattleController() {
     }
 
     if (
+      battleState &&
       dragSelection.instanceIds.length === 1 &&
-      dragSelection.sourceCard.zoneId === "hand" &&
+      ["center", "item"].includes(toZone) &&
       isAreaStackZone(toZone) &&
-      input.targetInstanceId &&
       input.clientX != null &&
       input.clientY != null
     ) {
+      const targetInstanceId =
+        input.targetInstanceId ??
+        getAreaStacks(battleState.players.self.zones[toZone].cards)[0]?.topCard
+          .instanceId;
+      if (!targetInstanceId) {
+        applyCardDrop(toZone, undefined, dragSelection, input);
+        return;
+      }
+
       setPendingActionPopup({
         source: {
           kind: "card",
           instanceId: dragSelection.sourceCard.instanceId,
-          fromZone: "hand"
+          fromZone: dragSelection.sourceCard.zoneId
         },
         sourceCard: dragSelection.sourceCard,
         toZone,
-        targetInstanceId: input.targetInstanceId,
+        targetInstanceId,
         x: input.clientX,
         y: input.clientY
       });

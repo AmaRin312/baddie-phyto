@@ -5672,7 +5672,7 @@ body:has(.bf-battle-app) {
 
 .bf-zone-gauge .bf-card-button.is-gauge-card {
   top: calc(24px + (var(--bf-gauge-row) * 15px));
-  left: calc(24px + (var(--bf-gauge-column) * -60px));
+  left: 24px;
   transform:
     rotate(-90deg);
 }
@@ -5730,8 +5730,8 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone-drop {
-  right: 17%;
-  top: 35%;
+  right: calc(17% - 70px);
+  top: calc(35% - 30px);
   width: 132px;
   height: 174px;
 }
@@ -5752,7 +5752,7 @@ body:has(.bf-battle-app) {
 
 .bf-zone-item {
   left: calc(40% - 56px);
-  top: 43%;
+  top: calc(43% + 35px);
   width: 244px;
   height: 174px;
   transform: none;
@@ -5794,11 +5794,12 @@ body:has(.bf-battle-app) {
   flex-direction: row-reverse;
   justify-content: flex-start;
   gap: 0;
+  transform: translateX(calc(-1 * (var(--bf-battle-card-w) + 20px)));
 }
 
 .bf-area-stack-zone.is-set-area .bf-area-stack-card,
 .bf-area-stack-zone.is-set-area .bf-area-stack-card:last-child {
-  margin-left: -20px;
+  margin-left: calc(-1 * (var(--bf-battle-card-w) - 20px));
 }
 
 .bf-area-stack-zone.is-set-area .bf-area-stack-card:first-child {
@@ -5810,6 +5811,12 @@ body:has(.bf-battle-app) {
 }
 
 .bf-card-button.is-rotated {
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
+  transform: none;
+}
+
+.bf-card-button.is-native-horizontal:not(.is-rotated) {
   width: var(--bf-battle-card-h);
   height: var(--bf-battle-card-w);
 }
@@ -5818,6 +5825,16 @@ body:has(.bf-battle-app) {
 .bf-card-button.is-rotated .bf-board-card {
   width: 100%;
   height: 100%;
+  transform: rotate(90deg);
+}
+
+.bf-card-button.is-rotated.is-selected {
+  transform: scale(1.04);
+}
+
+.bf-player-board.is-mirrored .bf-card-button.is-rotated .bf-board-card,
+.bf-player-board.is-mirrored .bf-card-button.is-rotated .bp-board-card {
+  transform: rotate(270deg);
 }
 
 .bf-board-half.is-opponent .bf-life-badge {
