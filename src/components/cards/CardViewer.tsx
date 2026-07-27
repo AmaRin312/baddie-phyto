@@ -32,6 +32,7 @@ export function CardViewer({
     styles.viewer,
     variant === "compact" ? styles.compact : "",
     variant === "board" ? styles.board : "",
+    variant === "viewer" && card.orientation === "horizontal" ? styles.horizontalViewer : "",
     className
   ]
     .filter(Boolean)
@@ -39,10 +40,10 @@ export function CardViewer({
 
   if (faceDown) {
     return (
-      <article className={rootClassName} aria-label="裏向きカード">
+      <article className={rootClassName} aria-label={"裏向きカード"}>
         {faceDownImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className={styles.image} src={faceDownImageUrl} alt="裏向きカード" />
+          <img className={styles.image} src={faceDownImageUrl} alt={"裏向きカード"} />
         ) : (
           <div className={styles.faceDown}>BF</div>
         )}
@@ -52,9 +53,11 @@ export function CardViewer({
 
   const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
 
+  const shouldForcePortraitImage =
+    card.orientation === "horizontal" && (forcePortrait || variant !== "viewer");
   const imageClassName = [
     styles.image,
-    forcePortrait && card.orientation === "horizontal" ? styles.forcePortraitImage : ""
+    shouldForcePortraitImage ? styles.forcePortraitImage : ""
   ]
     .filter(Boolean)
     .join(" ");

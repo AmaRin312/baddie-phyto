@@ -12,6 +12,7 @@ import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import {
+  copyDeck,
   loadDeck,
   loadDeckCards,
   setDeckCard,
@@ -82,6 +83,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
   const [selectedPlaymatSupplyId, setSelectedPlaymatSupplyId] = useState("");
   const [deckVisibility, setDeckVisibility] = useState<DeckVisibility>("private");
+  const [saveDefaultAlsoPrivate, setSaveDefaultAlsoPrivate] = useState(false);
   const [deckEra, setDeckEra] = useState<DeckEraKey | "">("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
@@ -171,6 +173,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedSleeveSupplyId(nextDeck.sleeve_supply_id ?? "");
     setSelectedPlaymatSupplyId(nextDeck.playmat_supply_id ?? "");
     setDeckVisibility(nextDeck.deck_visibility ?? "private");
+    setSaveDefaultAlsoPrivate(false);
     setDeckEra(nextDeck.era_key ?? "");
     const nextDeckCards = deckCardsResult.data ?? [];
     setSavedDeckCards(nextDeckCards);
@@ -334,6 +337,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   );
   const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
   const canEditDeck = Boolean(deck && currentUserId && deck.owner_id === currentUserId);
+  const shouldCopyDefaultDeckToPrivate = deckVisibility === "default" && saveDefaultAlsoPrivate;
   const hasUnsavedChanges = deck
     ? deckName.trim() !== deck.name ||
       selectedFlagId !== (deck.flag_id ?? "") ||
@@ -344,6 +348,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       selectedPlaymatSupplyId !== (deck.playmat_supply_id ?? "") ||
       deckVisibility !== (deck.deck_visibility ?? "private") ||
       deckEra !== (deck.era_key ?? "") ||
+      shouldCopyDefaultDeckToPrivate ||
       !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
     : false;
 
@@ -407,6 +412,24 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       if (error) {
         console.error(error);
         setMessage(`デッキカードの保存に失敗しました。${error.message}`);
+        setSavingDeck(false);
+        return;
+      }
+    }
+
+    if (shouldCopyDefaultDeckToPrivate) {
+      const copyResult = await copyDeck({
+        sourceDeckId: deck.id,
+        name: `${deckName.trim() || "無題のデッキ"}（自分用）`
+      });
+
+      if (copyResult.error || !copyResult.data) {
+        console.error(copyResult.error);
+        setMessage(
+          `サンプルデッキは保存しましたが、自分用コピーの作成に失敗しました。${
+            copyResult.error?.message ?? ""
+          }`
+        );
         setSavingDeck(false);
         return;
       }
@@ -726,9 +749,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   保存方法
                   <select
                     value={deckVisibility}
-                    onChange={(event) =>
-                      setDeckVisibility(event.target.value as DeckVisibility)
-                    }
+                    onChange={(event) => {
+                      const nextVisibility = event.target.value as DeckVisibility;
+                      setDeckVisibility(nextVisibility);
+                      if (nextVisibility !== "default") {
+                        setSaveDefaultAlsoPrivate(false);
+                      }
+                    }}
                     disabled={!canEditDeck}
                   >
                     {DECK_VISIBILITY_OPTIONS.map((option) => (
@@ -738,6 +765,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     ))}
                   </select>
                 </label>
+
+                {deckVisibility === "default" && (
+                  <label className="dm-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={saveDefaultAlsoPrivate}
+                      onChange={(event) => setSaveDefaultAlsoPrivate(event.target.checked)}
+                      disabled={!canEditDeck}
+                    />
+                    自分のデッキとしても保存する
+                  </label>
+                )}
 
                 <Button
                   type="submit"

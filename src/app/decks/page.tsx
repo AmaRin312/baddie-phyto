@@ -85,7 +85,9 @@ export default function DecksPage() {
         key: "own",
         title: "作成したデッキ",
         description: "自分が作成したデッキです。",
-        decks: eraFilteredDecks.filter((deck) => deck.owner_id === currentUserId)
+        decks: eraFilteredDecks.filter(
+          (deck) => deck.owner_id === currentUserId && deck.deck_visibility !== "default"
+        )
       },
       {
         key: "public",

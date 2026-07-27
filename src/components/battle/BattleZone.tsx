@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { DragEvent, MouseEvent } from "react";
+import type { CSSProperties, DragEvent, MouseEvent } from "react";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
 import {
@@ -49,6 +49,11 @@ type BattleZoneProps = {
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
+  onDoubleClickZone?: (
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLElement>,
+    playerId: "self" | "opponent"
+  ) => void;
   placementTargetZones?: ReadonlySet<BattleZoneId>;
   placementTargetPlayerId?: "self" | "opponent";
   onPlacementZoneClick?: (
@@ -84,6 +89,7 @@ export function BattleZone({
   onDragStartCard,
   onDragEndCard,
   onDropCard,
+  onDoubleClickZone,
   placementTargetZones,
   placementTargetPlayerId,
   onPlacementZoneClick
@@ -194,6 +200,10 @@ export function BattleZone({
         event.dataTransfer.dropEffect = "move";
       }}
       onDrop={handleZoneDrop}
+      onDoubleClick={(event) => {
+        if (event.defaultPrevented) return;
+        onDoubleClickZone?.(zoneId, event, playerId);
+      }}
     >
       <div className="bf-zone-title">{label}</div>
       {zoneId === "resolution" ? (
@@ -329,7 +339,7 @@ export function BattleZone({
                     card={areaCardRecord}
                     images={imagesByCard.get(areaCardRecord.id) ?? []}
                     selectedImageId={areaTopCard.selectedImageId}
-                    isPublic={shouldShowFace(areaTopCard)}
+                    isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
                     variant="board"
                     sleeveImageUrl={sleeveImageUrl}
                   />
@@ -340,14 +350,67 @@ export function BattleZone({
               </button>
             );
           })}
-          {areaStacks.length === 0 && <div className="bf-empty-zone">遨ｺ</div>}
+          {areaStacks.length === 0 && <div className="bf-empty-zone">空</div>}
           {areaStacks.length === 1 && heldStackId && (
             <div className="bf-area-new-slot-preview">2枠目</div>
           )}
         </div>
       ) : (
         <div className={stack ? "bf-stack-zone" : "bf-battle-slot"}>
-          {topCard && cardRecord ? (
+          {zoneId === "gauge" && cards.length > 0 ? (
+            cards.map((gaugeCard, gaugeIndex) => {
+              const gaugeCardRecord = cardMap.get(gaugeCard.cardId);
+              if (!gaugeCardRecord) return null;
+              const gaugeIsSelected = selectedInstanceIds.has(gaugeCard.instanceId);
+              const gaugeIsDragging =
+                draggedSingleCard?.instanceId === gaugeCard.instanceId;
+              const gaugeStyle = {
+                "--bf-gauge-row": String(gaugeIndex % 7),
+                "--bf-gauge-column": String(Math.floor(gaugeIndex / 7))
+              } as CSSProperties;
+
+              return (
+                <button
+                  type="button"
+                  className={`bf-card-button is-gauge-card${gaugeIsSelected ? " is-selected" : ""}${gaugeIsDragging ? " is-dragging" : ""}`}
+                  draggable={canDragBattleCard({ card: gaugeCard, playerId })}
+                  key={gaugeCard.instanceId}
+                  style={gaugeStyle}
+                  onDragStart={(event) => {
+                    event.stopPropagation();
+                    if (!canDragBattleCard({ card: gaugeCard, playerId })) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", gaugeCard.instanceId);
+                    onDragStartCard(gaugeCard, playerId);
+                  }}
+                  onDragEnd={onDragEndCard}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectCard(gaugeCard, { shiftKey: event.shiftKey, playerId });
+                  }}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    onDoubleClickCard(gaugeCard, { playerId });
+                  }}
+                  onContextMenu={(event) =>
+                    onContextMenuCard(gaugeCard, event, playerId)
+                  }
+                >
+                  <BoardCard
+                    card={gaugeCardRecord}
+                    images={imagesByCard.get(gaugeCardRecord.id) ?? []}
+                    selectedImageId={gaugeCard.selectedImageId}
+                    isPublic={false}
+                    variant="board"
+                    sleeveImageUrl={sleeveImageUrl}
+                  />
+                </button>
+              );
+            })
+          ) : topCard && cardRecord ? (
             <button
               type="button"
               className={`bf-card-button${rotateCard ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
@@ -369,6 +432,10 @@ export function BattleZone({
               }}
               onDoubleClick={(event) => {
                 event.stopPropagation();
+                if (zoneId === "drop") {
+                  onDoubleClickZone?.(zoneId, event, playerId);
+                  return;
+                }
                 onDoubleClickCard(topCard, { playerId });
               }}
               onContextMenu={(event) => onContextMenuCard(topCard, event, playerId)}
@@ -377,15 +444,15 @@ export function BattleZone({
                 card={cardRecord}
                 images={imagesByCard.get(cardRecord.id) ?? []}
                 selectedImageId={topCard.selectedImageId}
-                isPublic={shouldShowFace(topCard)}
+                isPublic={zoneId === "gauge" ? false : shouldShowFace(topCard)}
                 variant="board"
                 sleeveImageUrl={sleeveImageUrl}
               />
             </button>
           ) : (
-            <div className="bf-empty-zone">遨ｺ</div>
+            <div className="bf-empty-zone">空</div>
           )}
-          {showCount && <span className="bf-count-badge">{cards.length}譫・</span>}
+          {showCount && <span className="bf-count-badge">{cards.length}枚</span>}
           {revealedDeckCards.length > 0 && (
             <div className="bf-revealed-deck-cards">
               {revealedDeckCards.map((revealedCard) => {

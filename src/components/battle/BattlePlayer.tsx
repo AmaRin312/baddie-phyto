@@ -38,6 +38,11 @@ type BattlePlayerProps = {
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
+  onDoubleClickZone?: (
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLElement>,
+    playerId: "self" | "opponent"
+  ) => void;
   placementTargetZones?: ReadonlySet<BattleZoneId>;
   placementTargetPlayerId?: "self" | "opponent";
   onPlacementZoneClick?: (
@@ -65,6 +70,7 @@ export function BattlePlayer({
   onDragStartCard,
   onDragEndCard,
   onDropCard,
+  onDoubleClickZone,
   placementTargetZones,
   placementTargetPlayerId,
   onPlacementZoneClick
@@ -110,6 +116,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -134,6 +141,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -157,6 +165,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -180,6 +189,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -203,6 +213,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -229,6 +240,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -255,6 +267,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -280,6 +293,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -305,6 +319,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -330,6 +345,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
@@ -356,6 +372,7 @@ export function BattlePlayer({
             onDragStartCard={onDragStartCard}
             onDragEndCard={onDragEndCard}
             onDropCard={onDropCard}
+            onDoubleClickZone={onDoubleClickZone}
             placementTargetZones={placementTargetZones}
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}

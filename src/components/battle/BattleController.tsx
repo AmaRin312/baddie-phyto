@@ -308,6 +308,8 @@ export function BattleController() {
     useState<PendingFaceDownSoulPopup | null>(null);
   const [pendingHyakuganPopup, setPendingHyakuganPopup] =
     useState<PendingHyakuganPopup | null>(null);
+  const [dropBrowserPlayerId, setDropBrowserPlayerId] =
+    useState<BattlePlayerId | null>(null);
   const [abilityNotifications, setAbilityNotifications] = useState<
     BattleAbilityNotification[]
   >([]);
@@ -829,6 +831,10 @@ export function BattleController() {
       .map((instanceId) => deckCards.find((card) => card.instanceId === instanceId))
       .filter((card): card is BattleCard => card != null);
   }, [battleState]);
+  const dropBrowserCards = useMemo(() => {
+    if (!battleState || !dropBrowserPlayerId) return [];
+    return battleState.players[dropBrowserPlayerId].zones.drop.cards;
+  }, [battleState, dropBrowserPlayerId]);
   const soulTargetCandidates = useMemo(() => {
     if (!battleState) return [];
     return (["center", "left", "right", "item", "set"] as const).flatMap(
@@ -1074,10 +1080,12 @@ export function BattleController() {
 
     void deleteTask.then(([battleResult, playerResult]) => {
       if (battleResult.error || playerResult.error) {
-        setMessage("退室処理に失敗しました。");
-        return;
+        console.error(battleResult.error ?? playerResult.error);
       }
 
+      window.location.href = "/battle";
+    }).catch((error) => {
+      console.error(error);
       window.location.href = "/battle";
     });
   }
@@ -1238,7 +1246,7 @@ export function BattleController() {
           isContextMenuOpen: pendingContextMenu != null,
           isSelectionModeOpen: selectionMode != null,
           isDeckCountPopupOpen: pendingDeckCountPopup != null,
-          isDeckBrowserPopupOpen: lookedDeckCards.length > 0,
+          isDeckBrowserPopupOpen: lookedDeckCards.length > 0 || dropBrowserPlayerId != null,
           isDeckDropDialogOpen: pendingDeckDrop != null,
           isBiriKinataPopupOpen: pendingBiriKinataPopup != null,
           isFaceDownSoulPopupOpen: pendingFaceDownSoulPopup != null,
@@ -1263,6 +1271,7 @@ export function BattleController() {
     return () => window.removeEventListener("keydown", handleShortcutKeyDown);
   }, [
     lookedDeckCards.length,
+    dropBrowserPlayerId,
     pendingActionPopup,
     pendingBiriKinataPopup,
     pendingContextMenu,
@@ -1285,6 +1294,15 @@ export function BattleController() {
     });
   }
 
+  function canDisplayInViewer(
+    card: BattleCard,
+    playerId: BattlePlayerId
+  ) {
+    if (card.visibility === "public") return true;
+    if (playerId === "self" && card.zoneId === "hand") return true;
+    return false;
+  }
+
   function handleSelectCard(
     card: BattleCard,
     input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
@@ -1292,7 +1310,9 @@ export function BattleController() {
     const shiftKey = input?.shiftKey ?? false;
     const playerId = input?.playerId ?? "self";
 
-    setViewer(card.instanceId);
+    if (canDisplayInViewer(card, playerId)) {
+      setViewer(card.instanceId);
+    }
     setSoulSelection({
       parentInstanceId: null,
       instanceIds: []
@@ -1364,6 +1384,16 @@ export function BattleController() {
         instanceId: card.instanceId
       }
     });
+  }
+
+  function handleDoubleClickZone(
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLElement>,
+    playerId: BattlePlayerId
+  ) {
+    if (zoneId !== "drop" || playerId !== "self") return;
+    event.stopPropagation();
+    setDropBrowserPlayerId(playerId);
   }
 
   function handleDragStartCard(
@@ -2235,22 +2265,11 @@ export function BattleController() {
           {selectionMode.description && <span>{selectionMode.description}</span>}
         </div>
       )}
-      <aside className="bf-left-menu" aria-label="メインメニュー">
-        <Link href="/home" className="bf-left-menu-brand">
+      <aside className="bf-left-menu" aria-label="対戦操作">
+        <div className="bf-left-menu-brand" aria-label="Baddie Phyto">
           <span>Baddie</span>
           <b>Phyto</b>
-        </Link>
-
-        <nav className="bf-left-menu-nav">
-          <Link href="/home">ホーム</Link>
-          <Link href="/register">登録</Link>
-          <Link href="/decks">デッキ</Link>
-          <Link href="/supplies">サプライ</Link>
-          <Link href="/battle" className="is-active">
-            デッキ変更
-          </Link>
-          <Link href="/profile">設定</Link>
-        </nav>
+        </div>
 
         <div className="bf-battle-danger-actions">
           <span>Version {battleState.version ?? 0}</span>
@@ -2290,6 +2309,7 @@ export function BattleController() {
         onDragStartCard={handleDragStartCard}
         onDragEndCard={handleDragEndCard}
         onDropCard={handleDropCard}
+        onDoubleClickZone={handleDoubleClickZone}
         placementTargetZones={
           selectionMode?.type === "zone"
             ? new Set(selectionMode.allowedZones)
@@ -2316,6 +2336,7 @@ export function BattleController() {
         activeCard={activeCard}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
+        sleeveImageUrls={playerSleeveImageUrls}
         draggedCard={dragSelection?.sourceCard ?? null}
         draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
         draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
@@ -2438,6 +2459,20 @@ export function BattleController() {
           mode="move"
           onExecute={handleDeckBrowserExecute}
           onClose={handleCancelDeckLook}
+        />
+      )}
+
+      {dropBrowserPlayerId && (
+        <DeckBrowserPopup
+          cards={dropBrowserCards}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          soulCandidates={soulTargetCandidates}
+          title="ドロップゾーン"
+          description="ドロップゾーンのカード一覧です。"
+          mode="browse"
+          onExecute={() => undefined}
+          onClose={() => setDropBrowserPlayerId(null)}
         />
       )}
 

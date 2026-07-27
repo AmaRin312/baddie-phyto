@@ -26,6 +26,7 @@ type BattleSidebarProps = {
   activeCard: BattleCard | null;
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
   draggedSoulCard: BattleCard | null;
@@ -65,6 +66,7 @@ function HandCards({
   self,
   cardMap,
   imagesByCard,
+  sleeveImageUrls,
   draggedCard,
   draggedInstanceCount,
   draggedSoulCard,
@@ -80,6 +82,7 @@ function HandCards({
   self?: boolean;
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
   draggedSoulCard: BattleCard | null;
@@ -187,11 +190,14 @@ function HandCards({
               selectedImageId={battleCard.selectedImageId}
               isPublic={self || battleCard.visibility === "public"}
               variant="board"
+              sleeveImageUrl={
+                self ? sleeveImageUrls?.self ?? null : sleeveImageUrls?.opponent ?? null
+              }
             />
           </button>
         );
       })}
-      {cards.length === 0 && <p className="bf-hand-empty">0枚</p>}
+      {cards.length === 0 && <p className="bf-hand-empty">{"0\u679a"}</p>}
     </div>
   );
 }
@@ -201,6 +207,7 @@ export function BattleSidebar({
   activeCard,
   cardMap,
   imagesByCard,
+  sleeveImageUrls,
   draggedCard,
   draggedInstanceCount,
   draggedSoulCard,
@@ -232,6 +239,7 @@ export function BattleSidebar({
           cards={battleState.players.opponent.zones.hand.cards}
           cardMap={cardMap}
           imagesByCard={imagesByCard}
+          sleeveImageUrls={sleeveImageUrls}
           draggedCard={draggedCard}
           draggedInstanceCount={draggedInstanceCount}
           draggedSoulCard={draggedSoulCard}
@@ -291,7 +299,7 @@ export function BattleSidebar({
       </section>
 
       <section className="bf-side-panel-card is-self-hand">
-        <h2>自分 手札</h2>
+        <h2>{"\u81ea\u5206 \u624b\u672d"}</h2>
         <HandCards
           self
           cards={battleState.players.self.zones.hand.cards}
