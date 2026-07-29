@@ -12,6 +12,7 @@ import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import {
+  createDraftDeck,
   copyDeck,
   loadDeck,
   loadDeckCards,
@@ -75,6 +76,7 @@ function getFlagName(flag?: FlagWithCardRecord | null) {
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const router = useRouter();
   const [deck, setDeck] = useState<DeckRecord | null>(null);
+  const [isNewDeckDraft, setIsNewDeckDraft] = useState(false);
   const [deckName, setDeckName] = useState("");
   const [selectedFlagId, setSelectedFlagId] = useState("");
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
@@ -165,6 +167,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     );
 
     setDeck(nextDeck);
+    setIsNewDeckDraft(false);
     setDeckName(nextDeck.name);
     setSelectedFlagId(nextDeck.flag_id ?? "");
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
@@ -198,6 +201,68 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         return;
       }
       setCurrentUserId(profile.id);
+      if (resolvedDeckId === "new") {
+        const [flagResult, cardResult, imageResult, printingSearchResult, supplyResult] =
+          await Promise.all([
+            loadFlags({ selectableOnly: true, activeOnly: true }),
+            loadCards(),
+            loadCardImages(),
+            loadDeckCardPrintingSearchData(),
+            loadBattleSupplies()
+          ]);
+
+        if (
+          flagResult.error ||
+          cardResult.error ||
+          imageResult.error ||
+          printingSearchResult.error ||
+          supplyResult.error
+        ) {
+          console.error(
+            flagResult.error ??
+              cardResult.error ??
+              imageResult.error ??
+              printingSearchResult.error ??
+              supplyResult.error
+          );
+          setMessage("デッキ情報の読み込みに失敗しました。");
+          setLoading(false);
+          return;
+        }
+
+        const nextCards = (cardResult.data ?? []) as CardRecord[];
+        const nextFlags = (flagResult.data ?? []).filter(
+          (flag) =>
+            Boolean(flag.card_id) &&
+            flag.is_active &&
+            flag.can_be_selected_as_flag &&
+            flag.card?.card_type === "flag_card" &&
+            flag.card?.is_active
+        );
+
+        setDeck(null);
+        setIsNewDeckDraft(true);
+        setDeckName("");
+        setSelectedFlagId("");
+        setSelectedFlagImageId("");
+        setSelectedBuddyCardId("");
+        setSelectedBuddyImageId("");
+        setSelectedSleeveSupplyId("");
+        setSelectedPlaymatSupplyId("");
+        setDeckVisibility("private");
+        setSaveDefaultAlsoPrivate(false);
+        setDeckEra("");
+        setSavedDeckCards([]);
+        setDraftDeckCards([]);
+        setFlags(nextFlags);
+        setCards(nextCards);
+        setImages(imageResult.data ?? []);
+        setBattleSupplies(supplyResult.data ?? []);
+        setCardPrintings(printingSearchResult.printings);
+        setCardSets(printingSearchResult.sets);
+        setLoading(false);
+        return;
+      }
       await reload(resolvedDeckId);
     }
     void loadPage();
@@ -336,36 +401,76 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     [cardMap, draftDeckCards]
   );
   const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
-  const canEditDeck = Boolean(deck && currentUserId && deck.owner_id === currentUserId);
+  const canEditDeck = Boolean(
+    currentUserId && (isNewDeckDraft || (deck && deck.owner_id === currentUserId))
+  );
   const shouldCopyDefaultDeckToPrivate = deckVisibility === "default" && saveDefaultAlsoPrivate;
-  const hasUnsavedChanges = deck
-    ? deckName.trim() !== deck.name ||
-      selectedFlagId !== (deck.flag_id ?? "") ||
-      selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
-      effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
-      selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
-      selectedSleeveSupplyId !== (deck.sleeve_supply_id ?? "") ||
-      selectedPlaymatSupplyId !== (deck.playmat_supply_id ?? "") ||
-      deckVisibility !== (deck.deck_visibility ?? "private") ||
-      deckEra !== (deck.era_key ?? "") ||
-      shouldCopyDefaultDeckToPrivate ||
-      !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
-    : false;
+  const hasUnsavedChanges = isNewDeckDraft
+    ? Boolean(
+        deckName.trim() ||
+          selectedFlagId ||
+          selectedFlagImageId ||
+          effectiveSelectedBuddyCardId ||
+          selectedBuddyImageId ||
+          selectedSleeveSupplyId ||
+          selectedPlaymatSupplyId ||
+          deckVisibility !== "private" ||
+          deckEra ||
+          shouldCopyDefaultDeckToPrivate ||
+          draftDeckCards.length > 0
+      )
+    : deck
+      ? deckName.trim() !== deck.name ||
+        selectedFlagId !== (deck.flag_id ?? "") ||
+        selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
+        effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
+        selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
+        selectedSleeveSupplyId !== (deck.sleeve_supply_id ?? "") ||
+        selectedPlaymatSupplyId !== (deck.playmat_supply_id ?? "") ||
+        deckVisibility !== (deck.deck_visibility ?? "private") ||
+        deckEra !== (deck.era_key ?? "") ||
+        shouldCopyDefaultDeckToPrivate ||
+        !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
+      : false;
 
   async function handleSaveDeck() {
     if (!canEditDeck) {
       setMessage("このデッキは所有者だけが編集できます。");
       return;
     }
-    if (!deck) {
-      setMessage("デッキ情報が読み込まれていません。");
-      return;
-    }
 
     setSavingDeck(true);
     setMessage("");
+    let targetDeck = deck;
+    if (!targetDeck) {
+      const draftDeckResult = await createDraftDeck({
+        name: deckName.trim() || "無題のデッキ",
+        deckVisibility,
+        eraKey: deckEra || null
+      });
+
+      if (draftDeckResult.error || !draftDeckResult.data?.id) {
+        console.error(draftDeckResult.error);
+        setMessage(`デッキの作成に失敗しました。${draftDeckResult.error?.message ?? ""}`);
+        setSavingDeck(false);
+        return;
+      }
+
+      const createdDeckResult = await loadDeck(draftDeckResult.data.id);
+      if (createdDeckResult.error || !createdDeckResult.data) {
+        console.error(createdDeckResult.error);
+        setMessage("作成したデッキ情報の読み込みに失敗しました。");
+        setSavingDeck(false);
+        return;
+      }
+
+      targetDeck = createdDeckResult.data;
+      setDeck(targetDeck);
+      setIsNewDeckDraft(false);
+    }
+
     const settingsResult = await updateDeckSettings({
-      deckId: deck.id,
+      deckId: targetDeck.id,
       name: deckName.trim() || "無題のデッキ",
       flagId: selectedFlagId || null,
       buddyCardId: effectiveSelectedBuddyCardId || null,
@@ -402,7 +507,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
 
       const { error } = await setDeckCard({
-        deckId: deck.id,
+        deckId: targetDeck.id,
         cardId,
         quantity: draft?.quantity ?? 0,
         sortOrder: draft?.sortOrder ?? saved?.sortOrder ?? 0,
@@ -419,7 +524,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
     if (shouldCopyDefaultDeckToPrivate) {
       const copyResult = await copyDeck({
-        sourceDeckId: deck.id,
+        sourceDeckId: targetDeck.id,
         name: `${deckName.trim() || "無題のデッキ"}（自分用）`
       });
 
@@ -615,7 +720,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   return (
-    <AppShell kicker="DECK EDIT" title={deck?.name ?? "デッキ編集"}>
+    <AppShell kicker="DECK EDIT" title={deck?.name ?? (isNewDeckDraft ? "新規デッキ" : "デッキ編集")}>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/decks" />
         <Link href="/battle" className="dm-button secondary">
@@ -625,7 +730,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       {loading ? (
         <AppCard title="読み込み中" description="デッキ情報を取得しています。" />
-      ) : deck ? (
+      ) : deck || isNewDeckDraft ? (
         <div className="dm-deck-editor-layout is-three-column">
           <aside className="dm-deck-editor-column dm-deck-editor-settings">
             <AppCard title="デッキ設定">
