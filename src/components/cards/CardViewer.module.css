@@ -41,10 +41,11 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 140%;
-  height: 70%;
-  transform: translate(-50%, -50%) rotate(90deg);
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%) rotate(90deg) scale(2);
+  transform-origin: center;
+  object-fit: cover;
 }
 
 .faceDown {

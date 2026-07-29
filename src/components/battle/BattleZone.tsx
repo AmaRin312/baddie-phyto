@@ -223,7 +223,7 @@ export function BattleZone({
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-resolution-card${isResolutionSelected ? " is-selected" : ""}${isResolutionDragging ? " is-dragging" : ""}`}
+                className={`bf-card-button bf-resolution-card${card.orientation === "horizontal" ? " is-native-horizontal" : ""}${isResolutionSelected ? " is-selected" : ""}${isResolutionDragging ? " is-dragging" : ""}`}
                 key={battleCard.instanceId}
                 draggable={canDragBattleCard({ card: battleCard, playerId })}
                 onDragStart={(event) => {
@@ -256,6 +256,7 @@ export function BattleZone({
                   isPublic={shouldShowFace(battleCard)}
                   variant="board"
                   sleeveImageUrl={sleeveImageUrl}
+                  preserveOrientation={card.orientation === "horizontal"}
                 />
               </button>
             );
@@ -276,12 +277,11 @@ export function BattleZone({
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
             if (!areaCardRecord) return null;
             const areaIsRested = areaTopCard.orientation === "horizontal";
-            const areaIsNativeHorizontal = areaCardRecord.orientation === "horizontal";
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaIsNativeHorizontal ? " is-native-horizontal" : ""}${areaIsRested ? " is-rotated" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaIsRested ? " is-rotated" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
@@ -346,7 +346,6 @@ export function BattleZone({
                     isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
                     variant="board"
                     sleeveImageUrl={sleeveImageUrl}
-                    preserveOrientation={areaIsNativeHorizontal}
                   />
                 )}
                 {areaStack.cards.length > 1 && (
@@ -418,7 +417,7 @@ export function BattleZone({
           ) : topCard && cardRecord ? (
             <button
               type="button"
-              className={`bf-card-button${cardRecord.orientation === "horizontal" ? " is-native-horizontal" : ""}${rotateCard || topCard.orientation === "horizontal" ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
+              className={`bf-card-button${rotateCard || topCard.orientation === "horizontal" ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
               draggable={canDragBattleCard({ card: topCard, playerId })}
               onDragStart={(event) => {
                 event.stopPropagation();
@@ -452,7 +451,6 @@ export function BattleZone({
                 isPublic={zoneId === "gauge" ? false : shouldShowFace(topCard)}
                 variant="board"
                 sleeveImageUrl={sleeveImageUrl}
-                preserveOrientation={cardRecord.orientation === "horizontal"}
               />
             </button>
           ) : (

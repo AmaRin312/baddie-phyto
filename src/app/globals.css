@@ -2783,9 +2783,14 @@ select {
 }
 
 .bf-resolution-card {
-  width: 42px;
-  height: 60px;
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
   flex: 0 0 auto;
+}
+
+.bf-resolution-card.is-native-horizontal {
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
 }
 
 .bf-zone-flag {
@@ -5829,11 +5834,6 @@ body:has(.bf-battle-app) {
   width: var(--bf-battle-card-w);
   height: var(--bf-battle-card-h);
   transform: none;
-}
-
-.bf-card-button.is-native-horizontal:not(.is-rotated) {
-  width: var(--bf-battle-card-h);
-  height: var(--bf-battle-card-w);
 }
 
 .bf-card-button.is-rotated .bp-board-card,
