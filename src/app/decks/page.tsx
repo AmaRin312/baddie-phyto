@@ -8,7 +8,7 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
-import { copyDeck, loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
+import { copyDeck, deleteDeck, loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import {
@@ -56,6 +56,7 @@ export default function DecksPage() {
   const [selectedDeckForAction, setSelectedDeckForAction] =
     useState<DeckRecord | null>(null);
   const [copyingDeck, setCopyingDeck] = useState(false);
+  const [deletingDeck, setDeletingDeck] = useState(false);
 
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
@@ -167,6 +168,31 @@ export default function DecksPage() {
 
     setSelectedDeckForAction(null);
     router.push(`/decks/${result.data.id}`);
+  }
+
+  async function handleDeleteSelectedDeck() {
+    if (!selectedDeckForAction) return;
+    if (selectedDeckForAction.owner_id !== currentUserId) return;
+    if (selectedDeckForAction.deck_visibility === "default") return;
+
+    setDeletingDeck(true);
+    setMessage("");
+
+    const targetDeckId = selectedDeckForAction.id;
+    const result = await deleteDeck(targetDeckId);
+
+    setDeletingDeck(false);
+
+    if (result.error) {
+      console.error(result.error);
+      setMessage(`デッキの削除に失敗しました。${result.error.message ?? ""}`);
+      return;
+    }
+
+    setDecks((previous) => previous.filter((deck) => deck.id !== targetDeckId));
+    setDeckCards((previous) => previous.filter((deckCard) => deckCard.deck_id !== targetDeckId));
+    setSelectedDeckForAction(null);
+    setMessage("デッキを削除しました。");
   }
 
   function renderDeckContentList(deck: DeckRecord) {
@@ -368,19 +394,31 @@ export default function DecksPage() {
 
               {selectedDeckForAction.owner_id === currentUserId ? (
                 <div className="dm-dialog-actions">
+                  {selectedDeckForAction.deck_visibility !== "default" && (
+                    <button
+                      type="button"
+                      className="dm-button danger"
+                      onClick={() => void handleDeleteSelectedDeck()}
+                      disabled={deletingDeck}
+                    >
+                      {deletingDeck ? "???..." : "??"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="dm-button secondary"
                     onClick={() => setSelectedDeckForAction(null)}
+                    disabled={deletingDeck}
                   >
-                    戻る
+                    ??
                   </button>
                   <button
                     type="button"
                     className="dm-button primary"
                     onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
+                    disabled={deletingDeck}
                   >
-                    編集する
+                    ????
                   </button>
                 </div>
               ) : (
