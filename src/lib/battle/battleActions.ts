@@ -610,6 +610,7 @@ function normalizeSoulCardForZone(
     ...card,
     zoneId: input.toZone,
     visibility: getVisibilityForSoulMove(input.toZone),
+    orientation: "vertical",
     meta: { ...card.meta }
   };
 
@@ -622,6 +623,13 @@ function normalizeSoulCardForZone(
     input.areaStackId ?? getAreaStackId(movedCard),
     input.areaSlot ?? 0
   );
+}
+
+function resetMovedCard(card: BattleCard): BattleCard {
+  return {
+    ...card,
+    orientation: "vertical"
+  };
 }
 
 export function moveCard(state: BattleState, input: MoveCardInput): BattleState {
@@ -670,7 +678,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
               .map((card) =>
                 withAreaStackData(
                   withoutDeckRevealData({
-                    ...card,
+                    ...resetMovedCard(card),
                     zoneId: input.toZone,
                     visibility: getVisibilityForZone(input.toZone),
                     meta: { ...card.meta }
@@ -684,7 +692,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
             withoutCompositeData(
               withoutAreaStackData(
                 withoutDeckRevealData({
-                  ...card,
+                  ...resetMovedCard(card),
                   zoneId: input.toZone,
                   visibility: getVisibilityForZone(input.toZone),
                   meta: { ...card.meta }
@@ -711,7 +719,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!removedCard) return state;
 
   const movedCard: BattleCard = {
-    ...removedCard,
+    ...resetMovedCard(removedCard),
     zoneId: input.toZone,
     visibility: getVisibilityForZone(input.toZone),
     meta: { ...removedCard.meta }
@@ -775,7 +783,7 @@ export function stackCardOnAreaCard(
 
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
-      ...removedCard,
+      ...resetMovedCard(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
       meta: { ...removedCard.meta }
@@ -820,7 +828,7 @@ export function placeCardInAreaSlot(
   if (areaSlot == null) return state;
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
-      ...removedCard,
+      ...resetMovedCard(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
       meta: { ...removedCard.meta }
@@ -1002,7 +1010,7 @@ export function addSoulCard(
 
   targetCard.soul.push(
     withoutAreaStackData({
-      ...withoutDeckRevealData(removedCard),
+      ...resetMovedCard(withoutDeckRevealData(removedCard)),
       zoneId: target.zoneId,
       visibility: input.visibility,
       meta: { ...withoutDeckRevealData(removedCard).meta }
@@ -1065,7 +1073,7 @@ export function moveSoulToSoul(
 
   targetCard.soul.push(
     withoutAreaStackData({
-      ...removedSoulCard,
+      ...resetMovedCard(removedSoulCard),
       zoneId: target.zoneId,
       visibility: input.visibility,
       meta: { ...removedSoulCard.meta }
