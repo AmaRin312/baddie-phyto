@@ -2167,6 +2167,12 @@ select {
   height: 100%;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+}
+
+.bp-board-card,
+.bp-board-card * {
+  pointer-events: none;
 }
 
 .bp-board-card span {
@@ -3039,6 +3045,7 @@ select {
   place-items: center;
   background: transparent;
   cursor: pointer;
+  overflow: visible;
 }
 
 .bf-card-button[draggable="true"],
@@ -5834,11 +5841,13 @@ body:has(.bf-battle-app) {
   width: var(--bf-battle-card-h);
   height: var(--bf-battle-card-w);
   transform: none;
+  transform-origin: center;
 }
 
 .bf-card-button.is-native-horizontal {
   width: var(--bf-battle-card-h);
   height: var(--bf-battle-card-w);
+  transform-origin: center;
 }
 
 .bf-card-button.is-native-horizontal .bp-board-card,
@@ -5853,6 +5862,7 @@ body:has(.bf-battle-app) {
   width: 100%;
   height: 100%;
   transform: rotate(90deg);
+  transform-origin: center;
 }
 
 .bf-card-button.is-rotated.is-selected,
