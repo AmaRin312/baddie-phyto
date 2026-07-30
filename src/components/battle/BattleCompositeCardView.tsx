@@ -59,6 +59,7 @@ export function BattleCompositeCardView({
               selectedImageId={battleCard.selectedImageId}
               isPublic={battleCard.visibility !== "face_down"}
               variant="board"
+              preserveOrientation
             />
           ) : (
             <CardViewer

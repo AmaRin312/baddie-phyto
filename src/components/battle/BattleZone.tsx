@@ -67,6 +67,17 @@ function shouldShowFace(card: BattleCard) {
   return card.visibility !== "face_down";
 }
 
+function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
+  return (
+    zoneId === "center" ||
+    zoneId === "left" ||
+    zoneId === "right" ||
+    zoneId === "item" ||
+    zoneId === "set" ||
+    zoneId === "resolution"
+  );
+}
+
 export function BattleZone({
   zoneId,
   label,
@@ -133,6 +144,7 @@ export function BattleZone({
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
+  const preserveBattleOrientation = shouldPreserveBattleOrientation(zoneId);
 
   useEffect(() => {
     const resetTimerId =
@@ -339,14 +351,15 @@ export function BattleZone({
                     variant="board"
                   />
                 ) : (
-                  <BoardCard
-                    card={areaCardRecord}
-                    images={imagesByCard.get(areaCardRecord.id) ?? []}
-                    selectedImageId={areaTopCard.selectedImageId}
-                    isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
-                    variant="board"
-                    sleeveImageUrl={sleeveImageUrl}
-                  />
+                <BoardCard
+                  card={areaCardRecord}
+                  images={imagesByCard.get(areaCardRecord.id) ?? []}
+                  selectedImageId={areaTopCard.selectedImageId}
+                  isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
+                  variant="board"
+                  sleeveImageUrl={sleeveImageUrl}
+                  preserveOrientation={preserveBattleOrientation}
+                />
                 )}
                 {areaStack.cards.length > 1 && (
                   <span className="bf-area-stack-badge">{areaStack.cards.length}</span>
@@ -451,6 +464,7 @@ export function BattleZone({
                 isPublic={zoneId === "gauge" ? false : shouldShowFace(topCard)}
                 variant="board"
                 sleeveImageUrl={sleeveImageUrl}
+                preserveOrientation={preserveBattleOrientation}
               />
             </button>
           ) : (
