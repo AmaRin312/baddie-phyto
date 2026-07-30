@@ -5837,19 +5837,16 @@ body:has(.bf-battle-app) {
   justify-content: center;
 }
 
-.bf-card-button.is-rotated {
+.bf-card-button.is-rested,
+.bf-card-button.is-native-horizontal {
   width: var(--bf-battle-card-h);
   height: var(--bf-battle-card-w);
   transform: none;
   transform-origin: center;
 }
 
-.bf-card-button.is-native-horizontal {
-  width: var(--bf-battle-card-h);
-  height: var(--bf-battle-card-w);
-  transform-origin: center;
-}
-
+.bf-card-button.is-rested .bp-board-card,
+.bf-card-button.is-rested .bf-board-card,
 .bf-card-button.is-native-horizontal .bp-board-card,
 .bf-card-button.is-native-horizontal .bf-board-card {
   width: 100%;
@@ -5857,22 +5854,22 @@ body:has(.bf-battle-app) {
   transform: none;
 }
 
-.bf-card-button.is-rotated .bp-board-card,
-.bf-card-button.is-rotated .bf-board-card {
+.bf-card-button.is-rested .bp-board-card > *,
+.bf-card-button.is-rested .bf-board-card > * {
   width: 100%;
   height: 100%;
   transform: rotate(90deg);
   transform-origin: center;
 }
 
-.bf-card-button.is-rotated.is-selected,
-.bf-card-button.is-native-horizontal.is-selected {
-  transform: scale(1.04);
+.bf-player-board.is-mirrored .bf-card-button.is-rested .bf-board-card > *,
+.bf-player-board.is-mirrored .bf-card-button.is-rested .bp-board-card > * {
+  transform: rotate(270deg);
 }
 
-.bf-player-board.is-mirrored .bf-card-button.is-rotated .bf-board-card,
-.bf-player-board.is-mirrored .bf-card-button.is-rotated .bp-board-card {
-  transform: rotate(270deg);
+.bf-card-button.is-rested.is-selected,
+.bf-card-button.is-native-horizontal.is-selected {
+  transform: scale(1.04);
 }
 
 .bf-board-half.is-opponent .bf-life-badge {
