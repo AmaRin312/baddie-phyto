@@ -191,7 +191,7 @@ function HandCards({
               selectedImageId={battleCard.selectedImageId}
               isPublic={self || battleCard.visibility === "public"}
               variant="board"
-              forcePortraitZoomPercent={self ? 160 : undefined}
+              forcePortraitZoomPercent={self ? 140 : undefined}
               sleeveImageUrl={
                 self ? sleeveImageUrls?.self ?? null : sleeveImageUrls?.opponent ?? null
               }

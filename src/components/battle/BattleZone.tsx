@@ -289,11 +289,13 @@ export function BattleZone({
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
             if (!areaCardRecord) return null;
             const areaIsRested = areaTopCard.orientation === "horizontal";
+            const areaIsNativeHorizontal =
+              preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaIsRested ? " is-rotated" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaIsRested ? " is-rotated" : ""}${areaIsNativeHorizontal ? " is-native-horizontal" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
@@ -430,7 +432,7 @@ export function BattleZone({
           ) : topCard && cardRecord ? (
             <button
               type="button"
-              className={`bf-card-button${rotateCard || topCard.orientation === "horizontal" ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
+              className={`bf-card-button${rotateCard || topCard.orientation === "horizontal" ? " is-rotated" : ""}${preserveBattleOrientation && cardRecord.orientation === "horizontal" ? " is-native-horizontal" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
               draggable={canDragBattleCard({ card: topCard, playerId })}
               onDragStart={(event) => {
                 event.stopPropagation();
