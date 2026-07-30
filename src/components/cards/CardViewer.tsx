@@ -10,6 +10,7 @@ type CardViewerProps = {
   variant?: "viewer" | "compact" | "board";
   faceDown?: boolean;
   forcePortrait?: boolean;
+  forcePortraitZoomPercent?: number;
   faceDownImageUrl?: string | null;
   preserveOrientation?: boolean;
 };
@@ -26,6 +27,7 @@ export function CardViewer({
   variant = "viewer",
   faceDown = false,
   forcePortrait = false,
+  forcePortraitZoomPercent,
   faceDownImageUrl = null,
   preserveOrientation = false
 }: CardViewerProps) {
@@ -65,6 +67,10 @@ export function CardViewer({
   ]
     .filter(Boolean)
     .join(" ");
+  const imageStyle =
+    shouldForcePortraitImage && forcePortraitZoomPercent != null
+      ? { width: `${forcePortraitZoomPercent}%` }
+      : undefined;
 
   if (!displayCard.useHtmlCard && imageSrc) {
     return (
@@ -74,6 +80,7 @@ export function CardViewer({
           className={imageClassName}
           src={imageSrc}
           alt={displayCard.name}
+          style={imageStyle}
         />
       </article>
     );

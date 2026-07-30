@@ -8,6 +8,7 @@ type BoardCardProps = {
   isPublic?: boolean;
   variant?: "board";
   sleeveImageUrl?: string | null;
+  forcePortraitZoomPercent?: number;
   preserveOrientation?: boolean;
 };
 
@@ -17,6 +18,7 @@ export function BoardCard({
   selectedImageId,
   isPublic = true,
   sleeveImageUrl = null,
+  forcePortraitZoomPercent,
   preserveOrientation = false
 }: BoardCardProps) {
   return (
@@ -28,6 +30,7 @@ export function BoardCard({
         variant="board"
         faceDown={!isPublic}
         faceDownImageUrl={sleeveImageUrl}
+        forcePortraitZoomPercent={forcePortraitZoomPercent}
         preserveOrientation={preserveOrientation}
       />
     </div>

@@ -5831,8 +5831,8 @@ body:has(.bf-battle-app) {
 }
 
 .bf-card-button.is-rotated {
-  width: var(--bf-battle-card-w);
-  height: var(--bf-battle-card-h);
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
   transform: none;
 }
 
