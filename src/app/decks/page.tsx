@@ -401,7 +401,7 @@ export default function DecksPage() {
                       onClick={() => void handleDeleteSelectedDeck()}
                       disabled={deletingDeck}
                     >
-                      {deletingDeck ? "???..." : "??"}
+                      {deletingDeck ? "削除中..." : "削除"}
                     </button>
                   )}
                   <button
@@ -410,7 +410,7 @@ export default function DecksPage() {
                     onClick={() => setSelectedDeckForAction(null)}
                     disabled={deletingDeck}
                   >
-                    ??
+                    戻る
                   </button>
                   <button
                     type="button"
@@ -418,7 +418,7 @@ export default function DecksPage() {
                     onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
                     disabled={deletingDeck}
                   >
-                    ????
+                    編集する
                   </button>
                 </div>
               ) : (

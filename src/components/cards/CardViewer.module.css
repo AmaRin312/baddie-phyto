@@ -45,7 +45,7 @@
   height: 100%;
   transform: translate(-50%, -50%) rotate(90deg);
   transform-origin: center;
-  object-fit: contain;
+  object-fit: fill;
 }
 
 .faceDown {

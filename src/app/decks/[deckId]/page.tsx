@@ -59,6 +59,8 @@ import {
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
+type DetailImageContext = "deck" | "flag" | "buddy";
+
 const DECK_SEARCH_TYPE_ORDER: Record<CardRecord["card_type"], number> = {
   monster: 0,
   spell: 1,
@@ -102,6 +104,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [savingDeck, setSavingDeck] = useState(false);
   const [detailCardId, setDetailCardId] = useState("");
+  const [detailImageContext, setDetailImageContext] =
+    useState<DetailImageContext>("deck");
   const [previewCardId, setPreviewCardId] = useState("");
   const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
@@ -576,10 +580,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   function getDetailImageSelectValue(cardId: string) {
-    if (selectedFlagCard?.id === cardId) {
+    if (detailImageContext === "flag" && selectedFlagCard?.id === cardId) {
       return selectedFlagImageId;
     }
-    if (effectiveSelectedBuddyCardId === cardId) {
+    if (detailImageContext === "buddy" && effectiveSelectedBuddyCardId === cardId) {
       return selectedBuddyImageId;
     }
     return getImageSelectValue(cardId);
@@ -597,19 +601,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   function setDetailCardImage(cardId: string, selectedImageId: string | null) {
     if (!canEditDeck) return;
-    if (selectedFlagCard?.id === cardId) {
+    if (detailImageContext === "flag" && selectedFlagCard?.id === cardId) {
       setSelectedFlagImageId(selectedImageId ?? "");
       return;
     }
-    if (effectiveSelectedBuddyCardId === cardId) {
+    if (detailImageContext === "buddy" && effectiveSelectedBuddyCardId === cardId) {
       setSelectedBuddyImageId(selectedImageId ?? "");
       return;
     }
     setDeckCardImage(cardId, selectedImageId);
   }
 
-  function openCardDetail(cardId: string) {
+  function openCardDetail(cardId: string, context: DetailImageContext = "deck") {
     setDetailCardId(cardId);
+    setDetailImageContext(context);
   }
 
   function handleSearchFiltersChange(nextFilters: DeckCardSearchFilters) {
@@ -636,6 +641,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   function closeCardDetail() {
     setDetailCardId("");
+    setDetailImageContext("deck");
   }
 
   function moveSearchPreview(direction: "previous" | "next") {
@@ -775,7 +781,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         className="dm-deck-linked-card is-mini"
                         title={`フラッグ: ${selectedFlagCard.name}`}
                         aria-label={`フラッグ画像: ${selectedFlagCard.name}`}
-                        onClick={() => openCardDetail(selectedFlagCard.id)}
+                        onClick={() => openCardDetail(selectedFlagCard.id, "flag")}
                       >
                         <CardViewer
                           card={selectedFlagCard}
@@ -794,7 +800,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         title={`バディ: ${selectedBuddyCard.name}`}
                         aria-label={`バディ画像: ${selectedBuddyCard.name}`}
                         onClick={() => selectDeckCard(selectedBuddyCard.id)}
-                        onDoubleClick={() => openCardDetail(selectedBuddyCard.id)}
+                        onDoubleClick={() => openCardDetail(selectedBuddyCard.id, "buddy")}
                       >
                         <CardViewer
                           card={selectedBuddyCard}
@@ -940,7 +946,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       draggable={canEditDeck}
                       title={`${card.name} / ${getCardTypeLabel(card.card_type)} ×${item.quantity}`}
                       onClick={() => selectDeckCard(card.id)}
-                      onDoubleClick={() => openCardDetail(card.id)}
+                      onDoubleClick={() => openCardDetail(card.id, "deck")}
                       onDragStart={(event) => {
                         if (!canEditDeck) {
                           event.preventDefault();
@@ -1395,10 +1401,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               />
 
               <div className="dm-card-detail-meta">
-                {detailDeckDraft || detailIsSelectedFlag ? (
+                {detailDeckDraft || detailIsSelectedFlag || detailIsSelectedBuddy ? (
                   <>
                     <label className="dm-card-detail-image-select">
-                      使用画像
+                      {detailImageContext === "flag"
+                        ? "フラッグ画像"
+                        : detailImageContext === "buddy"
+                          ? "バディ画像"
+                          : "デッキ内カード画像"}
                       <select
                         value={getDetailImageSelectValue(detailCard.id)}
                         disabled={!canEditDeck}
@@ -1462,12 +1472,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                     {detailIsSelectedBuddy && detailDeckDraft && (
                       <label className="dm-card-detail-image-select">
-                        デッキ内カード画像
+                        {detailImageContext === "buddy" ? "デッキ内カード画像" : "バディ画像"}
                         <select
-                          value={getImageSelectValue(detailCard.id)}
+                          value={
+                            detailImageContext === "buddy"
+                              ? getImageSelectValue(detailCard.id)
+                              : selectedBuddyImageId
+                          }
                           disabled={!canEditDeck}
                           onChange={(event) =>
-                            setDeckCardImage(detailCard.id, event.target.value || null)
+                            detailImageContext === "buddy"
+                              ? setDeckCardImage(detailCard.id, event.target.value || null)
+                              : setSelectedBuddyImageId(event.target.value || "")
                           }
                         >
                           <option value="">Default画像を使う</option>
