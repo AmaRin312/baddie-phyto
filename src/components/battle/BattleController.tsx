@@ -14,6 +14,7 @@ import { AbilityCardTargetPopup } from "@/components/battle/AbilityCardTargetPop
 import { BiriKinataTargetPopup } from "@/components/battle/BiriKinataTargetPopup";
 import { BattleBoard } from "@/components/battle/BattleBoard";
 import { BattleContextMenu } from "@/components/battle/BattleContextMenu";
+import { BattlePopup } from "@/components/battle/BattlePopup";
 import { BattleSidebar } from "@/components/battle/BattleSidebar";
 import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
 import { DeckCountPopup } from "@/components/battle/DeckCountPopup";
@@ -23,7 +24,11 @@ import {
   isAreaStackZone
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
-import { disbandBattleRoom, loadBattleRoom } from "@/lib/battle/battleRooms";
+import {
+  disbandBattleRoom,
+  loadBattleRoom,
+  updateBattleRoomDeck
+} from "@/lib/battle/battleRooms";
 import {
   createBattleAbilityNotification,
   loadPendingBattleAbilityNotifications,
@@ -74,7 +79,7 @@ import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelection
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
-import { loadDeck, loadDeckCards } from "@/lib/decks/deckActions";
+import { loadDeck, loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import {
@@ -256,6 +261,20 @@ function hasBattleAbility(
   return cardAbilityMap.get(card.cardId)?.includes(abilityId) ?? false;
 }
 
+function getErrorMessage(error: unknown) {
+  if (!error) return null;
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return "不明なエラーが発生しました。";
+}
+
 export function BattleController() {
   const searchParams = useSearchParams();
   const deckId = searchParams.get("deckId");
@@ -325,6 +344,10 @@ export function BattleController() {
   >(mergeWithDefaultShortcuts(null));
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [showDeckChangePopup, setShowDeckChangePopup] = useState(false);
+  const [deckChangeLoading, setDeckChangeLoading] = useState(false);
+  const [changeableDecks, setChangeableDecks] = useState<DeckRecord[]>([]);
+  const [deckChangeTargetId, setDeckChangeTargetId] = useState("");
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
@@ -1103,6 +1126,125 @@ export function BattleController() {
     }).catch((error) => {
       console.error(error);
       window.location.href = "/battle";
+    });
+  }
+
+  function canStartBattleDeck(deck: DeckRecord | null) {
+    return Boolean(deck?.flag_id && deck?.buddy_card_id);
+  }
+
+  function buildBattleUrl(input: {
+    deckId: string;
+    roomId: string;
+    seat: BattlePlayerSeat;
+    mode: "solo" | "match";
+  }) {
+    const params = new URLSearchParams({
+      deckId: input.deckId,
+      roomId: input.roomId,
+      seat: input.seat,
+      mode: input.mode
+    });
+    return `/battle?${params.toString()}`;
+  }
+
+  function createSoloRoomId(nextDeckId: string) {
+    return `solo-${nextDeckId}`;
+  }
+
+  async function handleOpenDeckChangePopup() {
+    setDeckChangeLoading(true);
+    const deckResult = await loadDecks();
+    setDeckChangeLoading(false);
+
+    if (deckResult.error) {
+      setMessage("??????????????????");
+      return;
+    }
+
+    const currentUserId = currentUserIdRef.current ?? "";
+    const visibleDecks = (deckResult.data ?? []).filter(
+      (deck) =>
+        (deck.owner_id === currentUserId ||
+          deck.deck_visibility === "public" ||
+          deck.deck_visibility === "default") &&
+        canStartBattleDeck(deck)
+    );
+
+    setChangeableDecks(visibleDecks);
+    setDeckChangeTargetId(
+      visibleDecks.find((deck) => deck.id === battleDeck?.id)?.id ??
+        visibleDecks[0]?.id ??
+        ""
+    );
+    setShowDeckChangePopup(true);
+  }
+
+  function handleChangeDeck() {
+    void handleOpenDeckChangePopup();
+  }
+
+  async function handleConfirmDeckChange() {
+    if (!deckChangeTargetId || !roomId) return;
+    if (deckChangeTargetId === deckId) {
+      setShowDeckChangePopup(false);
+      return;
+    }
+
+    setDeckChangeLoading(true);
+
+    if (!isRealtimeBattle) {
+      const cleanupResults = await Promise.all([
+        deleteBattleState(roomId),
+        deleteSyncedPlayerBattleStates(roomId)
+      ]);
+      setDeckChangeLoading(false);
+
+      const failedCleanup = cleanupResults.find((result) => result.error);
+      if (failedCleanup?.error) {
+        setMessage(getErrorMessage(failedCleanup.error) ?? "デッキ変更に失敗しました。");
+        return;
+      }
+
+      window.location.href = buildBattleUrl({
+        deckId: deckChangeTargetId,
+        roomId: createSoloRoomId(deckChangeTargetId),
+        seat: "player1",
+        mode: "solo"
+      });
+      return;
+    }
+
+    if (!selfSeat) {
+      setDeckChangeLoading(false);
+      setMessage("デッキ変更には seat 情報が必要です。");
+      return;
+    }
+
+    const [roomUpdateResult, selfStateDeleteResult] = await Promise.all([
+      updateBattleRoomDeck({
+        roomId,
+        seat: selfSeat,
+        deckId: deckChangeTargetId
+      }),
+      deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
+    ]);
+    setDeckChangeLoading(false);
+
+    if (roomUpdateResult.error || selfStateDeleteResult.error) {
+      setMessage(
+        getErrorMessage(roomUpdateResult.error) ??
+          getErrorMessage(selfStateDeleteResult.error) ??
+          "デッキ変更に失敗しました。"
+      );
+      return;
+    }
+
+    window.location.href = buildBattleUrl({
+      deckId: deckChangeTargetId,
+      roomId,
+      seat: selfSeat,
+      mode: "match"
     });
   }
 
@@ -2340,6 +2482,9 @@ export function BattleController() {
           <button type="button" onClick={handleResetBattleState}>
             盤面リセット
           </button>
+          <button type="button" onClick={handleChangeDeck}>
+            デッキ変更
+          </button>
           <button type="button" onClick={handleDeleteRoomState}>
             退室
           </button>
@@ -2434,6 +2579,54 @@ export function BattleController() {
           }}
           onClose={() => setShowAbilityNotificationList(false)}
         />
+      )}
+
+      {showDeckChangePopup && (
+        <BattlePopup
+          title="デッキ変更"
+          description="同じ対戦部屋のまま、自分が使うデッキだけ変更します。"
+          size="small"
+          onClose={() => setShowDeckChangePopup(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowDeckChangePopup(false)}
+                disabled={deckChangeLoading}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmDeckChange()}
+                disabled={deckChangeLoading || !deckChangeTargetId}
+              >
+                {deckChangeLoading ? "変更中..." : "このデッキに変更"}
+              </button>
+            </>
+          }
+        >
+          {changeableDecks.length === 0 ? (
+            <p>対戦開始に使えるデッキがありません。</p>
+          ) : (
+            <label className="dm-form-label" htmlFor="battle-deck-change-select">
+              使用デッキ
+              <select
+                id="battle-deck-change-select"
+                className="dm-input"
+                value={deckChangeTargetId}
+                onChange={(event) => setDeckChangeTargetId(event.target.value)}
+                disabled={deckChangeLoading}
+              >
+                {changeableDecks.map((deck) => (
+                  <option key={deck.id} value={deck.id}>
+                    {deck.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </BattlePopup>
       )}
 
       {pendingDeckDrop && (

@@ -175,3 +175,29 @@ export async function disbandBattleRoom(roomId: string) {
 
   return { error: null };
 }
+
+export async function updateBattleRoomDeck(input: {
+  roomId: string;
+  seat: BattlePlayerSeat;
+  deckId: string;
+}) {
+  const updatePayload =
+    input.seat === "player1"
+      ? { host_deck_id: input.deckId }
+      : { guest_deck_id: input.deckId };
+
+  const { data, error } = await supabase
+    .from("battle_rooms")
+    .update(updatePayload)
+    .eq("room_id", input.roomId)
+    .neq("status", "disbanded")
+    .select("*")
+    .single<BattleRoomRecord>();
+
+  if (error) {
+    console.error(error);
+    return { data: null, error: error.message };
+  }
+
+  return { data, error: null };
+}
