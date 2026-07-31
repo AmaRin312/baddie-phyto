@@ -628,7 +628,11 @@ function normalizeSoulCardForZone(
 function resetMovedCard(card: BattleCard): BattleCard {
   return {
     ...card,
-    orientation: "vertical"
+    orientation: "vertical",
+    meta: {
+      ...card.meta,
+      isRested: false
+    }
   };
 }
 
@@ -1348,14 +1352,16 @@ export function toggleCardOrientation(
   const nextState = cloneBattleState(state);
   const compositeId = getCompositeId(located.card);
   if (compositeId) {
-    const nextOrientation =
-      located.card.orientation === "horizontal" ? "vertical" : "horizontal";
+    const nextRested = !(located.card.meta.isRested === true);
     nextState.players[located.playerId].zones[located.zoneId].cards =
       nextState.players[located.playerId].zones[located.zoneId].cards.map((card) =>
         getCompositeId(card) === compositeId
           ? {
               ...card,
-              orientation: nextOrientation
+              meta: {
+                ...card.meta,
+                isRested: nextRested
+              }
             }
           : card
       );
@@ -1365,7 +1371,10 @@ export function toggleCardOrientation(
   const card = nextState.players[located.playerId].zones[located.zoneId].cards[
     located.index
   ];
-  card.orientation = card.orientation === "horizontal" ? "vertical" : "horizontal";
+  card.meta = {
+    ...card.meta,
+    isRested: !(card.meta.isRested === true)
+  };
   return nextState;
 }
 
