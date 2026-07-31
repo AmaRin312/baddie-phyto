@@ -3061,9 +3061,11 @@ select {
 .bf-card-button.is-selected,
 .bf-hand-card-button.is-selected {
   position: relative;
-  outline: 5px solid #facc15;
-  outline-offset: 4px;
-  filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.72));
+  outline: none;
+  outline-offset: 0;
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.92),
+    0 0 16px rgba(250, 204, 21, 0.62);
   transform: scale(1.04);
 }
 
@@ -5932,6 +5934,9 @@ body:has(.bf-battle-app) {
 .bf-zone .bf-card-button.is-selected {
   outline: none;
   outline-offset: 0;
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.92),
+    0 0 16px rgba(250, 204, 21, 0.62);
 }
 
 .dm-deck-supply-setting {
