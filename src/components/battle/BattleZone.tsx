@@ -78,10 +78,10 @@ function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
   );
 }
 
-function isBattleCardRested(card: BattleCard, cardRecord: CardRecord | null | undefined) {
+function isBattleCardRested(card: BattleCard, _cardRecord: CardRecord | null | undefined) {
   if (card.meta.isRested === true) return true;
   if (card.meta.isRested === false) return false;
-  return card.orientation === "horizontal" && cardRecord?.orientation !== "horizontal";
+  return false;
 }
 
 export function BattleZone({

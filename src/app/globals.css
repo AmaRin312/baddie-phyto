@@ -5873,12 +5873,16 @@ body:has(.bf-battle-app) {
   transform: none;
 }
 
-.bf-zone .bf-card-button.is-selected {
+.bf-zone .bf-card-button.is-selected:not(.is-rested) {
   transform: none;
 }
 
 .bf-zone .bf-card-button.is-rested.is-selected {
-  transform: rotate(90deg);
+  transform: rotate(90deg) scale(1.04);
+}
+
+.bf-zone .bf-card-button.is-native-horizontal.is-selected:not(.is-rested) {
+  transform: scale(1.04);
 }
 
 .bf-board-half.is-opponent .bf-life-badge {
