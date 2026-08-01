@@ -176,6 +176,20 @@ export async function disbandBattleRoom(roomId: string) {
   return { error: null };
 }
 
+export async function deleteBattleRoom(roomId: string) {
+  const { error } = await supabase
+    .from("battle_rooms")
+    .delete()
+    .eq("room_id", roomId);
+
+  if (error) {
+    console.error(error);
+    return { error: error.message };
+  }
+
+  return { error: null };
+}
+
 export async function updateBattleRoomDeck(input: {
   roomId: string;
   seat: BattlePlayerSeat;

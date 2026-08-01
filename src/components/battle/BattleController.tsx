@@ -25,6 +25,8 @@ import {
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
 import {
+  cleanupExpiredBattleRooms,
+  deleteBattleRoom,
   disbandBattleRoom,
   loadBattleRoom,
   updateBattleRoomDeck
@@ -108,7 +110,12 @@ import type {
   BattleSupplySettingsRecord,
   CardImageRecord,
   DeckRecord,
-  CardRecord
+  CardRecord,
+  DeckEraKey
+} from "@/types/baddiePhyto";
+import {
+  DECK_ERA_OPTIONS,
+  getDeckEraLabel
 } from "@/types/baddiePhyto";
 import type { DeckPosition } from "@/lib/battle/battleActions";
 
@@ -348,6 +355,8 @@ export function BattleController() {
   const [deckChangeLoading, setDeckChangeLoading] = useState(false);
   const [changeableDecks, setChangeableDecks] = useState<DeckRecord[]>([]);
   const [deckChangeTargetId, setDeckChangeTargetId] = useState("");
+  const [deckChangeSearchText, setDeckChangeSearchText] = useState("");
+  const [deckChangeEraKey, setDeckChangeEraKey] = useState<DeckEraKey | "">("");
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
@@ -1108,10 +1117,15 @@ export function BattleController() {
 
     const deleteTask =
       isRealtimeBattle && selfSeat
-        ? Promise.all([
-            disbandBattleRoom(roomId),
-            deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
-          ])
+        ? (!opponentPresent
+            ? Promise.all([
+                deleteBattleRoom(roomId),
+                deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
+              ])
+            : Promise.all([
+                disbandBattleRoom(roomId),
+                deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
+              ]))
         : Promise.all([
             deleteBattleState(roomId),
             deleteSyncedPlayerBattleStates(roomId)
@@ -1122,6 +1136,7 @@ export function BattleController() {
         console.error(battleResult.error ?? playerResult.error);
       }
 
+      void cleanupExpiredBattleRooms();
       window.location.href = "/battle";
     }).catch((error) => {
       console.error(error);
@@ -1152,6 +1167,26 @@ export function BattleController() {
     return `solo-${nextDeckId}`;
   }
 
+  const filteredChangeableDecks = useMemo(() => {
+    const searchText = deckChangeSearchText.trim().toLowerCase();
+    return changeableDecks.filter((deck) => {
+      const matchesSearch =
+        !searchText || deck.name.toLowerCase().includes(searchText);
+      const matchesEra =
+        !deckChangeEraKey || deck.era_key === deckChangeEraKey;
+      return matchesSearch && matchesEra;
+    });
+  }, [changeableDecks, deckChangeEraKey, deckChangeSearchText]);
+
+  useEffect(() => {
+    if (!showDeckChangePopup) return;
+    if (filteredChangeableDecks.length === 0) return;
+    if (filteredChangeableDecks.some((deck) => deck.id === deckChangeTargetId)) {
+      return;
+    }
+    setDeckChangeTargetId(filteredChangeableDecks[0].id);
+  }, [deckChangeTargetId, filteredChangeableDecks, showDeckChangePopup]);
+
   async function handleOpenDeckChangePopup() {
     setDeckChangeLoading(true);
     const deckResult = await loadDecks();
@@ -1172,6 +1207,8 @@ export function BattleController() {
     );
 
     setChangeableDecks(visibleDecks);
+    setDeckChangeSearchText("");
+    setDeckChangeEraKey("");
     setDeckChangeTargetId(
       visibleDecks.find((deck) => deck.id === battleDeck?.id)?.id ??
         visibleDecks[0]?.id ??
@@ -2584,8 +2621,8 @@ export function BattleController() {
       {showDeckChangePopup && (
         <BattlePopup
           title="デッキ変更"
-          description="同じ対戦部屋のまま、自分が使うデッキだけ変更します。"
-          size="small"
+          description="対戦中のデッキを検索して切り替えます。"
+          size="large"
           onClose={() => setShowDeckChangePopup(false)}
           footer={
             <>
@@ -2609,22 +2646,71 @@ export function BattleController() {
           {changeableDecks.length === 0 ? (
             <p>対戦開始に使えるデッキがありません。</p>
           ) : (
-            <label className="dm-form-label" htmlFor="battle-deck-change-select">
-              使用デッキ
-              <select
-                id="battle-deck-change-select"
-                className="dm-input"
-                value={deckChangeTargetId}
-                onChange={(event) => setDeckChangeTargetId(event.target.value)}
-                disabled={deckChangeLoading}
-              >
-                {changeableDecks.map((deck) => (
-                  <option key={deck.id} value={deck.id}>
-                    {deck.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="bf-deck-change-popup">
+              <div className="bf-deck-change-search-row">
+                <label className="dm-form-label" htmlFor="battle-deck-change-search">
+                  デッキ名
+                  <input
+                    id="battle-deck-change-search"
+                    className="dm-input"
+                    type="search"
+                    value={deckChangeSearchText}
+                    placeholder="デッキ名を入力"
+                    onChange={(event) => setDeckChangeSearchText(event.target.value)}
+                    disabled={deckChangeLoading}
+                  />
+                </label>
+                <label className="dm-form-label" htmlFor="battle-deck-change-era">
+                  年代
+                  <select
+                    id="battle-deck-change-era"
+                    className="dm-input"
+                    value={deckChangeEraKey}
+                    onChange={(event) =>
+                      setDeckChangeEraKey(event.target.value as DeckEraKey | "")
+                    }
+                    disabled={deckChangeLoading}
+                  >
+                    <option value="">すべて</option>
+                    {DECK_ERA_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="dm-form-label" htmlFor="battle-deck-change-select">
+                使用デッキ
+                <select
+                  id="battle-deck-change-select"
+                  className="dm-input"
+                  value={deckChangeTargetId}
+                  onChange={(event) => setDeckChangeTargetId(event.target.value)}
+                  disabled={deckChangeLoading}
+                >
+                  {filteredChangeableDecks.length === 0 ? (
+                    <option value="">該当なし</option>
+                  ) : (
+                    filteredChangeableDecks.map((deck) => (
+                      <option key={deck.id} value={deck.id}>
+                        {deck.name} / {getDeckEraLabel(deck.era_key)}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+
+              <div className="bf-deck-change-summary">
+                <span>候補 {filteredChangeableDecks.length}件</span>
+                {deckChangeTargetId && (
+                  <span>
+                    選択中 {filteredChangeableDecks.find((deck) => deck.id === deckChangeTargetId)?.name ?? "未選択"}
+                  </span>
+                )}
+              </div>
+            </div>
           )}
         </BattlePopup>
       )}

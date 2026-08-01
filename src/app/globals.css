@@ -4031,7 +4031,8 @@ select {
 .bf-battle-danger-actions {
   margin-top: auto;
   display: grid;
-  gap: 8px;
+  gap: 16px;
+  padding-top: 10px;
 }
 
 .bf-battle-danger-actions span {
@@ -4054,6 +4055,27 @@ select {
 
 .bf-battle-danger-actions button:hover {
   background: rgba(185, 28, 28, 0.64);
+}
+
+.bf-deck-change-popup {
+  display: grid;
+  gap: 14px;
+}
+
+.bf-deck-change-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  gap: 12px;
+  align-items: end;
+}
+
+.bf-deck-change-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 @keyframes bf-hold-progress {

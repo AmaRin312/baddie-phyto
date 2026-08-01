@@ -206,6 +206,24 @@ export function BattleZone({
     setHeldStackId(null);
   }
 
+  function handleCardDrop(
+    event: DragEvent<HTMLElement>,
+    input?: {
+      targetInstanceId?: string;
+      placeAsNewStack?: boolean;
+    }
+  ) {
+    if (!canDrop) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onDropCard(zoneId, {
+      ...input,
+      clientX: event.clientX,
+      clientY: event.clientY
+    });
+    setHeldStackId(null);
+  }
+
   return (
     <div
       className={`bf-zone bf-zone-${zoneId}${canDrop ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
@@ -314,15 +332,10 @@ export function BattleZone({
                 }}
                 onDrop={(event) => {
                   if (!canDrop || draggedItemCount > 1) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onDropCard(zoneId, {
+                  handleCardDrop(event, {
                     targetInstanceId: areaTopCard.instanceId,
-                    placeAsNewStack: heldStackId === areaStack.stackId,
-                    clientX: event.clientX,
-                    clientY: event.clientY
+                    placeAsNewStack: heldStackId === areaStack.stackId
                   });
-                  setHeldStackId(null);
                 }}
                 onDragStart={(event) => {
                   event.stopPropagation();
@@ -368,7 +381,7 @@ export function BattleZone({
                   sleeveImageUrl={sleeveImageUrl}
                   preserveOrientation={areaIsNativeHorizontal}
                 />
-                )}
+                  )}
                 {areaStack.cards.length > 1 && (
                   <span className="bf-area-stack-badge">{areaStack.cards.length}</span>
                 )}
@@ -423,6 +436,13 @@ export function BattleZone({
                   onContextMenu={(event) =>
                     onContextMenuCard(gaugeCard, event, playerId)
                   }
+                  onDragOver={(event) => {
+                    if (!canDrop) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={handleCardDrop}
                 >
                   <BoardCard
                     card={gaugeCardRecord}
@@ -470,6 +490,13 @@ export function BattleZone({
                 onDoubleClickCard(topCard, { playerId });
               }}
               onContextMenu={(event) => onContextMenuCard(topCard, event, playerId)}
+              onDragOver={(event) => {
+                if (!canDrop) return;
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={handleCardDrop}
             >
               <BoardCard
                 card={cardRecord}
@@ -512,6 +539,13 @@ export function BattleZone({
                     onContextMenu={(event) =>
                       onContextMenuCard(revealedCard, event, playerId)
                     }
+                    onDragOver={(event) => {
+                      if (!canDrop) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      event.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={handleCardDrop}
                   >
                     <BoardCard
                       card={revealedCardRecord}

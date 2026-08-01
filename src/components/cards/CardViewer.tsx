@@ -44,10 +44,15 @@ export function CardViewer({
 
   if (faceDown) {
     return (
-      <article className={rootClassName} aria-label={"裏向きカード"}>
+      <article className={rootClassName} aria-label="??????">
         {faceDownImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className={styles.image} src={faceDownImageUrl} alt={"裏向きカード"} />
+          <img
+            className={styles.image}
+            src={faceDownImageUrl}
+            alt="??????"
+            draggable={false}
+          />
         ) : (
           <div className={styles.faceDown}>BF</div>
         )}
@@ -56,7 +61,6 @@ export function CardViewer({
   }
 
   const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
-
   const shouldForcePortraitImage =
     card.orientation === "horizontal" &&
     !preserveOrientation &&
@@ -81,6 +85,7 @@ export function CardViewer({
           src={imageSrc}
           alt={displayCard.name}
           style={imageStyle}
+          draggable={false}
         />
       </article>
     );
@@ -100,17 +105,17 @@ export function CardViewer({
         <strong className={styles.name}>{displayCard.name}</strong>
 
         <div className={styles.races}>
-          {displayCard.races.length > 0 ? displayCard.races.join(" / ") : "種族なし"}
+          {displayCard.races.length > 0 ? displayCard.races.join(" / ") : "????"}
         </div>
 
         <div className={styles.text}>
-          {displayCard.cardText?.trim() || "カードテキストなし"}
+          {displayCard.cardText?.trim() || "?????????"}
         </div>
 
         <div className={styles.stats}>
-          <span className={styles.stat}>攻 {formatValue(displayCard.power)}</span>
-          <span className={styles.stat}>防 {formatValue(displayCard.defense)}</span>
-          <span className={styles.stat}>打 {formatValue(displayCard.critical)}</span>
+          <span className={styles.stat}>? {formatValue(displayCard.power)}</span>
+          <span className={styles.stat}>? {formatValue(displayCard.defense)}</span>
+          <span className={styles.stat}>? {formatValue(displayCard.critical)}</span>
         </div>
       </div>
     </article>

@@ -174,6 +174,18 @@ function HandCards({
               onDragStartCard(battleCard, self ? "self" : "opponent");
             }}
             onDragEnd={onDragEndCard}
+            onDragOver={(event) => {
+              if (!self) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(event) => {
+              if (!self) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onDropCard("hand");
+            }}
             onClick={(event) => {
               event.stopPropagation();
               onSelectCard(battleCard, {
@@ -233,9 +245,9 @@ export function BattleSidebar({
     viewerCards.length > 0 ? viewerCards.slice(0, 2) : activeCard ? [activeCard] : [];
 
   return (
-    <aside className="bf-right-panel" aria-label="手札とビューアー">
+    <aside className="bf-right-panel" aria-label="??????">
       <section className="bf-side-panel-card">
-        <h2>相手 手札</h2>
+        <h2>????</h2>
         <HandCards
           cards={battleState.players.opponent.zones.hand.cards}
           cardMap={cardMap}
@@ -256,7 +268,7 @@ export function BattleSidebar({
 
       <section className="bf-side-panel-card bf-viewer-panel">
         <div className="bf-viewer-panel-header">
-          <h2>ビューアー</h2>
+          <h2>?????</h2>
           <button
             type="button"
             className={`bf-viewer-pin${viewerPinned ? " is-pinned" : ""}`}
@@ -266,7 +278,7 @@ export function BattleSidebar({
               onToggleViewerPin();
             }}
           >
-            📌
+            ??
           </button>
         </div>
         <div className="bf-viewer-grid">
@@ -302,11 +314,11 @@ export function BattleSidebar({
               );
             })
           ) : (
-            <p className="bf-viewer-empty">カードをクリックすると表示します。</p>
+            <p className="bf-viewer-empty">?????????????????</p>
           )}
           {normalizedViewerCards.length === 1 && (
             <div className="bf-single-viewer is-empty">
-              <p className="bf-viewer-empty">2枚目</p>
+              <p className="bf-viewer-empty">2??</p>
             </div>
           )}
         </div>
@@ -323,7 +335,7 @@ export function BattleSidebar({
       </section>
 
       <section className="bf-side-panel-card is-self-hand">
-        <h2>{"\u81ea\u5206 \u624b\u672d"}</h2>
+        <h2>????</h2>
         <HandCards
           self
           cards={battleState.players.self.zones.hand.cards}
