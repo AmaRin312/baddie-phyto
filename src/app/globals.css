@@ -5513,38 +5513,26 @@ body:has(.bf-battle-app) {
   width: 82px;
   height: 116px;
   transform:
-    translate(
-      calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 15px)
-    )
+    translate(calc(var(--bf-gauge-column) * -66px), calc(var(--bf-gauge-row) * 15px))
     rotate(-90deg);
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
   transform:
-    translate(
-      calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 15px)
-    )
+    translate(calc(var(--bf-gauge-column) * -66px), calc(var(--bf-gauge-row) * 15px))
     rotate(90deg);
 }
 
 .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
-    translate(
-      calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 15px)
-    )
+    translate(calc(var(--bf-gauge-column) * -66px), calc(var(--bf-gauge-row) * 15px))
     rotate(-90deg)
     scale(1.04);
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
-    translate(
-      calc(var(--bf-gauge-column) * -58px),
-      calc(var(--bf-gauge-row) * 15px)
-    )
+    translate(calc(var(--bf-gauge-column) * -66px), calc(var(--bf-gauge-row) * 15px))
     rotate(90deg)
     scale(1.04);
 }

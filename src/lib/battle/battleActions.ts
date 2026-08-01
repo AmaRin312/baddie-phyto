@@ -611,7 +611,10 @@ function normalizeSoulCardForZone(
     zoneId: input.toZone,
     visibility: getVisibilityForSoulMove(input.toZone),
     orientation: "vertical",
-    meta: { ...card.meta }
+    meta: {
+      ...card.meta,
+      isRested: false
+    }
   };
 
   if (!isAreaStackZone(input.toZone)) {
@@ -685,7 +688,10 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                     ...resetMovedCard(card),
                     zoneId: input.toZone,
                     visibility: getVisibilityForZone(input.toZone),
-                    meta: { ...card.meta }
+                    meta: {
+                      ...card.meta,
+                      isRested: false
+                    }
                   }),
                   stackId,
                   areaSlot
@@ -699,7 +705,10 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                   ...resetMovedCard(card),
                   zoneId: input.toZone,
                   visibility: getVisibilityForZone(input.toZone),
-                  meta: { ...card.meta }
+                  meta: {
+                    ...card.meta,
+                    isRested: false
+                  }
                 })
               )
             )
@@ -726,7 +735,10 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     ...resetMovedCard(removedCard),
     zoneId: input.toZone,
     visibility: getVisibilityForZone(input.toZone),
-    meta: { ...removedCard.meta }
+    meta: {
+      ...removedCard.meta,
+      isRested: false
+    }
   };
   const revealNormalizedMovedCard =
     input.toZone === "deck" ? movedCard : withoutDeckRevealData(movedCard);
@@ -790,7 +802,10 @@ export function stackCardOnAreaCard(
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
-      meta: { ...removedCard.meta }
+      meta: {
+        ...removedCard.meta,
+        isRested: false
+      }
     }),
     targetStackId,
     targetAreaSlot ?? fallbackTargetStack?.areaSlot ?? 0
@@ -835,7 +850,10 @@ export function placeCardInAreaSlot(
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
-      meta: { ...removedCard.meta }
+      meta: {
+        ...removedCard.meta,
+        isRested: false
+      }
     }),
     stackId,
     areaSlot
@@ -1476,6 +1494,7 @@ export function resolveBiriKinataNotification(
         visibility: "face_down",
         meta: {
           ...removedCard.meta,
+          isRested: false,
           placedByAbility: "biri_kinata_face_down_use"
         }
       }),
@@ -1543,17 +1562,18 @@ export function placeHyakuganComposite(
   player.zones[input.toZone].cards.push(
     ...roleCards.map(({ card, role }) =>
       withAreaStackData(
-        withoutDeckRevealData({
-          ...card,
-          zoneId: input.toZone,
-          visibility: "public",
-          meta: {
-            ...card.meta,
-            compositeId,
-            compositeRole: role,
-            compositeKind: "hyakugan_yamigedo"
-          }
-        }),
+      withoutDeckRevealData({
+        ...card,
+        zoneId: input.toZone,
+        visibility: "public",
+        meta: {
+          ...card.meta,
+          isRested: false,
+          compositeId,
+          compositeRole: role,
+          compositeKind: "hyakugan_yamigedo"
+        }
+      }),
         stackId,
         areaSlot
       )
