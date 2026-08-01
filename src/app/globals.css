@@ -5671,8 +5671,8 @@ body:has(.bf-battle-app) {
 .bf-zone-gauge {
   left: calc(4% + 140px);
   top: calc(17% - 80px);
-  width: 132px;
-  height: 226px;
+  width: 248px;
+  height: 320px;
   transform: none;
 }
 
@@ -5684,23 +5684,29 @@ body:has(.bf-battle-app) {
 .bf-zone-gauge .bf-card-button.is-gauge-card {
   top: calc(18px + (var(--bf-gauge-row) * 17px)) !important;
   left: 16px !important;
+  width: 82px;
+  height: 116px;
   transform:
+    translate(calc(var(--bf-gauge-column) * -128px), 0)
     rotate(-90deg) !important;
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
   transform:
+    translate(calc(var(--bf-gauge-column) * -128px), 0)
     rotate(90deg) !important;
 }
 
 .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
+    translate(calc(var(--bf-gauge-column) * -128px), 0)
     rotate(-90deg)
     scale(1.04) !important;
 }
 
 .bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   transform:
+    translate(calc(var(--bf-gauge-column) * -128px), 0)
     rotate(90deg)
     scale(1.04) !important;
 }
