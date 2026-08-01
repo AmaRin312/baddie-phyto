@@ -36,7 +36,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <AppShell kicker="PROFILE" title="プロフィール">
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/home" />
         <Button variant="danger" onClick={handleLogout}>

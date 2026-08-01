@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -726,7 +726,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   return (
-    <AppShell kicker="DECK EDIT" title={deck?.name ?? (isNewDeckDraft ? "新規デッキ" : "デッキ編集")}>
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/decks" />
         <Link href="/battle" className="dm-button secondary">

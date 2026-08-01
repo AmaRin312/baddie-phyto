@@ -64,7 +64,7 @@ export default function FlagsPage() {
   }
 
   return (
-    <AppShell kicker="FLAGS" title="フラッグ管理">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/flags/new" className="dm-button primary">
           フラッグ新規登録
@@ -75,7 +75,7 @@ export default function FlagsPage() {
 
       <AppCard
         title="フラッグ一覧"
-        description="flags はゲーム開始時に置くフラッグを管理します。"
+        description="flags テーブルに登録されているゲーム開始フラッグを管理します。"
       >
         {loading ? (
           <p className="dm-muted-text">フラッグを取得しています。</p>
@@ -84,13 +84,13 @@ export default function FlagsPage() {
         ) : (
           <div className="dm-flag-admin-list">
             <div className="dm-flag-admin-row dm-flag-admin-head">
-              <span>name</span>
-              <span>card名</span>
+              <span>名前</span>
+              <span>カード名</span>
               <span>usable_worlds</span>
-              <span>手札</span>
-              <span>ゲージ</span>
-              <span>ライフ</span>
-              <span>候補</span>
+              <span>初期手札</span>
+              <span>初期ゲージ</span>
+              <span>初期ライフ</span>
+              <span>候補表示</span>
               <span>状態</span>
               <span>操作</span>
             </div>

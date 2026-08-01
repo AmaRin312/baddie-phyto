@@ -41,7 +41,7 @@ export default function NewDeckPage() {
   }
 
   return (
-    <AppShell kicker="NEW DECK" title="デッキ作成">
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/decks" />
       </div>

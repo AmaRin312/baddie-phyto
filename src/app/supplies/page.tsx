@@ -212,8 +212,8 @@ export default function SuppliesPage() {
         title={`${SUPPLY_TYPE_LABELS[type]}登録`}
         description={
           type === "sleeve"
-            ? "裏向きカードに使用する画像です。"
-            : "対戦盤面の背景に使用する画像です。"
+            ? "裏向きカードに使用する画像を登録します。"
+            : "対戦盤面の背景に使用する画像を登録します。"
         }
       >
         <label>
@@ -237,7 +237,7 @@ export default function SuppliesPage() {
             setUploadFile(type, event.dataTransfer.files.item(0));
           }}
         >
-          <span>画像を選択、またはここへドラッグ&ドロップ</span>
+          <span>画像を選択、またはここへドラッグ＆ドロップ</span>
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -265,7 +265,7 @@ export default function SuppliesPage() {
     const selectedLabel =
       type === "sleeve" ? "デフォルト使用中" : "使用中";
     const actionLabel =
-      type === "sleeve" ? "デフォルトで使用" : "使用する";
+      type === "sleeve" ? "デフォルトで使う" : "使う";
 
     return (
       <AppCard title={`${SUPPLY_TYPE_LABELS[type]}選択`}>
@@ -345,12 +345,9 @@ export default function SuppliesPage() {
   }
 
   return (
-    <AppShell kicker="SUPPLIES" title="サプライ設定">
+    <AppShell>
       {loading ? (
-        <AppCard
-          title="読み込み中"
-          description="サプライ情報を取得しています。"
-        />
+        <AppCard title="読み込み中" description="サプライ情報を取得しています。" />
       ) : (
         <>
           {message && <p className="dm-form-message">{message}</p>}

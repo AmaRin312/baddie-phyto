@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +8,12 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
-import { copyDeck, deleteDeck, loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
+import {
+  copyDeck,
+  deleteDeck,
+  loadAllDeckCards,
+  loadDecks
+} from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import {
@@ -93,7 +98,7 @@ export default function DecksPage() {
       {
         key: "public",
         title: "共有デッキ",
-        description: "他ユーザーにも公開されている自作デッキです。",
+        description: "他ユーザーに公開されている自作デッキです。",
         decks: eraFilteredDecks.filter(
           (deck) => deck.deck_visibility === "public" && deck.owner_id !== currentUserId
         )
@@ -115,7 +120,9 @@ export default function DecksPage() {
         window.location.href = "/login";
         return;
       }
+
       setCurrentUserId(profile.id);
+
       const [deckResult, deckCardResult, flagResult, cardResult, imageResult] =
         await Promise.all([
           loadDecks(),
@@ -124,6 +131,7 @@ export default function DecksPage() {
           loadCards(),
           loadCardImages()
         ]);
+
       if (
         deckResult.error ||
         deckCardResult.error ||
@@ -146,18 +154,23 @@ export default function DecksPage() {
         setCards((cardResult.data ?? []) as CardRecord[]);
         setImages(imageResult.data ?? []);
       }
+
       setLoading(false);
     }
+
     void loadPage();
   }, []);
 
   async function handleCopySelectedDeck() {
     if (!selectedDeckForAction) return;
+
     setCopyingDeck(true);
     setMessage("");
+
     const result = await copyDeck({
       sourceDeckId: selectedDeckForAction.id
     });
+
     setCopyingDeck(false);
 
     if (result.error || !result.data) {
@@ -253,62 +266,63 @@ export default function DecksPage() {
       buddyCard?.id,
       deck.selected_buddy_image_id ?? buddyDeckCard?.selected_image_id
     );
+
     return (
       <div
         key={deck.id}
         className="dm-deck-management-item"
         onDoubleClick={() => setSelectedDeckForAction(deck)}
       >
-      <AppCard title={deck.name}>
-        <button
-          type="button"
-          className="dm-deck-management-card dm-deck-management-click-card"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              setSelectedDeckForAction(deck);
-            }
-          }}
-          title="ダブルクリックでデッキ内容を表示"
-        >
-          <div className="dm-deck-management-images">
-            <div>
-              {flagCard ? (
-                <CardViewer
-                  card={flagCard}
-                  images={imagesByCard.get(flagCard.id) ?? []}
-                  selectedImageId={flagImageId}
-                  variant="compact"
-                  className="dm-deck-management-image"
-                  forcePortrait
-                />
-              ) : (
-                <span className="dm-deck-management-empty">未選択</span>
-              )}
+        <AppCard title={deck.name}>
+          <button
+            type="button"
+            className="dm-deck-management-card dm-deck-management-click-card"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                setSelectedDeckForAction(deck);
+              }
+            }}
+            title="ダブルクリックでデッキ内容を表示"
+          >
+            <div className="dm-deck-management-images">
+              <div>
+                {flagCard ? (
+                  <CardViewer
+                    card={flagCard}
+                    images={imagesByCard.get(flagCard.id) ?? []}
+                    selectedImageId={flagImageId}
+                    variant="compact"
+                    className="dm-deck-management-image"
+                    forcePortrait
+                  />
+                ) : (
+                  <span className="dm-deck-management-empty">未選択</span>
+                )}
+              </div>
+              <div>
+                {buddyCard ? (
+                  <CardViewer
+                    card={buddyCard}
+                    images={imagesByCard.get(buddyCard.id) ?? []}
+                    selectedImageId={buddyImageId}
+                    variant="compact"
+                    className="dm-deck-management-image"
+                    forcePortrait
+                  />
+                ) : (
+                  <span className="dm-deck-management-empty">未選択</span>
+                )}
+              </div>
             </div>
-            <div>
-              {buddyCard ? (
-                <CardViewer
-                  card={buddyCard}
-                  images={imagesByCard.get(buddyCard.id) ?? []}
-                  selectedImageId={buddyImageId}
-                  variant="compact"
-                  className="dm-deck-management-image"
-                  forcePortrait
-                />
-              ) : (
-                <span className="dm-deck-management-empty">未選択</span>
-              )}
-            </div>
-          </div>
-          <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>
-        </button>
-      </AppCard>
+            <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>
+          </button>
+        </AppCard>
       </div>
     );
   }
 
   return (
-    <AppShell kicker="DECKS" title="デッキ管理">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/decks/new" className="dm-button primary">
           デッキ作成
@@ -318,26 +332,25 @@ export default function DecksPage() {
         </Link>
       </div>
 
-      <AppCard title="デッキ検索">
-        <label className="dm-inline-field">
-          年代
-          <select
-            value={eraFilter}
-            onChange={(event) => setEraFilter(event.target.value as DeckEraKey | "")}
-          >
-            <option value="">すべて</option>
-            {DECK_ERA_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </AppCard>
+      <div className="dm-deck-management-filter-bar">
+        <select
+          className="dm-deck-management-filter"
+          value={eraFilter}
+          onChange={(event) => setEraFilter(event.target.value as DeckEraKey | "")}
+          aria-label="年代フィルタ"
+        >
+          <option value="">年代: すべて</option>
+          {DECK_ERA_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {message && <p className="dm-form-message">{message}</p>}
       {loading ? (
-        <AppCard title="読み込み中" description="デッキを取得しています。" />
+        <AppCard title="読み込み中" description="デッキを読み込んでいます。" />
       ) : (
         <div className="dm-deck-management-sections">
           {sections.map((section) => (

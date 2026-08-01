@@ -45,7 +45,7 @@ export default function CardsPage() {
       if (abilityResult.error) {
         console.error(abilityResult.error);
         setMessage(
-          `Ability紐付け情報の読み込みに失敗しました。${abilityResult.error.message}`
+          `Ability 紐付け情報の読み込みに失敗しました。${abilityResult.error.message}`
         );
         setAbilityKeyMap(new Map());
       } else {
@@ -109,7 +109,7 @@ export default function CardsPage() {
   }
 
   return (
-    <AppShell kicker="CARDS" title="カード管理">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/cards/new" className="dm-button primary">
           カード新規登録
@@ -130,7 +130,7 @@ export default function CardsPage() {
 
       <AppCard
         title="カード検索"
-        description="カード名で検索できます。画像なしカードもテキスト情報で表示します。"
+        description="カード名で検索できます。無効化したカードも一覧表示できます。"
       >
         <form
           className="dm-card-search-form"

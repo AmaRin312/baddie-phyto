@@ -24,7 +24,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <AppShell kicker="HOME" title="ホーム">
+    <AppShell>
       {loading ? (
         <AppCard title="読み込み中" description="ログイン状態を確認しています。" />
       ) : (

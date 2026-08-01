@@ -98,7 +98,7 @@ export default function NewFlagPage() {
   }
 
   return (
-    <AppShell kicker="NEW FLAG" title="フラッグ新規登録">
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/flags" />
       </div>

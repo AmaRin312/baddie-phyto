@@ -270,7 +270,7 @@ export default function CardCsvImportPage() {
   }, []);
 
   return (
-    <AppShell kicker="CSV IMPORT" title="カードCSVインポート">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/cards" className="dm-button secondary">
           カード一覧へ戻る

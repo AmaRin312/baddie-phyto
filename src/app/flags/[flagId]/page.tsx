@@ -220,7 +220,7 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
     setMessage("フラッグ画像を削除しました。");
   }
   return (
-    <AppShell kicker="EDIT FLAG" title={flag ? getFlagDisplayName(flag) : "フラッグ編集"}>
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/flags" />
       </div>

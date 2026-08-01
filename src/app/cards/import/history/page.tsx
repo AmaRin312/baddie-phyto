@@ -60,7 +60,7 @@ export default function CardImportHistoryPage() {
   }, [reload]);
 
   return (
-    <AppShell kicker="IMPORT HISTORY" title="CSVインポート履歴">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/cards/import" className="dm-button secondary">
           CSVインポートへ戻る

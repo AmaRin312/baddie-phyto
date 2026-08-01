@@ -102,7 +102,7 @@ export default function CardCsvExportPage() {
   }
 
   return (
-    <AppShell kicker="CSV EXPORT" title="カードCSVエクスポート">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/cards" className="dm-button secondary">
           カード一覧へ戻る

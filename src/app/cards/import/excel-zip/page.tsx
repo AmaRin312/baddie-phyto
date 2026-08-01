@@ -308,7 +308,7 @@ export default function ExcelZipCardImportPage() {
   }
 
   return (
-    <AppShell kicker="Cards" title="Excel＋画像ZIP 一括インポート">
+    <AppShell>
       <div className="dm-stack">
         <div className="dm-row">
           <Link href="/cards/import">CSVインポートへ戻る</Link>

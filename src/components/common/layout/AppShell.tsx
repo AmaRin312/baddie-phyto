@@ -4,12 +4,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 type AppShellProps = {
-  kicker: string;
-  title: string;
   children: ReactNode;
 };
 
-export function AppShell({ kicker, title, children }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
   return (
     <main className="dm-app-page">
       <header className="dm-app-header">
@@ -27,10 +25,6 @@ export function AppShell({ kicker, title, children }: AppShellProps) {
       </header>
 
       <section className="dm-app-main">
-        <div className="dm-app-heading">
-          <p className="dm-kicker">{kicker}</p>
-          <h1 className="dm-app-title">{title}</h1>
-        </div>
         {children}
       </section>
     </main>

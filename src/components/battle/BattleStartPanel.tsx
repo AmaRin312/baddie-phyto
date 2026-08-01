@@ -376,7 +376,7 @@ export function BattleStartPanel() {
   }
 
   return (
-    <AppShell kicker="BATTLE START" title="対戦開始">
+    <AppShell>
       <div className="dm-page-actions">
         <Link href="/decks/new" className="dm-button secondary">
           新規デッキ作成
@@ -396,7 +396,7 @@ export function BattleStartPanel() {
       <div className="dm-app-grid">
         <AppCard
           title="一人回し"
-          description="選んだデッキで一人回しを開始します。Realtime同期は行いません。"
+          description="選んだデッキで一人回しを開始します。Realtime 同期は使いません。"
         >
           <label className="dm-form-label" htmlFor="battle-solo-deck">
             使用デッキ
@@ -439,7 +439,7 @@ export function BattleStartPanel() {
 
         <AppCard
           title="対人ルーム作成"
-          description="作成したルームは既存ルーム一覧に表示されます。相手はそこから入室できます。"
+          description="作成したルームは既存ルーム一覧に表示されます。後から他の人が入室できます。"
         >
           <label className="dm-form-label" htmlFor="battle-deck">
             使用デッキ
@@ -465,7 +465,7 @@ export function BattleStartPanel() {
             className="dm-input"
             value={roomName}
             onChange={(event) => setRoomName(event.target.value)}
-            placeholder="例：フリーバトル"
+            placeholder="例: フリーバトル"
           />
 
           <button
@@ -482,7 +482,7 @@ export function BattleStartPanel() {
 
       <AppCard
         title="既存ルーム"
-        description="既存ルームへ入室できます。参加人数で対戦相手がいるか確認できます。"
+        description="既存ルームへ入室できます。現在人数付きで対戦参加の可否を確認できます。"
       >
         {roomsLoading && <p className="dm-muted-text">ルームを読み込み中です。</p>}
         {!roomsLoading && rooms.length === 0 && (
@@ -494,8 +494,7 @@ export function BattleStartPanel() {
               <span>
                 <b>{room.name}</b>
                 <small>
-                  {room.status === "waiting" ? "募集中" : "対戦中"} / 参加{" "}
-                  {getRoomOccupancyLabel(room)}
+                  {room.status === "waiting" ? "募集中" : "対戦中"} / 参加 {getRoomOccupancyLabel(room)}
                 </small>
               </span>
               <div className="dm-deck-row-actions">
@@ -518,13 +517,13 @@ export function BattleStartPanel() {
       ) : (
         <div className="dm-deck-management-section">
           <div className="dm-app-grid">
-          {visibleDecks.map(renderDeck)}
-          {visibleDecks.length === 0 && (
-            <AppCard
-              title="デッキがありません"
-              description="まずデッキを作成してください。"
-            />
-          )}
+            {visibleDecks.map(renderDeck)}
+            {visibleDecks.length === 0 && (
+              <AppCard
+                title="デッキがありません"
+                description="まずデッキを作成してください。"
+              />
+            )}
           </div>
         </div>
       )}

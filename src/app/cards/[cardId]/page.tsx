@@ -228,7 +228,7 @@ export default function CardEditPage({ params }: CardEditPageProps) {
   }
 
   return (
-    <AppShell kicker="EDIT CARD" title={card?.name ?? "カード編集"}>
+    <AppShell>
       <div className="dm-page-actions">
         <BackButton fallbackHref="/cards" />
       </div>
