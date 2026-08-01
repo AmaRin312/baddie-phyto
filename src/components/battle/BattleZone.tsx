@@ -397,7 +397,7 @@ export function BattleZone({
               return (
                 <button
                   type="button"
-                  className={`bf-card-button is-gauge-card${gaugeIsSelected ? " is-selected" : ""}${gaugeIsDragging ? " is-dragging" : ""}`}
+                  className={`bf-card-button is-gauge-card${rotateCard ? " is-rotated" : ""}${gaugeIsSelected ? " is-selected" : ""}${gaugeIsDragging ? " is-dragging" : ""}`}
                   draggable={canDragBattleCard({ card: gaugeCard, playerId })}
                   key={gaugeCard.instanceId}
                   style={gaugeStyle}
@@ -437,8 +437,7 @@ export function BattleZone({
             })
           ) : topCard && cardRecord ? (
             (() => {
-              const isRested =
-                rotateCard || isBattleCardRested(topCard, cardRecord);
+              const isRested = isBattleCardRested(topCard, cardRecord);
               const isNativeHorizontal =
                 preserveBattleOrientation && cardRecord.orientation === "horizontal";
 

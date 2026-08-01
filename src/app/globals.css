@@ -5867,16 +5867,6 @@ body:has(.bf-battle-app) {
   transform-origin: center;
 }
 
-.bf-card-button.is-rested:not(.is-native-horizontal) {
-  width: var(--bf-battle-card-h);
-  height: var(--bf-battle-card-w);
-}
-
-.bf-card-button.is-native-horizontal.is-rested {
-  width: var(--bf-battle-card-w);
-  height: var(--bf-battle-card-h);
-}
-
 .bf-card-button.is-rested .bp-board-card,
 .bf-card-button.is-rested .bf-board-card {
   width: 100%;
@@ -5889,7 +5879,7 @@ body:has(.bf-battle-app) {
 }
 
 .bf-zone .bf-card-button.is-rested.is-selected {
-  transform: rotate(90deg) scale(1.04);
+  transform: rotate(90deg);
 }
 
 .bf-zone .bf-card-button.is-native-horizontal.is-selected:not(.is-rested) {
