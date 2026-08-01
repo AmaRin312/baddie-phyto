@@ -390,8 +390,8 @@ export function BattleZone({
               const gaugeIsDragging =
                 draggedSingleCard?.instanceId === gaugeCard.instanceId;
               const gaugeStyle = {
-                "--bf-gauge-row": String(gaugeIndex % 7),
-                "--bf-gauge-column": String(Math.floor(gaugeIndex / 7))
+                "--bf-gauge-row": String(gaugeIndex % 10),
+                "--bf-gauge-column": String(Math.floor(gaugeIndex / 10))
               } as CSSProperties;
 
               return (
