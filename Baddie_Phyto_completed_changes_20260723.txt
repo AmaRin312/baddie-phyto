@@ -1,0 +1,168 @@
+Baddie Phyto 変更完了リスト
+作成日: 2026-07-23
+
+対象:
+- Baddie Phyto 専用
+- Due Mano 側は変更なし
+
+==================================================
+1. Excel + 画像ZIPカード一括インポート
+==================================================
+
+完了:
+- cards.xlsx + images/ を含むZIPからカードと画像を一括登録できる土台を実装
+- cards.xlsx は 1行目説明、2行目システム列名、3行目以降データとして読み込み
+- 1カードに複数画像を登録可能
+- 画像は Supabase Storage の card-images bucket へ登録
+- 画像パスはユーザーごとに分離
+- 既存カードと一致する場合はカードを再利用し、画像だけ追加できる構成
+- 同一カード名で基本情報が違う場合はエラー
+- 同一画像や重複画像指定の検出
+- 登録前プレビュー
+- 登録結果CSV出力
+- サンプルZIPダウンロード
+- Excel内の画像ファイル名指定に対応
+
+追加/対応済み列:
+- set_code
+- set_name
+- era_key
+- card_number
+- rarity
+- is_original
+
+==================================================
+2. 年代・収録弾情報
+==================================================
+
+完了:
+- card_sets.era_key 対応
+- 年代キー:
+  - first
+  - hundred
+  - ddd
+  - x
+  - god
+- Excel ZIPインポートで set_code / set_name / era_key を扱えるよう対応
+- card_printings に収録弾情報を追加できる構成に対応
+- デッキ検索で年代検索と収録弾検索に対応済み
+
+==================================================
+3. オリカ判定
+==================================================
+
+完了:
+- cards.is_original を追加するSQLを作成
+- アプリ側の CardRecord 型に is_original を追加
+- カード登録/編集画面でオリカを設定可能
+- カード一覧にオリカバッジ表示
+- Excel ZIPインポートで is_original を読み込み
+- CSVインポート/エクスポートで is_original に対応
+- 旧CSV互換対応
+  - is_original 列がないCSVも読み込み可能
+  - その場合は false 扱い
+- デッキ検索にオリカ検索を追加
+  - すべて
+  - 公式のみ
+  - オリカのみ
+
+==================================================
+4. CSVカードインポート/エクスポート
+==================================================
+
+完了:
+- CSV列に is_original を追加
+- CSVの同一カード判定に is_original を追加
+- CSVエクスポート時に is_original を出力
+- CSVインポート画面の説明に is_original を追加
+- 旧CSV形式も壊さないよう互換ヘッダーを追加
+- CSV import / preview RPC 用SQLを is_original 対応版に整理
+
+==================================================
+5. Supabase SQL整理
+==================================================
+
+完了:
+- Supabaseに貼る本命SQLを明確化
+- 実行推奨SQL:
+  - supabase/migrations/20260723_card_csv_is_original.sql
+- 補助SQL:
+  - supabase/migrations/20260723_cards_is_original.sql
+- 補助SQLには「通常は貼らない」注意書きを追加
+- manual_sql に案内ファイルを追加
+  - supabase/manual_sql/20260723_card_original_csv_readme.sql
+
+20260723_card_csv_is_original.sql に含まれる内容:
+- public.cards.is_original boolean not null default false
+- cards_is_original_index
+- preview_baddie_phyto_card_csv(...) の差し替え
+- import_baddie_phyto_card_csv(...) の差し替え
+
+==================================================
+6. 文字化け修正
+==================================================
+
+完了:
+- CSVインポート関連の文字化け表示を修正
+- Excel ZIPインポート関連のユーザー表示メッセージを整理
+- 文字化け検出用に残っていた不要な正規表現を削除
+- 文字化け検索で0件になることを確認
+
+確認コマンド:
+- rg -n "縺|繧|繝|譛|蜿|螟|蛟|謨|險|鬲|豁ｦ|邵|讓|隍|縲|蜷" src supabase\migrations supabase\manual_sql
+
+結果:
+- 0件
+
+==================================================
+7. 表示名整理
+==================================================
+
+完了:
+- 画面表示の Original card を「オリカ」に統一
+- カード一覧バッジを「オリカ」に変更
+- デッキ検索フィルターを日本語表示へ変更
+  - 公式のみ
+  - オリカのみ
+
+==================================================
+8. 動作確認
+==================================================
+
+完了:
+- TypeScriptチェック成功
+  - npx.cmd tsc --noEmit
+- ESLint成功
+  - npm.cmd run lint
+- Next.js build成功
+  - npm.cmd run build
+
+build時はダミーSupabase環境変数で確認:
+- NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+- NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy
+
+==================================================
+9. まだSupabase側で必要な作業
+==================================================
+
+未実行の場合のみ必要:
+- Supabase SQL Editorで以下の全文を実行
+  - supabase/migrations/20260723_card_csv_is_original.sql
+
+注意:
+- supabase/migrations/20260723_cards_is_original.sql は列/indexだけの補助SQL
+- 通常は 20260723_card_csv_is_original.sql だけ実行すればよい
+
+==================================================
+10. 今回あえて実装していないもの
+==================================================
+
+未実装:
+- インポート履歴テーブルの新規追加
+  - ユーザー判断により今回は作成しない方針
+- CSV/Excelインポートの完全な履歴管理
+- 禁止・制限カード管理
+- デッキ枚数制限
+- Battle周りの追加変更
+- Ability追加実装
+
