@@ -2881,9 +2881,10 @@ select {
 
 .bf-zone-gauge .bf-gauge-grid {
   position: relative;
-  width: 300px;
+  width: 360px;
   height: 248px;
   margin-top: 28px;
+  overflow: visible;
 }
 
 .bf-zone-gauge .bf-gauge-card {

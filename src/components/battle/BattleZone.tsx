@@ -59,9 +59,9 @@ type BattleZoneProps = {
 
 const EMPTY_ZONE_LABEL = "空";
 const GAUGE_CARDS_PER_COLUMN = 10;
-const GAUGE_BASE_LEFT = 90;
+const GAUGE_BASE_LEFT = 110;
 const GAUGE_BASE_TOP = 48;
-const GAUGE_COLUMN_OFFSET = 90;
+const GAUGE_COLUMN_OFFSET = 110;
 const GAUGE_ROW_OFFSET = 18;
 
 function shouldShowFace(card: BattleCard) {
