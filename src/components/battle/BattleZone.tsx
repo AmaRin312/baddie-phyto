@@ -58,9 +58,9 @@ type BattleZoneProps = {
 };
 
 const GAUGE_CARDS_PER_COLUMN = 10;
-const GAUGE_BASE_LEFT = 110;
+const GAUGE_BASE_LEFT = 94;
 const GAUGE_BASE_TOP = 48;
-const GAUGE_COLUMN_OFFSET = 110;
+const GAUGE_COLUMN_OFFSET = 94;
 const GAUGE_ROW_OFFSET = 18;
 
 function shouldShowFace(card: BattleCard) {
@@ -218,13 +218,12 @@ export function BattleZone({
     const isDragging = draggedSingleCard?.instanceId === battleCard.instanceId;
     const baseOrientation = getBattleCardBaseOrientation(battleCard);
     const isRotated =
-      rotateCard ||
-      (baseOrientation === "vertical" && battleCard.orientation === "horizontal") ||
-      (baseOrientation === "horizontal" && battleCard.orientation === "vertical");
-    const isHorizontalBase =
       !rotateCard &&
-      baseOrientation === "horizontal" &&
-      battleCard.orientation === "horizontal";
+      ((baseOrientation === "vertical" && battleCard.orientation === "horizontal") ||
+        (baseOrientation === "horizontal" && battleCard.orientation === "vertical"));
+    const isHorizontalBase =
+      rotateCard ||
+      (baseOrientation === "horizontal" && battleCard.orientation === "horizontal");
 
     return (
       <button
@@ -263,7 +262,7 @@ export function BattleZone({
           selectedImageId={battleCard.selectedImageId}
           isPublic={input?.forceFaceDown ? false : shouldShowFace(battleCard)}
           variant="board"
-          displayOrientation={baseOrientation}
+          displayOrientation={rotateCard ? "horizontal" : baseOrientation}
         />
         {input?.badge}
       </button>
@@ -345,15 +344,15 @@ export function BattleZone({
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
             const baseOrientation = getBattleCardBaseOrientation(areaTopCard);
             const isRotated =
-              rotateCard ||
-              (baseOrientation === "vertical" &&
-                areaTopCard.orientation === "horizontal") ||
-              (baseOrientation === "horizontal" &&
-                areaTopCard.orientation === "vertical");
-            const isHorizontalBase =
               !rotateCard &&
-              baseOrientation === "horizontal" &&
-              areaTopCard.orientation === "horizontal";
+              ((baseOrientation === "vertical" &&
+                areaTopCard.orientation === "horizontal") ||
+                (baseOrientation === "horizontal" &&
+                  areaTopCard.orientation === "vertical"));
+            const isHorizontalBase =
+              rotateCard ||
+              (baseOrientation === "horizontal" &&
+                areaTopCard.orientation === "horizontal");
 
             return (
               <button

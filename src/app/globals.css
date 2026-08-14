@@ -2375,9 +2375,9 @@ select {
   --bf-red: #dc2626;
   --bf-card-back: linear-gradient(145deg, #020617, #1e3a8a 55%, #020617);
   --bf-sidebar-width: 210px;
-  --bf-right-panel-width: 442px;
-  --bf-col-gauge: 132px;
-  --bf-col-main: 165px;
+  --bf-right-panel-width: 560px;
+  --bf-col-gauge: 92px;
+  --bf-col-main: 140px;
   --bf-col-side: 132px;
   --bf-battle-card-w: 112px;
   --bf-battle-card-h: 158px;
@@ -2386,7 +2386,7 @@ select {
   min-height: 100vh;
   padding: 10px;
   display: grid;
-  grid-template-columns: var(--bf-sidebar-width) minmax(720px, 1fr) var(--bf-right-panel-width);
+  grid-template-columns: var(--bf-sidebar-width) minmax(640px, 1fr) var(--bf-right-panel-width);
   gap: 10px;
   color: #0f172a;
   background: var(--bf-page-bg);
@@ -2543,14 +2543,15 @@ select {
 
 .bf-zone-gauge {
   grid-area: gauge;
+  justify-self: end;
 }
 
 .bf-zone-item {
-  grid-area: flag;
+  grid-area: item;
   min-height: 130px;
   align-self: start;
   justify-self: center;
-  transform: translateY(-58%);
+  transform: translateY(-22%);
   z-index: 2;
 }
 
@@ -2558,21 +2559,21 @@ select {
   grid-area: left;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(3%);
+  transform: translateY(-2%);
 }
 
 .bf-zone-center {
   grid-area: center;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(-4%);
+  transform: translateY(-2%);
 }
 
 .bf-zone-right {
   grid-area: right;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(3%);
+  transform: translateY(-2%);
 }
 
 .bf-zone-resolution {
@@ -2592,7 +2593,7 @@ select {
 .bf-zone-set {
   grid-area: set;
   min-height: 130px;
-  transform: translateY(-20%);
+  transform: translateY(-2%);
 }
 
 .bf-resolution-card-row {
@@ -2622,14 +2623,14 @@ select {
   min-height: 130px;
   align-self: end;
   justify-self: center;
-  transform: translateY(-12%);
+  transform: translateY(-16%);
   z-index: 1;
 }
 
 .bf-zone-buddy {
   grid-area: buddy;
   min-height: 130px;
-  transform: translateY(-20%);
+  transform: translateY(-6%);
 }
 
 .bf-zone-deck {
@@ -2645,7 +2646,11 @@ select {
 .bf-zone-flag .bf-zone-title,
 .bf-zone-buddy .bf-zone-title,
 .bf-zone-item .bf-zone-title {
-  top: 88px;
+  top: 96px;
+}
+
+.bf-zone-set .bf-zone-title {
+  top: 28px;
 }
 
 .bf-zone-deck .bf-zone-title {
@@ -2914,7 +2919,7 @@ select {
 
 .bf-zone-gauge .bf-gauge-grid {
   position: relative;
-  width: 360px;
+  width: 188px;
   height: 248px;
   margin-top: 28px;
   overflow: visible;
@@ -3833,7 +3838,7 @@ select {
 .bf-battle-danger-actions {
   margin-top: auto;
   display: grid;
-  gap: 8px;
+  gap: 16px;
 }
 
 .bf-battle-danger-actions span {

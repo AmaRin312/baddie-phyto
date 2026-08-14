@@ -15,7 +15,7 @@ import {
   loadAllDeckCards,
   loadDecks,
   setDeckCard,
-  updateDeckSettings,
+  updateDeckSettings
 } from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
@@ -25,9 +25,9 @@ import type {
   DeckCardRecord,
   DeckEraKey,
   DeckRecord,
-  FlagWithCardRecord,
+  FlagWithCardRecord
 } from "@/types/baddiePhyto";
-import { getDeckEraLabel, getDeckVisibilityLabel } from "@/types/baddiePhyto";
+import { getDeckVisibilityLabel } from "@/types/baddiePhyto";
 
 type EraFilter = "all" | DeckEraKey | "unset";
 
@@ -38,7 +38,7 @@ const ERA_FILTER_OPTIONS: ReadonlyArray<{ value: EraFilter; label: string }> = [
   { value: "ddd", label: "DDD" },
   { value: "x", label: "X" },
   { value: "god", label: "神" },
-  { value: "unset", label: "未設定" },
+  { value: "unset", label: "未設定" }
 ];
 
 function buildImagesByCard(images: CardImageRecord[]) {
@@ -67,7 +67,7 @@ function DeckIconCard({
   buddy,
   buddySelectedImageId,
   imagesByCard,
-  onOpen,
+  onOpen
 }: {
   deck: DeckRecord;
   flag: FlagWithCardRecord | null;
@@ -79,12 +79,7 @@ function DeckIconCard({
   const flagCard = flag?.card ?? null;
 
   return (
-    <button
-      type="button"
-      className="dm-deck-library-card"
-      onDoubleClick={onOpen}
-      title={`${deck.name} を確認`}
-    >
+    <button type="button" className="dm-deck-library-card" onDoubleClick={onOpen}>
       <span className="dm-deck-library-title">{deck.name}</span>
       <span className="dm-deck-library-images">
         <span className="dm-deck-library-image">
@@ -95,9 +90,7 @@ function DeckIconCard({
               selectedImageId={deck.selected_flag_image_id}
               variant="compact"
             />
-          ) : (
-            <span className="dm-deck-library-missing">未選択</span>
-          )}
+          ) : null}
         </span>
         <span className="dm-deck-library-image">
           {buddy ? (
@@ -107,12 +100,9 @@ function DeckIconCard({
               selectedImageId={buddySelectedImageId}
               variant="compact"
             />
-          ) : (
-            <span className="dm-deck-library-missing">未選択</span>
-          )}
+          ) : null}
         </span>
       </span>
-      <span className="dm-deck-library-era">{getDeckEraLabel(deck.era_key)}</span>
     </button>
   );
 }
@@ -124,7 +114,7 @@ function DeckSection({
   cardsById,
   deckCardsByDeck,
   imagesByCard,
-  onOpen,
+  onOpen
 }: {
   title: string;
   decks: DeckRecord[];
@@ -143,9 +133,7 @@ function DeckSection({
         <span className="dm-deck-library-count">{decks.length}件</span>
       </div>
 
-      {decks.length === 0 ? (
-        <AppCard title="該当なし" description="条件に合うデッキがありません。" />
-      ) : (
+      {decks.length > 0 ? (
         <div className="dm-deck-library-grid">
           {decks.map((deck) => {
             const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
@@ -168,7 +156,7 @@ function DeckSection({
             );
           })}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -211,7 +199,7 @@ export default function DecksPage() {
         loadAllDeckCards(),
         loadFlags(),
         loadCards(),
-        loadCardImages(),
+        loadCardImages()
       ]);
 
       if (
@@ -226,7 +214,7 @@ export default function DecksPage() {
             deckCardResult.error ??
             flagResult.error ??
             cardResult.error ??
-            imageResult.error,
+            imageResult.error
         );
         setMessage("デッキ情報の読み込みに失敗しました。");
       } else {
@@ -253,22 +241,22 @@ export default function DecksPage() {
   const ownDecks = useMemo(
     () =>
       filteredDecks.filter(
-        (deck) => deck.owner_id === currentUserId && deck.deck_visibility !== "default",
+        (deck) => deck.owner_id === currentUserId && deck.deck_visibility !== "default"
       ),
-    [currentUserId, filteredDecks],
+    [currentUserId, filteredDecks]
   );
 
   const sharedDecks = useMemo(
     () =>
       filteredDecks.filter(
-        (deck) => deck.deck_visibility === "public" && deck.owner_id !== currentUserId,
+        (deck) => deck.deck_visibility === "public" && deck.owner_id !== currentUserId
       ),
-    [currentUserId, filteredDecks],
+    [currentUserId, filteredDecks]
   );
 
   const sampleDecks = useMemo(
     () => filteredDecks.filter((deck) => deck.deck_visibility === "default"),
-    [filteredDecks],
+    [filteredDecks]
   );
 
   async function handleCopyDeck(deck: DeckRecord) {
@@ -280,7 +268,7 @@ export default function DecksPage() {
     const draftResult = await createDraftDeck({
       name: copiedName,
       deckVisibility: "private",
-      eraKey: deck.era_key ?? null,
+      eraKey: deck.era_key ?? null
     });
 
     if (draftResult.error || !draftResult.data?.id) {
@@ -298,7 +286,7 @@ export default function DecksPage() {
       buddyCardId: deck.buddy_card_id,
       selectedFlagImageId: deck.selected_flag_image_id,
       deckVisibility: "private",
-      eraKey: deck.era_key ?? null,
+      eraKey: deck.era_key ?? null
     });
 
     if (settingsResult.error) {
@@ -314,7 +302,7 @@ export default function DecksPage() {
         cardId: sourceCard.card_id,
         quantity: sourceCard.quantity,
         sortOrder: sourceCard.sort_order,
-        selectedImageId: sourceCard.selected_image_id,
+        selectedImageId: sourceCard.selected_image_id
       });
 
       if (result.error) {
@@ -356,9 +344,6 @@ export default function DecksPage() {
         <Link href="/decks/new" className="dm-button primary">
           デッキ作成
         </Link>
-        <Link href="/battle" className="dm-button secondary">
-          対戦開始へ
-        </Link>
       </div>
 
       {message ? <p className="dm-form-message">{message}</p> : null}
@@ -380,7 +365,7 @@ export default function DecksPage() {
       </div>
 
       {loading ? (
-        <AppCard title="読み込み中" description="デッキ情報を確認しています。">
+        <AppCard title="読み込み中" description="デッキ情報を取得しています。">
           <p className="dm-muted-text">少し待ってください。</p>
         </AppCard>
       ) : (
@@ -443,7 +428,6 @@ export default function DecksPage() {
             </header>
 
             <div className="dm-deck-preview-meta">
-              <span>{getDeckEraLabel(previewDeck.era_key)}</span>
               <span>{previewDeckCards.reduce((total, card) => total + card.quantity, 0)}枚</span>
             </div>
 

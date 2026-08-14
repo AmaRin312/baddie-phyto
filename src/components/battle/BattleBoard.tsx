@@ -6,7 +6,7 @@ import type {
   BattleCard,
   BattleDropInput,
   BattleState,
-  BattleZoneId,
+  BattleZoneId
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
@@ -21,16 +21,16 @@ type BattleBoardProps = {
   selectedInstanceIds: ReadonlySet<string>;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" },
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
   ) => void;
   onDoubleClickCard: (
     card: BattleCard,
-    input?: { playerId?: "self" | "opponent" },
+    input?: { playerId?: "self" | "opponent" }
   ) => void;
   onContextMenuCard: (
     card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent",
+    playerId: "self" | "opponent"
   ) => void;
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
@@ -40,7 +40,7 @@ type BattleBoardProps = {
   onPlacementZoneClick?: (
     zoneId: BattleZoneId,
     event: MouseEvent<HTMLDivElement>,
-    playerId: "self" | "opponent",
+    playerId: "self" | "opponent"
   ) => void;
 };
 
@@ -61,7 +61,7 @@ export function BattleBoard({
   onDropCard,
   placementTargetZones,
   placementTargetPlayerId,
-  onPlacementZoneClick,
+  onPlacementZoneClick
 }: BattleBoardProps) {
   const isPlacementMode = placementTargetZones != null;
 

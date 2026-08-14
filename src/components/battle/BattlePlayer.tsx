@@ -6,7 +6,7 @@ import type {
   BattleCard,
   BattleDropInput,
   BattleZoneId,
-  PlayerState,
+  PlayerState
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
@@ -22,16 +22,16 @@ type BattlePlayerProps = {
   selectedInstanceIds: ReadonlySet<string>;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" },
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
   ) => void;
   onDoubleClickCard: (
     card: BattleCard,
-    input?: { playerId?: "self" | "opponent" },
+    input?: { playerId?: "self" | "opponent" }
   ) => void;
   onContextMenuCard: (
     card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent",
+    playerId: "self" | "opponent"
   ) => void;
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
@@ -41,7 +41,7 @@ type BattlePlayerProps = {
   onPlacementZoneClick?: (
     zoneId: BattleZoneId,
     event: MouseEvent<HTMLDivElement>,
-    playerId: "self" | "opponent",
+    playerId: "self" | "opponent"
   ) => void;
 };
 
@@ -64,7 +64,7 @@ const ZONE_CONFIGS: readonly ZoneConfig[] = [
   { zoneId: "flag", label: "フラッグ", stack: true },
   { zoneId: "item", label: "アイテム", stack: true },
   { zoneId: "buddy", label: "バディ", stack: true },
-  { zoneId: "deck", label: "デッキ", stack: true, showCount: true },
+  { zoneId: "deck", label: "デッキ", stack: true, showCount: true }
 ];
 
 export function BattlePlayer({
@@ -85,7 +85,7 @@ export function BattlePlayer({
   onDropCard,
   placementTargetZones,
   placementTargetPlayerId,
-  onPlacementZoneClick,
+  onPlacementZoneClick
 }: BattlePlayerProps) {
   const isOpponent = side === "opponent";
 

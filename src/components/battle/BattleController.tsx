@@ -1039,6 +1039,12 @@ export function BattleController() {
     });
   }
 
+  function handleLeaveBattleRoom() {
+    clearTransientBattleUi();
+    handleClearSelection();
+    router.replace("/battle");
+  }
+
   function getSingleSelectedSelfCard() {
     if (!battleState || selection.instanceIds.length !== 1 || !selection.zoneId) {
       return null;
@@ -2187,10 +2193,10 @@ export function BattleController() {
         </div>
       )}
       <aside className="bf-left-menu" aria-label="対戦メニュー">
-        <Link href="/home" className="bf-left-menu-brand">
+        <div className="bf-left-menu-brand" aria-label="Baddie Phyto">
           <span>Baddie</span>
           <b>Phyto</b>
-        </Link>
+        </div>
 
         <div className="bf-battle-danger-actions">
           <span>Version {battleState.version ?? 0}</span>
@@ -2206,6 +2212,9 @@ export function BattleController() {
           </button>
           <button type="button" onClick={handleDeleteRoomState}>
             ルーム削除
+          </button>
+          <button type="button" onClick={handleLeaveBattleRoom}>
+            退室
           </button>
         </div>
       </aside>
