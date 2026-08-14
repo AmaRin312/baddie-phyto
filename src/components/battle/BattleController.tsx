@@ -72,7 +72,12 @@ import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelection
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
-import { loadDeck, loadDeckCards } from "@/lib/decks/deckActions";
+import {
+  loadAllDeckCards,
+  loadDeck,
+  loadDeckCards,
+  loadDecks
+} from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
 import { loadCardImages } from "@/lib/storage/cardImageStorage";
 import { loadShortcutSettings } from "@/lib/shortcuts/shortcutSettings";
@@ -493,18 +498,40 @@ export function BattleController() {
       loadBattleCardAbilityMap()
     ]);
 
+    let resolvedDeck = deckResult.data ?? null;
+    let resolvedDeckCards = deckCardsResult.data ?? null;
+
+    if (!resolvedDeck || deckCardsResult.error) {
+      const [fallbackDecksResult, fallbackDeckCardsResult] = await Promise.all([
+        loadDecks(),
+        loadAllDeckCards()
+      ]);
+
+      if (!resolvedDeck && !fallbackDecksResult.error) {
+        resolvedDeck =
+          (fallbackDecksResult.data ?? []).find((deck) => deck.id === deckId) ?? null;
+      }
+
+      if ((deckCardsResult.error || !resolvedDeckCards) && !fallbackDeckCardsResult.error) {
+        resolvedDeckCards = (fallbackDeckCardsResult.data ?? []).filter(
+          (deckCard) => deckCard.deck_id === deckId
+        );
+      }
+    }
+
     if (
       deckResult.error ||
-      deckCardsResult.error ||
       cardResult.error ||
       imageResult.error ||
-      !deckResult.data
+      !resolvedDeck ||
+      resolvedDeckCards == null
     ) {
       console.error(
         deckResult.error ??
           deckCardsResult.error ??
           cardResult.error ??
-          imageResult.error
+          imageResult.error ??
+          new Error("deck data is unavailable")
       );
       setMessage("Battle開始に必要なデッキ情報の読み込みに失敗しました。");
       setLoading(false);
@@ -515,7 +542,7 @@ export function BattleController() {
       console.warn("Battle ability map load skipped:", abilityMapResult.error);
     }
 
-    if (!deckResult.data.flag_id || !deckResult.data.buddy_card_id) {
+    if (!resolvedDeck.flag_id || !resolvedDeck.buddy_card_id) {
       setMessage(
         "Battle開始には、デッキ編集画面でフラッグとバディを選択してください。"
       );
@@ -523,7 +550,7 @@ export function BattleController() {
       return;
     }
 
-    const flagResult = await loadFlag(deckResult.data.flag_id);
+    const flagResult = await loadFlag(resolvedDeck.flag_id);
     if (flagResult.error || !flagResult.data) {
       console.error(flagResult.error);
       setMessage("フラッグ情報の読み込みに失敗しました。");
@@ -538,15 +565,15 @@ export function BattleController() {
           ? (cardMap.get(flagResult.data.card_id)?.orientation ?? "vertical")
           : "vertical";
       const buddyOrientation =
-        cardMap.get(deckResult.data.buddy_card_id)?.orientation ?? "vertical";
+        cardMap.get(resolvedDeck.buddy_card_id)?.orientation ?? "vertical";
       const resetSource: BattleResetSource = {
         flag: {
           ...flagResult.data,
           orientation: flagCardOrientation
         },
-        buddyCardId: deckResult.data.buddy_card_id,
+        buddyCardId: resolvedDeck.buddy_card_id,
         buddyOrientation,
-        deckCards: (deckCardsResult.data ?? []).map((deckCard) => ({
+        deckCards: resolvedDeckCards.map((deckCard) => ({
           ...deckCard,
           orientation: cardMap.get(deckCard.card_id)?.orientation ?? "vertical"
         }))
