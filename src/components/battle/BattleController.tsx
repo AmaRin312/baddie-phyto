@@ -387,19 +387,21 @@ export function BattleController() {
       deckCardsResult.error ||
       cardResult.error ||
       imageResult.error ||
-      abilityMapResult.error ||
       !deckResult.data
     ) {
       console.error(
         deckResult.error ??
           deckCardsResult.error ??
           cardResult.error ??
-          imageResult.error ??
-          abilityMapResult.error
+          imageResult.error
       );
       setMessage("Battle開始に必要なデッキ情報の読み込みに失敗しました。");
       setLoading(false);
       return;
+    }
+
+    if (abilityMapResult.error) {
+      console.warn("Battle ability map load skipped:", abilityMapResult.error);
     }
 
     if (!deckResult.data.flag_id || !deckResult.data.buddy_card_id) {

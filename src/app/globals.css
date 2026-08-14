@@ -4296,15 +4296,17 @@ select {
 }
 
 .dm-deck-library-card {
+  box-sizing: border-box;
   border: 1px solid rgba(147, 197, 253, 0.9);
   border-radius: 16px;
   padding: 10px;
-  width: 108px;
+  width: 118px;
   display: grid;
   gap: 8px;
   background: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
 }
 
 .dm-deck-library-card.is-selected {
@@ -4324,12 +4326,23 @@ select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+  align-items: start;
 }
 
 .dm-deck-library-image {
-  min-height: 74px;
+  width: 44px;
+  min-width: 44px;
+  height: 62px;
   display: grid;
   place-items: center;
+  overflow: hidden;
+}
+
+.dm-deck-library-image .viewer,
+.dm-deck-library-image .compact {
+  width: 44px;
+  height: 62px;
+  border-radius: 8px;
 }
 
 .dm-deck-library-missing {

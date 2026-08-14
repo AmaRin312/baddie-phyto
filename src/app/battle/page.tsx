@@ -8,6 +8,7 @@ import { Button } from "@/components/common/button";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import { loadCards } from "@/lib/cards/cardActions";
 import { loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlags } from "@/lib/flags/flagActions";
@@ -20,7 +21,7 @@ import {
   type DeckCardRecord,
   type DeckEraKey,
   type DeckRecord,
-  type FlagWithCardRecord,
+  type FlagWithCardRecord
 } from "@/types/baddiePhyto";
 
 type EraFilter = "all" | DeckEraKey | "unset";
@@ -65,14 +66,21 @@ function BattleEntryPage() {
 
       setCurrentUserId(profile.id);
 
-      const [deckResult, deckCardResult, flagResult, cardResult, imageResult] =
-        await Promise.all([
-          loadDecks(),
-          loadAllDeckCards(),
-          loadFlags(),
-          loadCards(),
-          loadCardImages(),
-        ]);
+      const [
+        deckResult,
+        deckCardResult,
+        flagResult,
+        cardResult,
+        imageResult,
+        abilityMapResult
+      ] = await Promise.all([
+        loadDecks(),
+        loadAllDeckCards(),
+        loadFlags(),
+        loadCards(),
+        loadCardImages(),
+        loadBattleCardAbilityMap()
+      ]);
 
       if (
         deckResult.error ||
@@ -86,7 +94,7 @@ function BattleEntryPage() {
             deckCardResult.error ??
             flagResult.error ??
             cardResult.error ??
-            imageResult.error,
+            imageResult.error
         );
         setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
@@ -97,6 +105,10 @@ function BattleEntryPage() {
         setImages(imageResult.data ?? []);
       }
 
+      if (abilityMapResult.error) {
+        console.warn("Battle ability map load skipped:", abilityMapResult.error);
+      }
+
       setLoading(false);
     }
 
@@ -105,16 +117,16 @@ function BattleEntryPage() {
 
   const cardsById = useMemo(
     () => new Map(cards.map((card) => [card.id, card])),
-    [cards],
+    [cards]
   );
   const flagsById = useMemo(
     () => new Map(flags.map((flag) => [flag.id, flag])),
-    [flags],
+    [flags]
   );
   const imagesByCard = useMemo(() => buildImagesByCard(images), [images]);
   const deckCardsByDeck = useMemo(
     () => buildDeckCardsByDeck(deckCards),
-    [deckCards],
+    [deckCards]
   );
 
   const filteredDecks = useMemo(() => {
@@ -127,27 +139,29 @@ function BattleEntryPage() {
     });
   }, [decks, eraFilter, searchText]);
 
-  const ownAndSharedDecks = useMemo(
+  const ownDecks = useMemo(
     () =>
       filteredDecks.filter(
         (deck) =>
-          deck.deck_visibility !== "default" && deck.owner_id === currentUserId,
+          deck.deck_visibility !== "default" && deck.owner_id === currentUserId
       ),
-    [currentUserId, filteredDecks],
+    [currentUserId, filteredDecks]
   );
 
   const sampleDecks = useMemo(
     () => filteredDecks.filter((deck) => deck.deck_visibility === "default"),
-    [filteredDecks],
+    [filteredDecks]
   );
 
   const selectedDeck = selectedDeckId
     ? decks.find((deck) => deck.id === selectedDeckId) ?? null
     : null;
+
   const selectedFlag = selectedDeck?.flag_id
     ? flagsById.get(selectedDeck.flag_id) ?? null
     : null;
   const selectedFlagCard = selectedFlag?.card ?? null;
+
   const selectedBuddyCard = selectedDeck?.buddy_card_id
     ? cardsById.get(selectedDeck.buddy_card_id) ?? null
     : null;
@@ -163,7 +177,7 @@ function BattleEntryPage() {
     if (!selectedDeck) return;
     const roomId = `solo-${selectedDeck.id}`;
     router.push(
-      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=solo`,
+      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=solo`
     );
   }
 
@@ -171,7 +185,7 @@ function BattleEntryPage() {
     if (!selectedDeck) return;
     const roomId = `room-${selectedDeck.id}-${Date.now()}`;
     router.push(
-      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=room`,
+      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=room`
     );
   }
 
@@ -243,6 +257,7 @@ function BattleEntryPage() {
               placeholder="デッキ名で検索"
               className="dm-input"
             />
+
             <label className="dm-deck-library-filter">
               <select
                 value={eraFilter}
@@ -262,7 +277,7 @@ function BattleEntryPage() {
           </div>
 
           {loading ? (
-            <p className="dm-muted-text">デッキを読み込み中です...</p>
+            <p className="dm-muted-text">デッキを読み込み中です…</p>
           ) : (
             <div className="dm-battle-entry-sections">
               <section className="dm-deck-library-section">
@@ -270,12 +285,17 @@ function BattleEntryPage() {
                   <div>
                     <h2>自分のデッキ</h2>
                   </div>
-                  <span className="dm-deck-library-count">
-                    {ownAndSharedDecks.length}件
-                  </span>
+                  <span className="dm-deck-library-count">{ownDecks.length}件</span>
                 </div>
                 <div className="dm-deck-library-grid">
-                  {ownAndSharedDecks.map(renderDeckCard)}
+                  {ownDecks.length > 0 ? (
+                    ownDecks.map(renderDeckCard)
+                  ) : (
+                    <div className="dm-app-card">
+                      <h2>該当なし</h2>
+                      <p>条件に合うデッキがありません。</p>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -284,12 +304,17 @@ function BattleEntryPage() {
                   <div>
                     <h2>サンプルデッキ</h2>
                   </div>
-                  <span className="dm-deck-library-count">
-                    {sampleDecks.length}件
-                  </span>
+                  <span className="dm-deck-library-count">{sampleDecks.length}件</span>
                 </div>
                 <div className="dm-deck-library-grid">
-                  {sampleDecks.map(renderDeckCard)}
+                  {sampleDecks.length > 0 ? (
+                    sampleDecks.map(renderDeckCard)
+                  ) : (
+                    <div className="dm-app-card">
+                      <h2>該当なし</h2>
+                      <p>条件に合うデッキがありません。</p>
+                    </div>
+                  )}
                 </div>
               </section>
             </div>
@@ -299,7 +324,9 @@ function BattleEntryPage() {
         <AppCard
           title={selectedDeck ? selectedDeck.name : "デッキ未選択"}
           description={
-            selectedDeck ? "対戦開始前の確認" : "左の一覧から選択してください"
+            selectedDeck
+              ? "対戦開始前の確認"
+              : "左の一覧から選択してください"
           }
         >
           {selectedDeck ? (
@@ -337,7 +364,7 @@ function BattleEntryPage() {
                   枚数:{" "}
                   {(deckCardsByDeck.get(selectedDeck.id) ?? []).reduce(
                     (sum, item) => sum + item.quantity,
-                    0,
+                    0
                   )}
                   枚
                 </p>
@@ -373,7 +400,7 @@ function BattlePageContent() {
 export default function BattlePage() {
   return (
     <Suspense
-      fallback={<main className="bf-battle-loading">Battle を読み込み中です...</main>}
+      fallback={<main className="bf-battle-loading">Battle を読み込み中です…</main>}
     >
       <BattlePageContent />
     </Suspense>
