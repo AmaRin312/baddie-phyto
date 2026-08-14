@@ -8,6 +8,23 @@ export type Profile = {
   updated_at: string;
 };
 
+function buildFallbackProfile(user: {
+  id: string;
+  email?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}): Profile {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    nickname: null,
+    created_at: user.created_at ?? timestamp,
+    updated_at: user.updated_at ?? user.created_at ?? timestamp
+  };
+}
+
 export async function getOrCreateProfile(): Promise<Profile | null> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -20,8 +37,8 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     .maybeSingle();
 
   if (error) {
-    console.error(error);
-    return null;
+    console.warn("profiles select failed; falling back to auth user", error);
+    return buildFallbackProfile(userData.user);
   }
 
   if (data) return data as Profile;
@@ -37,8 +54,8 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     .single();
 
   if (insertError) {
-    console.error(insertError);
-    return null;
+    console.warn("profiles insert failed; falling back to auth user", insertError);
+    return buildFallbackProfile(userData.user);
   }
 
   return inserted as Profile;
