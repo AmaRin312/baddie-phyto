@@ -188,7 +188,6 @@ function HandCards({
           </button>
         );
       })}
-      {cards.length === 0 && <p className="bf-hand-empty">0枚</p>}
     </div>
   );
 }
@@ -222,9 +221,8 @@ export function BattleSidebar({
     : [];
 
   return (
-    <aside className="bf-right-panel" aria-label="手札とビューアー">
+    <aside className="bf-right-panel" aria-label="battle sidebar">
       <section className="bf-side-panel-card">
-        <h2>相手手札</h2>
         <HandCards
           cards={battleState.players.opponent.zones.hand.cards}
           cardMap={cardMap}
@@ -244,12 +242,11 @@ export function BattleSidebar({
 
       <section className="bf-side-panel-card bf-viewer-panel">
         <div className="bf-viewer-panel-header">
-          <h2>ビューアー</h2>
           <button
             type="button"
             className={`bf-viewer-pin${viewerPinned ? " is-pinned" : ""}`}
             aria-pressed={viewerPinned}
-            aria-label={viewerPinned ? "ビューアー固定を解除" : "ビューアーを固定"}
+            aria-label={viewerPinned ? "viewer pin off" : "viewer pin on"}
             onClick={(event) => {
               event.stopPropagation();
               onToggleViewerPin();
@@ -273,9 +270,7 @@ export function BattleSidebar({
               images={imagesByCard.get(activeCardRecord.id) ?? []}
               selectedImageId={activeCard.selectedImageId}
             />
-          ) : (
-            <p className="bf-viewer-empty">カードをクリックすると表示します。</p>
-          )}
+          ) : null}
         </div>
 
         <SoulCardList
@@ -291,7 +286,6 @@ export function BattleSidebar({
       </section>
 
       <section className="bf-side-panel-card is-self-hand">
-        <h2>自分手札</h2>
         <HandCards
           self
           cards={battleState.players.self.zones.hand.cards}

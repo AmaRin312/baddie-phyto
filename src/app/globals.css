@@ -2100,6 +2100,10 @@ select {
   gap: 6px;
 }
 
+.bf-composite-card-view.is-viewer .bf-composite-card-piece::before {
+  display: none;
+}
+
 .bf-ability-notification-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2435,8 +2439,8 @@ select {
   display: grid;
   grid-template-rows: 1fr 1fr;
   background: linear-gradient(var(--bf-board-top), var(--bf-board-bottom));
-  transform: translate(-4%, -2%);
-  width: 104%;
+  transform: translateY(-2%);
+  width: 100%;
   height: 105%;
   min-height: calc(100vh - 20px);
 }
@@ -2459,6 +2463,7 @@ select {
   height: 100%;
   display: grid;
   place-items: center;
+  justify-items: center;
 }
 
 .bf-player-board {
@@ -2478,6 +2483,8 @@ select {
     "item  set  flag       buddy      deck";
   align-content: center;
   justify-content: center;
+  justify-self: center;
+  margin-inline: auto;
 }
 
 .bf-player-board.is-mirrored {
@@ -2584,13 +2591,14 @@ select {
 
 .bf-resolution-card-row {
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 4px;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .bf-resolution-card-row .bf-empty-zone {
