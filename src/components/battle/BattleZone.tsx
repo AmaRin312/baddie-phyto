@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
@@ -58,7 +58,7 @@ type BattleZoneProps = {
 };
 
 const GAUGE_CARDS_PER_COLUMN = 10;
-const GAUGE_BASE_LEFT = 94;
+const GAUGE_BASE_LEFT = 44;
 const GAUGE_BASE_TOP = 48;
 const GAUGE_COLUMN_OFFSET = 94;
 const GAUGE_ROW_OFFSET = 18;
@@ -475,3 +475,4 @@ export function BattleZone({
     </div>
   );
 }
+

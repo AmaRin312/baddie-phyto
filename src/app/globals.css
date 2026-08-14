@@ -2375,29 +2375,33 @@ select {
   --bf-red: #dc2626;
   --bf-card-back: linear-gradient(145deg, #020617, #1e3a8a 55%, #020617);
   --bf-sidebar-width: 210px;
-  --bf-right-panel-width: 560px;
+  --bf-right-panel-width: 780px;
   --bf-col-gauge: 92px;
-  --bf-col-main: 140px;
-  --bf-col-side: 132px;
+  --bf-col-main: 116px;
+  --bf-col-side: 116px;
   --bf-battle-card-w: 112px;
   --bf-battle-card-h: 158px;
   --bf-small-card-w: calc(var(--bf-battle-card-w) * 0.85);
   --bf-small-card-h: calc(var(--bf-battle-card-h) * 0.85);
   min-height: 100vh;
+  height: 100vh;
   padding: 10px;
   display: grid;
-  grid-template-columns: var(--bf-sidebar-width) minmax(640px, 1fr) var(--bf-right-panel-width);
+  grid-template-columns: var(--bf-sidebar-width) minmax(500px, 1fr) var(--bf-right-panel-width);
   gap: 10px;
   color: #0f172a;
   background: var(--bf-page-bg);
+  overflow: hidden;
 }
 
 .bf-left-menu {
+  height: calc(100vh - 20px);
   min-height: calc(100vh - 20px);
   border-radius: 12px;
   padding: 20px;
   color: white;
   background: var(--bf-sidebar-bg);
+  overflow: hidden;
 }
 
 .bf-left-menu-brand {
@@ -2442,15 +2446,16 @@ select {
   display: grid;
   grid-template-rows: 1fr 1fr;
   background: linear-gradient(var(--bf-board-top), var(--bf-board-bottom));
-  transform: translateY(-2%);
+  transform: translateY(0);
   width: 100%;
-  height: 105%;
+  height: calc(100vh - 20px);
   min-height: calc(100vh - 20px);
 }
 
 .bf-board-half {
   position: relative;
-  padding: 14px;
+  padding: 6px 10px 8px;
+  overflow: hidden;
 }
 
 .bf-board-half.is-opponent {
@@ -2479,11 +2484,11 @@ select {
     var(--bf-col-main)
     var(--bf-col-main)
     var(--bf-col-side);
-  grid-template-rows: 22% 33% 45%;
+  grid-template-rows: 19% 32% 49%;
   grid-template-areas:
-    "gauge left resolution resolution drop"
-    "gauge left center     right      drop"
-    "item  set  flag       buddy      deck";
+    "gauge resolution resolution resolution drop"
+    "gauge left       center     right      drop"
+    "gauge set        flag       buddy      deck";
   align-content: center;
   justify-content: center;
   justify-self: center;
@@ -2547,33 +2552,36 @@ select {
 }
 
 .bf-zone-item {
-  grid-area: item;
+  grid-area: flag;
   min-height: 130px;
   align-self: start;
   justify-self: center;
-  transform: translateY(-22%);
-  z-index: 2;
+  transform: translateY(-118%);
+  z-index: 3;
 }
 
 .bf-zone-left {
   grid-area: left;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(-2%);
+  width: var(--bf-battle-card-w);
+  transform: translateY(8%);
 }
 
 .bf-zone-center {
   grid-area: center;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(-2%);
+  width: calc(var(--bf-battle-card-w) * 2 + 12px);
+  transform: translateY(8%);
 }
 
 .bf-zone-right {
   grid-area: right;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(-2%);
+  width: var(--bf-battle-card-w);
+  transform: translateY(8%);
 }
 
 .bf-zone-resolution {
@@ -2581,6 +2589,7 @@ select {
   min-height: 92px;
   max-height: 120px;
   padding: 18px 8px 8px;
+  transform: translateY(-90%);
 }
 
 .bf-zone-drop {
@@ -2593,14 +2602,14 @@ select {
 .bf-zone-set {
   grid-area: set;
   min-height: 130px;
-  transform: translateY(-2%);
+  transform: translateY(8%);
 }
 
 .bf-resolution-card-row {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 4px;
   width: 100%;
   height: 100%;
@@ -2613,8 +2622,6 @@ select {
 }
 
 .bf-resolution-card {
-  width: 42px;
-  height: 60px;
   flex: 0 0 auto;
 }
 
@@ -2623,14 +2630,14 @@ select {
   min-height: 130px;
   align-self: end;
   justify-self: center;
-  transform: translateY(-16%);
+  transform: translateY(0);
   z-index: 1;
 }
 
 .bf-zone-buddy {
   grid-area: buddy;
   min-height: 130px;
-  transform: translateY(-6%);
+  transform: translateY(0);
 }
 
 .bf-zone-deck {
@@ -2650,7 +2657,7 @@ select {
 }
 
 .bf-zone-set .bf-zone-title {
-  top: 28px;
+  top: 96px;
 }
 
 .bf-zone-deck .bf-zone-title {
@@ -2728,6 +2735,11 @@ select {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.bf-zone-center .bf-area-stack-zone {
+  width: calc(var(--bf-battle-card-w) * 2 + 12px);
+  justify-content: center;
 }
 
 .bf-area-stack-card {
@@ -2920,8 +2932,8 @@ select {
 .bf-zone-gauge .bf-gauge-grid {
   position: relative;
   width: 188px;
-  height: 248px;
-  margin-top: 28px;
+  height: 292px;
+  margin-top: 18px;
   overflow: visible;
 }
 
@@ -2954,10 +2966,12 @@ select {
 }
 
 .bf-right-panel {
+  height: calc(100vh - 20px);
   min-height: calc(100vh - 20px);
   display: grid;
-  grid-template-rows: 98px 1fr 293px;
+  grid-template-rows: 108px 1fr 360px;
   gap: 10px;
+  overflow: hidden;
 }
 
 .bf-side-panel-card {
@@ -2991,6 +3005,7 @@ select {
   display: flex;
   align-items: center;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .bf-hand-row.is-drop-target {
@@ -3011,9 +3026,9 @@ select {
 }
 
 .bf-hand-row.is-self .bf-hand-card-button {
-  width: 138px;
-  height: 198px;
-  margin-right: -64px;
+  width: 174px;
+  height: 248px;
+  margin-right: -48px;
   border-radius: 10px;
 }
 
