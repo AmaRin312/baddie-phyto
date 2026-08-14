@@ -6,6 +6,7 @@ import type {
   BattleZoneId,
   PlayerState
 } from "@/types/battle";
+import type { CardOrientation } from "@/types/baddiePhyto";
 
 export const MOVABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "hand",
@@ -78,6 +79,44 @@ type LocatedBattleCard = {
   index: number;
   card: BattleCard;
 };
+
+function getBaseOrientation(card: BattleCard): CardOrientation {
+  const metaOrientation = card.meta.baseOrientation;
+  return metaOrientation === "horizontal" || metaOrientation === "mixed"
+    ? metaOrientation
+    : "vertical";
+}
+
+function resetBattleCardOrientation(card: BattleCard): BattleCard {
+  const baseOrientation = getBaseOrientation(card);
+  return {
+    ...card,
+    orientation: baseOrientation,
+    meta: {
+      ...card.meta,
+      baseOrientation,
+    },
+  };
+}
+
+function toggleRestOrientation(card: BattleCard): BattleCard {
+  const baseOrientation = getBaseOrientation(card);
+  const nextOrientation =
+    card.orientation === baseOrientation
+      ? baseOrientation === "horizontal"
+        ? "vertical"
+        : "horizontal"
+      : baseOrientation;
+
+  return {
+    ...card,
+    orientation: nextOrientation,
+    meta: {
+      ...card.meta,
+      baseOrientation,
+    },
+  };
+}
 
 export type BattleAreaStack = {
   stackId: string;
@@ -653,11 +692,11 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
               .map((card) =>
                 withAreaStackData(
                   withoutDeckRevealData({
-                    ...card,
-                    zoneId: input.toZone,
-                    visibility: getVisibilityForZone(input.toZone),
-                    meta: { ...card.meta }
-                  }),
+                  ...resetBattleCardOrientation(card),
+                  zoneId: input.toZone,
+                  visibility: getVisibilityForZone(input.toZone),
+                  meta: { ...card.meta }
+                }),
                   stackId,
                   areaSlot
                 )
@@ -667,11 +706,11 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
             withoutCompositeData(
               withoutAreaStackData(
                 withoutDeckRevealData({
-                  ...card,
-                  zoneId: input.toZone,
-                  visibility: getVisibilityForZone(input.toZone),
-                  meta: { ...card.meta }
-                })
+                   ...resetBattleCardOrientation(card),
+                   zoneId: input.toZone,
+                   visibility: getVisibilityForZone(input.toZone),
+                   meta: { ...card.meta }
+                 })
               )
             )
           );
@@ -694,7 +733,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!removedCard) return state;
 
   const movedCard: BattleCard = {
-    ...removedCard,
+    ...resetBattleCardOrientation(removedCard),
     zoneId: input.toZone,
     visibility: getVisibilityForZone(input.toZone),
     meta: { ...removedCard.meta }
@@ -756,7 +795,7 @@ export function stackCardOnAreaCard(
 
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
-      ...removedCard,
+      ...resetBattleCardOrientation(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
       meta: { ...removedCard.meta }
@@ -804,7 +843,7 @@ export function placeCardInAreaSlot(
     : 0;
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
-      ...removedCard,
+      ...resetBattleCardOrientation(removedCard),
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
       meta: { ...removedCard.meta }
@@ -982,10 +1021,10 @@ export function addSoulCard(
 
   targetCard.soul.push(
     withoutAreaStackData({
-      ...withoutDeckRevealData(removedCard),
+      ...withoutDeckRevealData(resetBattleCardOrientation(removedCard)),
       zoneId: target.zoneId,
       visibility: input.visibility,
-      meta: { ...withoutDeckRevealData(removedCard).meta }
+      meta: { ...withoutDeckRevealData(resetBattleCardOrientation(removedCard)).meta }
     })
   );
 
@@ -1317,24 +1356,19 @@ export function toggleCardOrientation(
   const nextState = cloneBattleState(state);
   const compositeId = getCompositeId(located.card);
   if (compositeId) {
-    const nextOrientation =
-      located.card.orientation === "horizontal" ? "vertical" : "horizontal";
     nextState.players[located.playerId].zones[located.zoneId].cards =
       nextState.players[located.playerId].zones[located.zoneId].cards.map((card) =>
         getCompositeId(card) === compositeId
-          ? {
-              ...card,
-              orientation: nextOrientation
-            }
+          ? toggleRestOrientation(card)
           : card
       );
     return nextState;
   }
 
-  const card = nextState.players[located.playerId].zones[located.zoneId].cards[
-    located.index
-  ];
-  card.orientation = card.orientation === "horizontal" ? "vertical" : "horizontal";
+  const card =
+    nextState.players[located.playerId].zones[located.zoneId].cards[located.index];
+  nextState.players[located.playerId].zones[located.zoneId].cards[located.index] =
+    toggleRestOrientation(card);
   return nextState;
 }
 
@@ -1368,9 +1402,9 @@ export function placeAsFlag(
   player.zones.flag.cards.push(
     withoutAreaStackData(
       withoutDeckRevealData({
-      ...removedCard,
-      zoneId: "flag",
-      visibility: "public"
+        ...resetBattleCardOrientation(removedCard),
+        zoneId: "flag",
+        visibility: "public"
       })
     )
   );
@@ -1427,7 +1461,7 @@ export function resolveBiriKinataNotification(
   self.zones.center.cards.push(
     withAreaStackData(
       withoutDeckRevealData({
-        ...removedCard,
+        ...resetBattleCardOrientation(removedCard),
         zoneId: "center",
         visibility: "face_down",
         meta: {
@@ -1507,7 +1541,7 @@ export function placeHyakuganComposite(
     ...roleCards.map(({ card, role }) =>
       withAreaStackData(
         withoutDeckRevealData({
-          ...card,
+          ...resetBattleCardOrientation(card),
           zoneId: input.toZone,
           visibility: "public",
           meta: {

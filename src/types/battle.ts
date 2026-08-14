@@ -88,5 +88,5 @@ export const BATTLE_ZONE_LABELS: Readonly<Record<BattleZoneId, string>> = {
   right: "ライト",
   item: "アイテム",
   set: "設置",
-  resolution: "どこでもないゾーン"
+  resolution: "どこでもないゾーン",
 };

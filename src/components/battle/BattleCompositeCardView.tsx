@@ -20,26 +20,30 @@ function getRoleLabel(card: BattleCard) {
   return "";
 }
 
+function getDisplayOrientation(card: BattleCard) {
+  return card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical";
+}
+
 export function BattleCompositeCardView({
   cards,
   cardMap,
   imagesByCard,
-  variant
+  variant,
 }: BattleCompositeCardViewProps) {
   const visibleCards = cards
     .map((battleCard) => ({
       battleCard,
-      cardRecord: cardMap.get(battleCard.cardId) ?? null
+      cardRecord: cardMap.get(battleCard.cardId) ?? null,
     }))
     .filter(
       (entry): entry is { battleCard: BattleCard; cardRecord: CardRecord } =>
-        entry.cardRecord != null
+        entry.cardRecord != null,
     );
 
   if (visibleCards.length === 0) return null;
 
   const isHorizontal = visibleCards.some(
-    ({ battleCard }) => battleCard.orientation === "horizontal"
+    ({ battleCard }) => battleCard.orientation === "horizontal",
   );
 
   return (
@@ -59,6 +63,7 @@ export function BattleCompositeCardView({
               selectedImageId={battleCard.selectedImageId}
               isPublic={battleCard.visibility !== "face_down"}
               variant="board"
+              displayOrientation={getDisplayOrientation(battleCard)}
             />
           ) : (
             <CardViewer
@@ -66,6 +71,7 @@ export function BattleCompositeCardView({
               images={imagesByCard.get(cardRecord.id) ?? []}
               selectedImageId={battleCard.selectedImageId}
               faceDown={battleCard.visibility === "face_down"}
+              displayOrientation={getDisplayOrientation(battleCard)}
             />
           )}
         </div>

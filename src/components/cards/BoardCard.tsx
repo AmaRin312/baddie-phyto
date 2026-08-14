@@ -1,5 +1,9 @@
 import { CardViewer } from "@/components/cards/CardViewer";
-import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
+import type {
+  CardImageRecord,
+  CardOrientation,
+  CardRecord,
+} from "@/types/baddiePhyto";
 
 type BoardCardProps = {
   card: CardRecord;
@@ -7,13 +11,15 @@ type BoardCardProps = {
   selectedImageId?: string | null;
   isPublic?: boolean;
   variant?: "board";
+  displayOrientation?: CardOrientation;
 };
 
 export function BoardCard({
   card,
   images = [],
   selectedImageId,
-  isPublic = true
+  isPublic = true,
+  displayOrientation = "vertical",
 }: BoardCardProps) {
   return (
     <div className="bp-board-card">
@@ -23,6 +29,7 @@ export function BoardCard({
         selectedImageId={selectedImageId}
         variant="board"
         faceDown={!isPublic}
+        displayOrientation={displayOrientation}
       />
     </div>
   );

@@ -199,8 +199,61 @@ const PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
 type BattleResetSource = {
   flag: Parameters<typeof createInitialBattleState>[0]["flag"];
   buddyCardId: string;
+  buddyOrientation?: Parameters<typeof createInitialBattleState>[0]["buddyOrientation"];
   deckCards: Parameters<typeof createInitialBattleState>[0]["deckCards"];
 };
+
+type ViewerSlots = {
+  left: string | null;
+  right: string | null;
+  next: "left" | "right";
+};
+
+const EMPTY_VIEWER_SLOTS: ViewerSlots = {
+  left: null,
+  right: null,
+  next: "left"
+};
+
+function pushViewerSlots(current: ViewerSlots, instanceId: string | null): ViewerSlots {
+  if (instanceId == null) {
+    return EMPTY_VIEWER_SLOTS;
+  }
+
+  if (current.left === instanceId || current.right === instanceId) {
+    return current;
+  }
+
+  if (current.left == null) {
+    return {
+      left: instanceId,
+      right: current.right,
+      next: "right"
+    };
+  }
+
+  if (current.right == null) {
+    return {
+      left: current.left,
+      right: instanceId,
+      next: "left"
+    };
+  }
+
+  if (current.next === "left") {
+    return {
+      left: instanceId,
+      right: current.right,
+      next: "right"
+    };
+  }
+
+  return {
+    left: current.left,
+    right: instanceId,
+    next: "left"
+  };
+}
 
 function findBattleCardByInstanceId(
   battleState: BattleState | null,
@@ -253,6 +306,63 @@ function hasBattleAbility(
   return cardAbilityMap.get(card.cardId)?.includes(abilityId) ?? false;
 }
 
+function normalizeBattleCardOrientation(
+  battleCard: BattleCard,
+  cardMap: Map<string, CardRecord>
+): BattleCard {
+  const baseOrientation = cardMap.get(battleCard.cardId)?.orientation ?? "vertical";
+
+  return {
+    ...battleCard,
+    soul: battleCard.soul.map((soulCard) =>
+      normalizeBattleCardOrientation(soulCard, cardMap)
+    ),
+    meta: {
+      ...battleCard.meta,
+      baseOrientation
+    }
+  };
+}
+
+function normalizeBattleStateOrientations(
+  state: BattleState,
+  cardMap: Map<string, CardRecord>
+): BattleState {
+  return {
+    ...state,
+    players: {
+      self: {
+        ...state.players.self,
+        zones: Object.fromEntries(
+          Object.entries(state.players.self.zones).map(([zoneId, zone]) => [
+            zoneId,
+            {
+              ...zone,
+              cards: zone.cards.map((card) =>
+                normalizeBattleCardOrientation(card, cardMap)
+              )
+            }
+          ])
+        ) as BattleState["players"]["self"]["zones"]
+      },
+      opponent: {
+        ...state.players.opponent,
+        zones: Object.fromEntries(
+          Object.entries(state.players.opponent.zones).map(([zoneId, zone]) => [
+            zoneId,
+            {
+              ...zone,
+              cards: zone.cards.map((card) =>
+                normalizeBattleCardOrientation(card, cardMap)
+              )
+            }
+          ])
+        ) as BattleState["players"]["opponent"]["zones"]
+      }
+    }
+  };
+}
+
 export function BattleController() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -300,7 +410,7 @@ export function BattleController() {
   const [showAbilityNotificationList, setShowAbilityNotificationList] =
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
-  const [viewerHistory, setViewerHistory] = useState<string[]>([]);
+  const [viewerSlots, setViewerSlots] = useState<ViewerSlots>(EMPTY_VIEWER_SLOTS);
   const [shortcutSettings, setShortcutSettings] = useState<
     Required<ShortcutSettings>
   >(mergeWithDefaultShortcuts(null));
@@ -422,10 +532,24 @@ export function BattleController() {
     }
 
     try {
+      const cardMap = new Map((cardResult.data ?? []).map((card) => [card.id, card]));
+      const flagCardOrientation =
+        flagResult.data.card_id != null
+          ? (cardMap.get(flagResult.data.card_id)?.orientation ?? "vertical")
+          : "vertical";
+      const buddyOrientation =
+        cardMap.get(deckResult.data.buddy_card_id)?.orientation ?? "vertical";
       const resetSource: BattleResetSource = {
-        flag: flagResult.data,
+        flag: {
+          ...flagResult.data,
+          orientation: flagCardOrientation
+        },
         buddyCardId: deckResult.data.buddy_card_id,
-        deckCards: deckCardsResult.data ?? []
+        buddyOrientation,
+        deckCards: (deckCardsResult.data ?? []).map((deckCard) => ({
+          ...deckCard,
+          orientation: cardMap.get(deckCard.card_id)?.orientation ?? "vertical"
+        }))
       };
       const freshBattleState = createInitialBattleState(resetSource);
       const savedBattleStateResult = await loadBattleState(roomId);
@@ -442,7 +566,7 @@ export function BattleController() {
         );
       }
 
-      const initialState = selfSeat
+      const mergedState = selfSeat
         ? mergePlayerStates(baseState, {
             self: syncedSeats[selfSeat]?.state ?? freshBattleState.players.self,
             opponent:
@@ -454,6 +578,7 @@ export function BattleController() {
               baseState.players.opponent
           })
         : baseState;
+      const initialState = normalizeBattleStateOrientations(mergedState, cardMap);
 
       BATTLE_PLAYER_SEATS.forEach((seatKey) => {
         const syncedSeat = syncedSeats[seatKey];
@@ -613,7 +738,7 @@ export function BattleController() {
     battleState,
     battleState?.activeViewerCardInstanceId ?? null
   );
-  const viewerCards = viewerHistory
+  const viewerCards = [viewerSlots.left, viewerSlots.right]
     .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
     .filter((card): card is BattleCard => card != null);
   const activeAbilityNotification =
@@ -628,17 +753,7 @@ export function BattleController() {
 
   useEffect(() => {
     const activeViewerId = battleState?.activeViewerCardInstanceId ?? null;
-    setViewerHistory((current) => {
-      if (activeViewerId == null) {
-        return [];
-      }
-
-      if (current[0] === activeViewerId) {
-        return current.slice(0, 2);
-      }
-
-      return [activeViewerId, ...current.filter((id) => id !== activeViewerId)].slice(0, 2);
-    });
+    setViewerSlots((current) => pushViewerSlots(current, activeViewerId));
   }, [battleState?.activeViewerCardInstanceId]);
   const activeAbilityNotificationSourceCard = activeAbilityNotification
     ? findBattleCardByInstanceId(
@@ -1050,7 +1165,9 @@ export function BattleController() {
         const selectedCard = getSingleSelectedSelfCard();
         if (
           !selectedCard ||
-          !["center", "left", "right", "item"].includes(selectedCard.zoneId)
+          !["center", "left", "right", "item", "buddy"].includes(
+            selectedCard.zoneId
+          )
         ) {
           return;
         }
@@ -1119,13 +1236,7 @@ export function BattleController() {
 
   function setViewer(instanceId: string | null, input?: { force?: boolean }) {
     if (viewerPinned && !input?.force) return;
-    setViewerHistory((current) => {
-      if (instanceId == null) {
-        return [];
-      }
-
-      return [instanceId, ...current.filter((id) => id !== instanceId)].slice(0, 2);
-    });
+    setViewerSlots((current) => pushViewerSlots(current, instanceId));
 
     executeCommand({
       type: "SET_VIEWER_CARD",
@@ -1203,7 +1314,9 @@ export function BattleController() {
   ) {
     const playerId = input?.playerId ?? "self";
     if (playerId !== "self") return;
-    if (!["center", "left", "right", "item"].includes(card.zoneId)) return;
+    if (!["center", "left", "right", "item", "buddy"].includes(card.zoneId)) {
+      return;
+    }
 
     executeShortcutCommand({
       type: "TOGGLE_CARD_ORIENTATION",

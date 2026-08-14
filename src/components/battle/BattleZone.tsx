@@ -57,7 +57,6 @@ type BattleZoneProps = {
   ) => void;
 };
 
-const EMPTY_ZONE_LABEL = "空";
 const GAUGE_CARDS_PER_COLUMN = 10;
 const GAUGE_BASE_LEFT = 110;
 const GAUGE_BASE_TOP = 48;
@@ -68,8 +67,8 @@ function shouldShowFace(card: BattleCard) {
   return card.visibility !== "face_down";
 }
 
-function shouldRotateBattleCard(card: BattleCard, forceRotate: boolean) {
-  return forceRotate || card.orientation === "horizontal";
+function getBattleCardBaseOrientation(card: BattleCard) {
+  return card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical";
 }
 
 export function BattleZone({
@@ -217,12 +216,20 @@ export function BattleZone({
   ) {
     const isSelected = selectedInstanceIds.has(battleCard.instanceId);
     const isDragging = draggedSingleCard?.instanceId === battleCard.instanceId;
-    const isRotated = shouldRotateBattleCard(battleCard, rotateCard);
+    const baseOrientation = getBattleCardBaseOrientation(battleCard);
+    const isRotated =
+      rotateCard ||
+      (baseOrientation === "vertical" && battleCard.orientation === "horizontal") ||
+      (baseOrientation === "horizontal" && battleCard.orientation === "vertical");
+    const isHorizontalBase =
+      !rotateCard &&
+      baseOrientation === "horizontal" &&
+      battleCard.orientation === "horizontal";
 
     return (
       <button
         type="button"
-        className={`${className}${isRotated ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}`}
+        className={`${className}${isRotated ? " is-rotated" : ""}${isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}`}
         style={input?.style}
         draggable={canDragBattleCard({ card: battleCard, playerId })}
         onDragEnter={input?.onDragEnter}
@@ -256,6 +263,7 @@ export function BattleZone({
           selectedImageId={battleCard.selectedImageId}
           isPublic={input?.forceFaceDown ? false : shouldShowFace(battleCard)}
           variant="board"
+          displayOrientation={baseOrientation}
         />
         {input?.badge}
       </button>
@@ -335,13 +343,23 @@ export function BattleZone({
             const isSelected = selectedInstanceIds.has(areaTopCard.instanceId);
             const isDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
-            const isRotated = shouldRotateBattleCard(areaTopCard, rotateCard);
+            const baseOrientation = getBattleCardBaseOrientation(areaTopCard);
+            const isRotated =
+              rotateCard ||
+              (baseOrientation === "vertical" &&
+                areaTopCard.orientation === "horizontal") ||
+              (baseOrientation === "horizontal" &&
+                areaTopCard.orientation === "vertical");
+            const isHorizontalBase =
+              !rotateCard &&
+              baseOrientation === "horizontal" &&
+              areaTopCard.orientation === "horizontal";
 
             return (
               <button
                 key={areaStack.stackId}
                 type="button"
-                className={`bf-card-button bf-area-stack-card${isRotated ? " is-rotated" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${isRotated ? " is-rotated" : ""}${isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
                 onDragLeave={() => handleAreaStackDragLeave(areaStack.stackId)}
@@ -393,6 +411,7 @@ export function BattleZone({
                     selectedImageId={areaTopCard.selectedImageId}
                     isPublic={shouldShowFace(areaTopCard)}
                     variant="board"
+                    displayOrientation={baseOrientation}
                   />
                 )}
                 {areaStack.cards.length > 1 && (

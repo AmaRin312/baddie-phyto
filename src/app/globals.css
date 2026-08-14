@@ -2003,16 +2003,19 @@ select {
   height: 100%;
   overflow: hidden;
   border-radius: inherit;
-  display: grid;
-  place-items: center;
-  color: white;
-  background: linear-gradient(135deg, rgba(30, 58, 138, 0.96), rgba(88, 28, 135, 0.94));
+  display: block;
+  background: transparent;
+}
+
+.bp-board-card > * {
+  width: 100%;
+  height: 100%;
 }
 
 .bp-board-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -2543,9 +2546,12 @@ select {
 }
 
 .bf-zone-item {
-  grid-area: item;
+  grid-area: flag;
   min-height: 130px;
-  transform: translateY(-20%);
+  align-self: start;
+  justify-self: center;
+  transform: translateY(-58%);
+  z-index: 2;
 }
 
 .bf-zone-left {
@@ -2614,7 +2620,10 @@ select {
 .bf-zone-flag {
   grid-area: flag;
   min-height: 130px;
-  transform: translateY(-20%);
+  align-self: end;
+  justify-self: center;
+  transform: translateY(-12%);
+  z-index: 1;
 }
 
 .bf-zone-buddy {
@@ -2833,7 +2842,6 @@ select {
   cursor: grabbing;
 }
 
-.bf-card-button.is-selected,
 .bf-hand-card-button.is-selected {
   position: relative;
   outline: 5px solid #facc15;
@@ -2842,9 +2850,19 @@ select {
   transform: scale(1.04);
 }
 
+.bf-card-button.is-selected,
+.bf-hand-card-button.is-selected {
+  position: relative;
+  z-index: 2;
+}
+
+.bf-card-button.is-selected {
+  filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.72));
+}
+
 .bf-card-button.is-selected::after,
 .bf-hand-card-button.is-selected::after {
-  content: "?";
+  content: "✓";
   position: absolute;
   z-index: 8;
   top: -12px;
@@ -2881,12 +2899,17 @@ select {
 }
 
 .bf-card-button.is-rotated.is-selected {
-  transform: rotate(-90deg) scale(1.04);
+  transform: rotate(-90deg);
 }
 
 .bf-stack-zone .bf-card-button {
-  width: 64px;
-  height: 90px;
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
+}
+
+.bf-card-button.is-horizontal-base {
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
 }
 
 .bf-zone-gauge .bf-gauge-grid {
@@ -3012,7 +3035,8 @@ select {
 .bf-viewer-slot {
   min-height: 0;
   display: grid;
-  place-items: center;
+  justify-items: start;
+  align-items: start;
 }
 
 .bf-viewer {
@@ -3025,19 +3049,13 @@ select {
 }
 
 .bf-viewer::before {
-  content: attr(data-title);
+  content: "";
   position: absolute;
   top: 8px;
   left: 10px;
   color: var(--bf-blue);
   font-size: 13px;
   font-weight: 950;
-}
-
-.bf-viewer .bf-board-card {
-  width: 192px;
-  height: 270px;
-  font-size: 34px;
 }
 
 .bf-soul-empty {
@@ -3319,7 +3337,7 @@ select {
 }
 
 .bf-zone.is-placement-target .bf-zone-title::after {
-  content: " ???????";
+  content: "";
   color: #2563eb;
   font-size: 10px;
   font-weight: 950;
@@ -4329,8 +4347,10 @@ select {
 
 .dm-deck-library-image .viewer,
 .dm-deck-library-image .compact {
-  width: 44px;
-  height: 62px;
+  width: 100%;
+  max-width: 44px;
+  height: 100%;
+  max-height: 62px;
   border-radius: 8px;
 }
 

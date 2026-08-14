@@ -5,18 +5,27 @@ import {
   type BattleState,
   type BattleZone,
   type BattleZoneId,
-  type PlayerState
+  type PlayerState,
 } from "@/types/battle";
-import type { DeckCardRecord, FlagRecord } from "@/types/baddiePhyto";
+import type {
+  CardOrientation,
+  DeckCardRecord,
+  FlagRecord,
+} from "@/types/baddiePhyto";
 
 type CreateInitialBattleStateInput = {
   flag: Pick<
     FlagRecord,
     "card_id" | "initial_hand" | "initial_gauge" | "initial_life"
-  >;
+  > & {
+    orientation?: CardOrientation;
+  };
   buddyCardId: string;
+  buddyOrientation?: CardOrientation;
   deckCards: Array<
-    Pick<DeckCardRecord, "card_id" | "quantity" | "selected_image_id">
+    Pick<DeckCardRecord, "card_id" | "quantity" | "selected_image_id"> & {
+      orientation?: CardOrientation;
+    }
   >;
   random?: () => number;
 };
@@ -33,7 +42,7 @@ const ZONE_IDS: BattleZoneId[] = [
   "right",
   "item",
   "set",
-  "resolution"
+  "resolution",
 ];
 
 function createEmptyZones(): Record<BattleZoneId, BattleZone> {
@@ -42,7 +51,7 @@ function createEmptyZones(): Record<BattleZoneId, BattleZone> {
     zones[id] = {
       id,
       label: BATTLE_ZONE_LABELS[id],
-      cards: []
+      cards: [],
     };
   }
   return zones;
@@ -54,8 +63,11 @@ function createBattleCard(input: {
   zoneId: BattleZoneId;
   selectedImageId?: string | null;
   visibility?: BattleCard["visibility"];
+  orientation?: CardOrientation;
   index: number;
 }): BattleCard {
+  const baseOrientation = input.orientation ?? "vertical";
+
   return {
     instanceId: `${input.ownerId}:${input.zoneId}:${input.cardId}:${input.index}:${crypto.randomUUID()}`,
     cardId: input.cardId,
@@ -63,10 +75,12 @@ function createBattleCard(input: {
     zoneId: input.zoneId,
     selectedImageId: input.selectedImageId ?? null,
     visibility: input.visibility ?? "public",
-    orientation: "vertical",
+    orientation: baseOrientation,
     soul: [],
     counters: {},
-    meta: {}
+    meta: {
+      baseOrientation,
+    },
   };
 }
 
@@ -75,10 +89,7 @@ function shuffleCards<T>(cards: T[], random: () => number) {
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [
-      shuffled[swapIndex],
-      shuffled[index]
-    ];
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
 
   return shuffled;
@@ -86,7 +97,7 @@ function shuffleCards<T>(cards: T[], random: () => number) {
 
 function expandDeckCards(
   deckCards: CreateInitialBattleStateInput["deckCards"],
-  ownerId: BattlePlayerId
+  ownerId: BattlePlayerId,
 ) {
   return deckCards.flatMap((deckCard) =>
     Array.from({ length: deckCard.quantity }).map((_, index) =>
@@ -96,9 +107,10 @@ function expandDeckCards(
         zoneId: "deck",
         selectedImageId: deckCard.selected_image_id,
         visibility: "face_down",
-        index
-      })
-    )
+        orientation: deckCard.orientation ?? "vertical",
+        index,
+      }),
+    ),
   );
 }
 
@@ -107,15 +119,16 @@ function createEmptyPlayer(id: BattlePlayerId, name: string): PlayerState {
     id,
     name,
     life: { value: 0 },
-    zones: createEmptyZones()
+    zones: createEmptyZones(),
   };
 }
 
 export function createInitialBattleState({
   flag,
   buddyCardId,
+  buddyOrientation,
   deckCards,
-  random = Math.random
+  random = Math.random,
 }: CreateInitialBattleStateInput): BattleState {
   if (!flag.card_id) {
     throw new Error("Game start flag must have card_id.");
@@ -129,32 +142,34 @@ export function createInitialBattleState({
     ownerId: "self",
     zoneId: "flag",
     visibility: "public",
-    index: 0
+    orientation: flag.orientation ?? "vertical",
+    index: 0,
   });
   const buddyCard = createBattleCard({
     cardId: buddyCardId,
     ownerId: "self",
     zoneId: "buddy",
     visibility: "public",
-    index: 0
+    orientation: buddyOrientation ?? "vertical",
+    index: 0,
   });
 
   const shuffledDeck = shuffleCards(expandDeckCards(deckCards, "self"), random);
   const initialHand = shuffledDeck.slice(0, flag.initial_hand).map((card) => ({
     ...card,
     zoneId: "hand" as const,
-    visibility: "private" as const
+    visibility: "private" as const,
   }));
   const afterHand = shuffledDeck.slice(flag.initial_hand);
   const initialGauge = afterHand.slice(0, flag.initial_gauge).map((card) => ({
     ...card,
     zoneId: "gauge" as const,
-    visibility: "public" as const
+    visibility: "public" as const,
   }));
   const remainingDeck = afterHand.slice(flag.initial_gauge).map((card) => ({
     ...card,
     zoneId: "deck" as const,
-    visibility: "face_down" as const
+    visibility: "face_down" as const,
   }));
 
   self.zones.flag.cards = [flagCard];
@@ -170,14 +185,14 @@ export function createInitialBattleState({
     startedAt: new Date().toISOString(),
     players: {
       self,
-      opponent
+      opponent,
     },
     activeViewerCardInstanceId: flagCard.instanceId,
     ruleState: {
       itemLimit: 1,
-      appliedRuleEffectIds: []
+      appliedRuleEffectIds: [],
     },
     deckLook: null,
-    meta: {}
+    meta: {},
   };
 }

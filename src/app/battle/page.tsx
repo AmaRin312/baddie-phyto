@@ -21,7 +21,7 @@ import {
   type DeckCardRecord,
   type DeckEraKey,
   type DeckRecord,
-  type FlagWithCardRecord
+  type FlagWithCardRecord,
 } from "@/types/baddiePhyto";
 
 type EraFilter = "all" | DeckEraKey | "unset";
@@ -72,14 +72,14 @@ function BattleEntryPage() {
         flagResult,
         cardResult,
         imageResult,
-        abilityMapResult
+        abilityMapResult,
       ] = await Promise.all([
         loadDecks(),
         loadAllDeckCards(),
         loadFlags(),
         loadCards(),
         loadCardImages(),
-        loadBattleCardAbilityMap()
+        loadBattleCardAbilityMap(),
       ]);
 
       if (
@@ -94,7 +94,7 @@ function BattleEntryPage() {
             deckCardResult.error ??
             flagResult.error ??
             cardResult.error ??
-            imageResult.error
+            imageResult.error,
         );
         setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
@@ -115,26 +115,24 @@ function BattleEntryPage() {
     void loadPage();
   }, [router]);
 
-  const cardsById = useMemo(
-    () => new Map(cards.map((card) => [card.id, card])),
-    [cards]
-  );
-  const flagsById = useMemo(
-    () => new Map(flags.map((flag) => [flag.id, flag])),
-    [flags]
-  );
+  const cardsById = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const flagsById = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const imagesByCard = useMemo(() => buildImagesByCard(images), [images]);
-  const deckCardsByDeck = useMemo(
-    () => buildDeckCardsByDeck(deckCards),
-    [deckCards]
-  );
+  const deckCardsByDeck = useMemo(() => buildDeckCardsByDeck(deckCards), [deckCards]);
 
   const filteredDecks = useMemo(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
+
     return decks.filter((deck) => {
       const eraValue = deck.era_key ?? "unset";
-      if (eraFilter !== "all" && eraValue !== eraFilter) return false;
-      if (!normalizedSearch) return true;
+      if (eraFilter !== "all" && eraValue !== eraFilter) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
       return deck.name.toLowerCase().includes(normalizedSearch);
     });
   }, [decks, eraFilter, searchText]);
@@ -142,26 +140,22 @@ function BattleEntryPage() {
   const ownDecks = useMemo(
     () =>
       filteredDecks.filter(
-        (deck) =>
-          deck.deck_visibility !== "default" && deck.owner_id === currentUserId
+        (deck) => deck.deck_visibility !== "default" && deck.owner_id === currentUserId,
       ),
-    [currentUserId, filteredDecks]
+    [currentUserId, filteredDecks],
   );
 
   const sampleDecks = useMemo(
     () => filteredDecks.filter((deck) => deck.deck_visibility === "default"),
-    [filteredDecks]
+    [filteredDecks],
   );
 
   const selectedDeck = selectedDeckId
     ? decks.find((deck) => deck.id === selectedDeckId) ?? null
     : null;
 
-  const selectedFlag = selectedDeck?.flag_id
-    ? flagsById.get(selectedDeck.flag_id) ?? null
-    : null;
+  const selectedFlag = selectedDeck?.flag_id ? flagsById.get(selectedDeck.flag_id) ?? null : null;
   const selectedFlagCard = selectedFlag?.card ?? null;
-
   const selectedBuddyCard = selectedDeck?.buddy_card_id
     ? cardsById.get(selectedDeck.buddy_card_id) ?? null
     : null;
@@ -169,32 +163,25 @@ function BattleEntryPage() {
     selectedDeck && selectedDeck.buddy_card_id
       ? deckCardsByDeck
           .get(selectedDeck.id)
-          ?.find((deckCard) => deckCard.card_id === selectedDeck.buddy_card_id) ??
-        null
+          ?.find((deckCard) => deckCard.card_id === selectedDeck.buddy_card_id) ?? null
       : null;
 
   function openSoloBattle() {
     if (!selectedDeck) return;
     const roomId = `solo-${selectedDeck.id}`;
-    router.push(
-      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=solo`
-    );
+    router.push(`/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=solo`);
   }
 
   function openBattleRoom() {
     if (!selectedDeck) return;
     const roomId = `room-${selectedDeck.id}-${Date.now()}`;
-    router.push(
-      `/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=room`
-    );
+    router.push(`/battle?deckId=${selectedDeck.id}&roomId=${roomId}&seat=player1&mode=room`);
   }
 
   function renderDeckCard(deck: DeckRecord) {
     const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
     const flagCard = flag?.card ?? null;
-    const buddyCard = deck.buddy_card_id
-      ? cardsById.get(deck.buddy_card_id) ?? null
-      : null;
+    const buddyCard = deck.buddy_card_id ? cardsById.get(deck.buddy_card_id) ?? null : null;
     const buddyDeckCard =
       deck.buddy_card_id && deckCardsByDeck.get(deck.id)
         ? deckCardsByDeck
@@ -206,9 +193,7 @@ function BattleEntryPage() {
       <button
         key={deck.id}
         type="button"
-        className={`dm-deck-library-card${
-          selectedDeckId === deck.id ? " is-selected" : ""
-        }`}
+        className={`dm-deck-library-card${selectedDeckId === deck.id ? " is-selected" : ""}`}
         onClick={() => setSelectedDeckId(deck.id)}
       >
         <span className="dm-deck-library-title">{deck.name}</span>
@@ -222,7 +207,7 @@ function BattleEntryPage() {
                 variant="compact"
               />
             ) : (
-              <span className="dm-deck-library-missing">未選択</span>
+              <span className="dm-deck-library-missing">未設定</span>
             )}
           </span>
           <span className="dm-deck-library-image">
@@ -234,7 +219,7 @@ function BattleEntryPage() {
                 variant="compact"
               />
             ) : (
-              <span className="dm-deck-library-missing">未選択</span>
+              <span className="dm-deck-library-missing">未設定</span>
             )}
           </span>
         </span>
@@ -277,7 +262,7 @@ function BattleEntryPage() {
           </div>
 
           {loading ? (
-            <p className="dm-muted-text">デッキを読み込み中です…</p>
+            <p className="dm-muted-text">読み込み中です。</p>
           ) : (
             <div className="dm-battle-entry-sections">
               <section className="dm-deck-library-section">
@@ -324,9 +309,7 @@ function BattleEntryPage() {
         <AppCard
           title={selectedDeck ? selectedDeck.name : "デッキ未選択"}
           description={
-            selectedDeck
-              ? "対戦開始前の確認"
-              : "左の一覧から選択してください"
+            selectedDeck ? "対戦開始前の確認です。" : "左の一覧から選択してください"
           }
         >
           {selectedDeck ? (
@@ -341,7 +324,7 @@ function BattleEntryPage() {
                       variant="compact"
                     />
                   ) : (
-                    <span className="dm-deck-library-missing">未選択</span>
+                    <span className="dm-deck-library-missing">未設定</span>
                   )}
                 </div>
                 <div className="dm-deck-library-image">
@@ -353,7 +336,7 @@ function BattleEntryPage() {
                       variant="compact"
                     />
                   ) : (
-                    <span className="dm-deck-library-missing">未選択</span>
+                    <span className="dm-deck-library-missing">未設定</span>
                   )}
                 </div>
               </div>
@@ -364,7 +347,7 @@ function BattleEntryPage() {
                   枚数:{" "}
                   {(deckCardsByDeck.get(selectedDeck.id) ?? []).reduce(
                     (sum, item) => sum + item.quantity,
-                    0
+                    0,
                   )}
                   枚
                 </p>
@@ -399,9 +382,7 @@ function BattlePageContent() {
 
 export default function BattlePage() {
   return (
-    <Suspense
-      fallback={<main className="bf-battle-loading">Battle を読み込み中です…</main>}
-    >
+    <Suspense fallback={<main className="bf-battle-loading">Battle を読み込み中です。</main>}>
       <BattlePageContent />
     </Suspense>
   );

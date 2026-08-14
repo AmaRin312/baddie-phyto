@@ -23,6 +23,18 @@
   box-shadow: none;
 }
 
+.viewer.horizontal {
+  width: min(100%, 420px);
+  aspect-ratio: 7 / 5;
+}
+
+.compact.horizontal,
+.board.horizontal {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
 .image {
   width: 100%;
   height: 100%;

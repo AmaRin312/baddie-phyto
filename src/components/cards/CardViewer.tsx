@@ -1,5 +1,9 @@
 ﻿import { getDisplayCard } from "@/lib/cards/cardPresentation";
-import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
+import type {
+  CardImageRecord,
+  CardOrientation,
+  CardRecord,
+} from "@/types/baddiePhyto";
 import styles from "./CardViewer.module.css";
 
 type CardViewerProps = {
@@ -9,6 +13,7 @@ type CardViewerProps = {
   className?: string;
   variant?: "viewer" | "compact" | "board";
   faceDown?: boolean;
+  displayOrientation?: CardOrientation;
 };
 
 function formatValue(value: number | null) {
@@ -22,12 +27,14 @@ export function CardViewer({
   className = "",
   variant = "viewer",
   faceDown = false,
+  displayOrientation = "vertical",
 }: CardViewerProps) {
   const displayCard = getDisplayCard({ card, images, selectedImageId });
   const rootClassName = [
     styles.viewer,
     variant === "compact" ? styles.compact : "",
     variant === "board" ? styles.board : "",
+    displayOrientation === "horizontal" ? styles.horizontal : "",
     className,
   ]
     .filter(Boolean)

@@ -10,14 +10,14 @@ import {
   canDropMultipleCards,
   canDropMultipleSoulCards,
   canDropSingleCard,
-  canDropSingleSoulCard
+  canDropSingleSoulCard,
 } from "@/lib/battle/battleActions";
 import { findCompositeGroupCardsInBattleState } from "@/lib/battle/compositeCards";
 import type {
   BattleCard,
   BattleDropInput,
   BattleState,
-  BattleZoneId
+  BattleZoneId,
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
@@ -36,18 +36,18 @@ type BattleSidebarProps = {
   viewerPinned: boolean;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" },
   ) => void;
   onToggleViewerPin: () => void;
   onContextMenuCard: (
     card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent"
+    playerId: "self" | "opponent",
   ) => void;
   onSelectSoulCard: (
     parentCard: BattleCard,
     soulCard: BattleCard,
-    input?: { shiftKey?: boolean }
+    input?: { shiftKey?: boolean },
   ) => void;
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
@@ -56,7 +56,7 @@ type BattleSidebarProps = {
   onContextMenuSoulCard: (
     parentCard: BattleCard,
     soulCard: BattleCard,
-    event: MouseEvent<HTMLButtonElement>
+    event: MouseEvent<HTMLButtonElement>,
   ) => void;
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
 };
@@ -72,12 +72,12 @@ type HandCardsProps = {
   draggedSoulInstanceCount: number;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" },
   ) => void;
   onContextMenuCard: (
     card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent"
+    playerId: "self" | "opponent",
   ) => void;
   onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
   onDragEndCard: () => void;
@@ -99,7 +99,7 @@ function HandCards({
   onContextMenuCard,
   onDragStartCard,
   onDragEndCard,
-  onDropCard
+  onDropCard,
 }: HandCardsProps) {
   const canDropToHand =
     self &&
@@ -107,23 +107,23 @@ function HandCards({
       (draggedSoulInstanceCount > 1
         ? canDropMultipleSoulCards({
             toZone: "hand",
-            targetPlayerId: "self"
+            targetPlayerId: "self",
           })
         : canDropSingleSoulCard({
             toZone: "hand",
-            targetPlayerId: "self"
+            targetPlayerId: "self",
           }))) ||
       (draggedCard != null &&
         (draggedInstanceCount > 1
           ? canDropMultipleCards({
               card: draggedCard,
               toZone: "hand",
-              targetPlayerId: "self"
+              targetPlayerId: "self",
             })
           : canDropSingleCard({
               card: draggedCard,
               toZone: "hand",
-              targetPlayerId: "self"
+              targetPlayerId: "self",
             }))));
 
   return (
@@ -149,7 +149,7 @@ function HandCards({
           self &&
           canDragBattleCard({
             card: battleCard,
-            playerId
+            playerId,
           });
         const isDragging = draggedCard?.instanceId === battleCard.instanceId;
 
@@ -174,7 +174,7 @@ function HandCards({
               event.stopPropagation();
               onSelectCard(battleCard, {
                 shiftKey: event.shiftKey,
-                playerId
+                playerId,
               });
             }}
             onContextMenu={(event) => onContextMenuCard(battleCard, event, playerId)}
@@ -215,7 +215,7 @@ export function BattleSidebar({
   onDragStartSoulCard,
   onDragEndSoulCard,
   onContextMenuSoulCard,
-  onDropCard
+  onDropCard,
 }: BattleSidebarProps) {
   function renderViewerCard(card: BattleCard) {
     const cardRecord = cardMap.get(card.cardId);
@@ -238,6 +238,7 @@ export function BattleSidebar({
         card={cardRecord}
         images={imagesByCard.get(cardRecord.id) ?? []}
         selectedImageId={card.selectedImageId}
+        displayOrientation={card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical"}
       />
     );
   }
