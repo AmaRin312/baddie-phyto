@@ -300,6 +300,7 @@ export function BattleController() {
   const [showAbilityNotificationList, setShowAbilityNotificationList] =
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
+  const [viewerHistory, setViewerHistory] = useState<string[]>([]);
   const [shortcutSettings, setShortcutSettings] = useState<
     Required<ShortcutSettings>
   >(mergeWithDefaultShortcuts(null));
@@ -612,6 +613,9 @@ export function BattleController() {
     battleState,
     battleState?.activeViewerCardInstanceId ?? null
   );
+  const viewerCards = viewerHistory
+    .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
+    .filter((card): card is BattleCard => card != null);
   const activeAbilityNotification =
     activeAbilityNotificationId == null
       ? null
@@ -621,6 +625,21 @@ export function BattleController() {
   const pendingAbilityNotificationCount = abilityNotifications.length;
   const hasHiddenAbilityNotification =
     pendingAbilityNotificationCount > 0 && activeAbilityNotification == null;
+
+  useEffect(() => {
+    const activeViewerId = battleState?.activeViewerCardInstanceId ?? null;
+    setViewerHistory((current) => {
+      if (activeViewerId == null) {
+        return [];
+      }
+
+      if (current[0] === activeViewerId) {
+        return current.slice(0, 2);
+      }
+
+      return [activeViewerId, ...current.filter((id) => id !== activeViewerId)].slice(0, 2);
+    });
+  }, [battleState?.activeViewerCardInstanceId]);
   const activeAbilityNotificationSourceCard = activeAbilityNotification
     ? findBattleCardByInstanceId(
         battleState,
@@ -1100,6 +1119,14 @@ export function BattleController() {
 
   function setViewer(instanceId: string | null, input?: { force?: boolean }) {
     if (viewerPinned && !input?.force) return;
+    setViewerHistory((current) => {
+      if (instanceId == null) {
+        return [];
+      }
+
+      return [instanceId, ...current.filter((id) => id !== instanceId)].slice(0, 2);
+    });
+
     executeCommand({
       type: "SET_VIEWER_CARD",
       payload: {
@@ -2109,6 +2136,7 @@ export function BattleController() {
       <BattleSidebar
         battleState={battleState}
         activeCard={activeCard}
+        viewerCards={viewerCards}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
         draggedCard={dragSelection?.sourceCard ?? null}

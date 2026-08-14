@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --dm-bg-start: #f8fbff;
@@ -2602,7 +2602,7 @@ select {
 }
 
 .bf-resolution-card-row .bf-empty-zone {
-  width: 100%;
+  display: none;
 }
 
 .bf-resolution-card {
@@ -2844,7 +2844,7 @@ select {
 
 .bf-card-button.is-selected::after,
 .bf-hand-card-button.is-selected::after {
-  content: "✓";
+  content: "?";
   position: absolute;
   z-index: 8;
   top: -12px;
@@ -2875,6 +2875,8 @@ select {
 }
 
 .bf-card-button.is-rotated {
+  width: var(--bf-battle-card-h);
+  height: var(--bf-battle-card-w);
   transform: rotate(-90deg);
 }
 
@@ -2897,31 +2899,17 @@ select {
 
 .bf-zone-gauge .bf-gauge-card {
   position: absolute;
-  width: 64px;
-  height: 90px;
+  width: 90px;
+  height: 64px;
 }
 
-.bf-zone-gauge .bf-gauge-card .bf-board-card {
-  width: 64px;
-  height: 90px;
-  transform: rotate(-90deg);
-  transform-origin: center;
-}
-
-.bf-player-board.is-mirrored .bf-zone-gauge .bf-gauge-card .bf-board-card {
-  transform: rotate(-90deg);
+.bf-zone-gauge .bf-gauge-card .bp-board-card {
+  width: 100%;
+  height: 100%;
 }
 
 .bf-empty-zone {
-  min-width: 54px;
-  min-height: 42px;
-  border: 1px dashed rgba(100, 116, 139, 0.38);
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: #94a3b8;
-  font-size: 12px;
-  font-weight: 900;
+  display: none;
 }
 
 .bf-life-badge {
@@ -3014,14 +3002,15 @@ select {
 }
 
 .bf-viewer-grid {
-  height: calc(100% - 32px);
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  align-items: start;
 }
 
-.bf-single-viewer {
-  height: calc(100% - 32px);
+.bf-viewer-slot {
+  min-height: 0;
   display: grid;
   place-items: center;
 }
@@ -3330,7 +3319,7 @@ select {
 }
 
 .bf-zone.is-placement-target .bf-zone-title::after {
-  content: " クリックで配置";
+  content: " ???????";
   color: #2563eb;
   font-size: 10px;
   font-weight: 950;
@@ -3365,7 +3354,7 @@ select {
 }
 
 .bf-viewer-pin.is-pinned::before {
-  content: "●";
+  content: "?";
   margin-right: 2px;
   color: #0f172a;
   font-size: 8px;
@@ -4456,3 +4445,4 @@ select {
     grid-template-columns: 1fr;
   }
 }
+

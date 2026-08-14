@@ -212,6 +212,7 @@ export function BattleZone({
       onDrop?: (event: DragEvent<HTMLButtonElement>) => void;
       onDragEnd?: () => void;
       badge?: React.ReactNode;
+      forceFaceDown?: boolean;
     }
   ) {
     const isSelected = selectedInstanceIds.has(battleCard.instanceId);
@@ -253,7 +254,7 @@ export function BattleZone({
           card={cardRecord}
           images={imagesByCard.get(cardRecord.id) ?? []}
           selectedImageId={battleCard.selectedImageId}
-          isPublic={shouldShowFace(battleCard)}
+          isPublic={input?.forceFaceDown ? false : shouldShowFace(battleCard)}
           variant="board"
         />
         {input?.badge}
@@ -262,7 +263,7 @@ export function BattleZone({
   }
 
   function renderEmptyZone() {
-    return <div className="bf-empty-zone">{EMPTY_ZONE_LABEL}</div>;
+    return <div className="bf-empty-zone" aria-hidden="true" />;
   }
 
   return (
@@ -313,7 +314,8 @@ export function BattleZone({
               card,
               "bf-card-button bf-gauge-card",
               {
-                style: { left: `${left}px`, top: `${top}px` }
+                style: { left: `${left}px`, top: `${top}px` },
+                forceFaceDown: true
               }
             );
           })}

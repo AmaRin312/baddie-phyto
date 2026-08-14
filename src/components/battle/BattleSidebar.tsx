@@ -24,6 +24,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 type BattleSidebarProps = {
   battleState: BattleState;
   activeCard: BattleCard | null;
+  viewerCards: BattleCard[];
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
   draggedCard: BattleCard | null;
@@ -195,6 +196,7 @@ function HandCards({
 export function BattleSidebar({
   battleState,
   activeCard,
+  viewerCards,
   cardMap,
   imagesByCard,
   draggedCard,
@@ -215,10 +217,30 @@ export function BattleSidebar({
   onContextMenuSoulCard,
   onDropCard
 }: BattleSidebarProps) {
-  const activeCardRecord = activeCard ? cardMap.get(activeCard.cardId) : null;
-  const activeCompositeCards = activeCard
-    ? findCompositeGroupCardsInBattleState(battleState, activeCard)
-    : [];
+  function renderViewerCard(card: BattleCard) {
+    const cardRecord = cardMap.get(card.cardId);
+    if (!cardRecord) return null;
+
+    const compositeCards = findCompositeGroupCardsInBattleState(battleState, card);
+    if (compositeCards.length > 1) {
+      return (
+        <BattleCompositeCardView
+          cards={compositeCards}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          variant="viewer"
+        />
+      );
+    }
+
+    return (
+      <CardViewer
+        card={cardRecord}
+        images={imagesByCard.get(cardRecord.id) ?? []}
+        selectedImageId={card.selectedImageId}
+      />
+    );
+  }
 
   return (
     <aside className="bf-right-panel" aria-label="battle sidebar">
@@ -256,21 +278,12 @@ export function BattleSidebar({
           </button>
         </div>
 
-        <div className="bf-single-viewer">
-          {activeCompositeCards.length > 1 ? (
-            <BattleCompositeCardView
-              cards={activeCompositeCards}
-              cardMap={cardMap}
-              imagesByCard={imagesByCard}
-              variant="viewer"
-            />
-          ) : activeCard && activeCardRecord ? (
-            <CardViewer
-              card={activeCardRecord}
-              images={imagesByCard.get(activeCardRecord.id) ?? []}
-              selectedImageId={activeCard.selectedImageId}
-            />
-          ) : null}
+        <div className="bf-viewer-grid">
+          {viewerCards.slice(0, 2).map((viewerCard) => (
+            <div key={viewerCard.instanceId} className="bf-viewer-slot">
+              {renderViewerCard(viewerCard)}
+            </div>
+          ))}
         </div>
 
         <SoulCardList
