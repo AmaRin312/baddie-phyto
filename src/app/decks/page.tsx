@@ -12,7 +12,7 @@ import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
   createDraftDeck,
   deleteDeck,
-  loadDeckCardsByDeckIds,
+  loadDeckCards,
   loadDecks,
   setDeckCard,
   updateDeckSettings
@@ -50,27 +50,11 @@ function buildImagesByCard(images: CardImageRecord[]) {
   return map;
 }
 
-function buildDeckCardsByDeck(deckCards: DeckCardRecord[]) {
-  const map = new Map<string, DeckCardRecord[]>();
-  for (const deckCard of deckCards) {
-    map.set(deckCard.deck_id, [...(map.get(deckCard.deck_id) ?? []), deckCard]);
-  }
-  return map;
-}
-
-function collectDeckLibraryCardIds(
-  decks: DeckRecord[],
-  deckCards: DeckCardRecord[],
-  flags: FlagRecord[]
-) {
+function collectDeckLibraryCardIds(decks: DeckRecord[], flags: FlagRecord[]) {
   const ids = new Set<string>();
 
   for (const deck of decks) {
     if (deck.buddy_card_id) ids.add(deck.buddy_card_id);
-  }
-
-  for (const deckCard of deckCards) {
-    ids.add(deckCard.card_id);
   }
 
   for (const flag of flags) {
@@ -88,14 +72,12 @@ const DeckIconCard = memo(function DeckIconCard({
   deck,
   flagCard,
   buddy,
-  buddySelectedImageId,
   imagesByCard,
   onOpen
 }: {
   deck: DeckRecord;
   flagCard: CardRecord | null;
   buddy: CardRecord | null;
-  buddySelectedImageId: string | null;
   imagesByCard: Map<string, CardImageRecord[]>;
   onOpen: () => void;
 }) {
@@ -118,7 +100,6 @@ const DeckIconCard = memo(function DeckIconCard({
             <CardViewer
               card={buddy}
               images={imagesByCard.get(buddy.id) ?? []}
-              selectedImageId={buddySelectedImageId}
               variant="compact"
             />
           ) : null}
@@ -133,7 +114,6 @@ const DeckSection = memo(function DeckSection({
   decks,
   flagsById,
   cardsById,
-  deckCardsByDeck,
   imagesByCard,
   onOpen
 }: {
@@ -141,7 +121,6 @@ const DeckSection = memo(function DeckSection({
   decks: DeckRecord[];
   flagsById: Map<string, FlagRecord>;
   cardsById: Map<string, CardRecord>;
-  deckCardsByDeck: Map<string, DeckCardRecord[]>;
   imagesByCard: Map<string, CardImageRecord[]>;
   onOpen: (deckId: string) => void;
 }) {
@@ -160,10 +139,6 @@ const DeckSection = memo(function DeckSection({
             const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
             const flagCard = flag?.card_id ? cardsById.get(flag.card_id) ?? null : null;
             const buddy = deck.buddy_card_id ? cardsById.get(deck.buddy_card_id) ?? null : null;
-            const buddyDeckCard =
-              deckCardsByDeck
-                .get(deck.id)
-                ?.find((deckCard) => deckCard.card_id === deck.buddy_card_id) ?? null;
 
             return (
               <DeckIconCard
@@ -171,7 +146,6 @@ const DeckSection = memo(function DeckSection({
                 deck={deck}
                 flagCard={flagCard}
                 buddy={buddy}
-                buddySelectedImageId={buddyDeckCard?.selected_image_id ?? null}
                 imagesByCard={imagesByCard}
                 onOpen={() => onOpen(deck.id)}
               />
@@ -186,10 +160,13 @@ const DeckSection = memo(function DeckSection({
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
-  const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [previewDeckCards, setPreviewDeckCards] = useState<DeckCardRecord[]>([]);
+  const [previewCards, setPreviewCards] = useState<CardRecord[]>([]);
+  const [previewImages, setPreviewImages] = useState<CardImageRecord[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -200,11 +177,14 @@ export default function DecksPage() {
 
   const flagsById = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardsById = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
-  const deckCardsByDeck = useMemo(() => buildDeckCardsByDeck(deckCards), [deckCards]);
   const imagesByCard = useMemo(() => buildImagesByCard(images), [images]);
+  const previewCardsById = useMemo(
+    () => new Map(previewCards.map((card) => [card.id, card])),
+    [previewCards]
+  );
+  const previewImagesByCard = useMemo(() => buildImagesByCard(previewImages), [previewImages]);
 
   const previewDeck = previewDeckId ? decks.find((deck) => deck.id === previewDeckId) ?? null : null;
-  const previewDeckCards = previewDeck ? deckCardsByDeck.get(previewDeck.id) ?? [] : [];
 
   useEffect(() => {
     async function loadPage() {
@@ -218,37 +198,22 @@ export default function DecksPage() {
 
       const deckResult = await loadDecks();
 
-      const deckIds = (deckResult.data ?? []).map((deck) => deck.id);
       const flagIds = (deckResult.data ?? [])
         .map((deck) => deck.flag_id)
         .filter((value): value is string => typeof value === "string" && value.length > 0);
 
-      const [deckCardResult, flagResult] = await Promise.all([
-        loadDeckCardsByDeckIds(deckIds),
-        loadFlagsByIds(flagIds)
-      ]);
+      const flagResult = await loadFlagsByIds(flagIds);
 
-      const relatedCardIds = collectDeckLibraryCardIds(
-        deckResult.data ?? [],
-        deckCardResult.data ?? [],
-        flagResult.data ?? []
-      );
+      const relatedCardIds = collectDeckLibraryCardIds(deckResult.data ?? [], flagResult.data ?? []);
 
       const [cardResult, imageResult] = await Promise.all([
         loadCardsByIds(relatedCardIds),
         loadCardImagesByCardIds(relatedCardIds)
       ]);
 
-      if (
-        deckResult.error ||
-        deckCardResult.error ||
-        flagResult.error ||
-        cardResult.error ||
-        imageResult.error
-      ) {
+      if (deckResult.error || flagResult.error || cardResult.error || imageResult.error) {
         const targetError =
           deckResult.error ??
-          deckCardResult.error ??
           flagResult.error ??
           cardResult.error ??
           imageResult.error;
@@ -256,7 +221,6 @@ export default function DecksPage() {
         setMessage(getSupabaseLoadErrorMessage(targetError, "デッキ情報の読み込みに失敗しました。"));
       } else {
         setDecks(deckResult.data ?? []);
-        setDeckCards(deckCardResult.data ?? []);
         setFlags(flagResult.data ?? []);
         setCards(cardResult.data ?? []);
         setImages(imageResult.data ?? []);
@@ -267,6 +231,69 @@ export default function DecksPage() {
 
     void loadPage();
   }, [router]);
+
+  useEffect(() => {
+    if (!previewDeckId) {
+      return;
+    }
+
+    const currentPreviewDeckId = previewDeckId;
+    let cancelled = false;
+
+    async function loadPreviewDeck() {
+      setPreviewLoading(true);
+      const deckCardResult = await loadDeckCards(currentPreviewDeckId);
+      if (cancelled) {
+        return;
+      }
+
+      if (deckCardResult.error) {
+        console.error(deckCardResult.error);
+        setMessage(
+          getSupabaseLoadErrorMessage(deckCardResult.error, "デッキ内容の読み込みに失敗しました。")
+        );
+        setPreviewDeckCards([]);
+        setPreviewCards([]);
+        setPreviewImages([]);
+        setPreviewLoading(false);
+        return;
+      }
+
+      const nextDeckCards = deckCardResult.data ?? [];
+      const cardIds = [...new Set(nextDeckCards.map((deckCard) => deckCard.card_id))];
+      const [cardResult, imageResult] = await Promise.all([
+        loadCardsByIds(cardIds),
+        loadCardImagesByCardIds(cardIds)
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (cardResult.error || imageResult.error) {
+        const targetError = cardResult.error ?? imageResult.error;
+        console.error(targetError);
+        setMessage(
+          getSupabaseLoadErrorMessage(targetError, "プレビュー用カードの読み込みに失敗しました。")
+        );
+        setPreviewDeckCards(nextDeckCards);
+        setPreviewCards([]);
+        setPreviewImages([]);
+      } else {
+        setPreviewDeckCards(nextDeckCards);
+        setPreviewCards(cardResult.data ?? []);
+        setPreviewImages(imageResult.data ?? []);
+      }
+
+      setPreviewLoading(false);
+    }
+
+    void loadPreviewDeck();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewDeckId]);
 
   const filteredDecks = useMemo(() => {
     return decks.filter((deck) => {
@@ -297,9 +324,18 @@ export default function DecksPage() {
   );
 
   async function handleCopyDeck(deck: DeckRecord) {
-    const sourceCards = deckCardsByDeck.get(deck.id) ?? [];
     setCopyingDeckId(deck.id);
     setMessage("");
+
+    const sourceDeckCardsResult = await loadDeckCards(deck.id);
+    if (sourceDeckCardsResult.error) {
+      console.error(sourceDeckCardsResult.error);
+      setMessage("コピー元デッキ内容の読み込みに失敗しました。");
+      setCopyingDeckId(null);
+      return;
+    }
+
+    const sourceCards = sourceDeckCardsResult.data ?? [];
 
     const copiedName = `${deck.name} のコピー`;
     const draftResult = await createDraftDeck({
@@ -370,9 +406,24 @@ export default function DecksPage() {
     }
 
     setDecks((current) => current.filter((item) => item.id !== deck.id));
-    setDeckCards((current) => current.filter((item) => item.deck_id !== deck.id));
     setPreviewDeckId(null);
     setDeletingDeckId(null);
+  }
+
+  function openPreviewDeck(nextDeckId: string) {
+    setPreviewDeckCards([]);
+    setPreviewCards([]);
+    setPreviewImages([]);
+    setPreviewLoading(true);
+    setPreviewDeckId(nextDeckId);
+  }
+
+  function closePreviewDeck() {
+    setPreviewDeckId(null);
+    setPreviewDeckCards([]);
+    setPreviewCards([]);
+    setPreviewImages([]);
+    setPreviewLoading(false);
   }
 
   return (
@@ -412,27 +463,24 @@ export default function DecksPage() {
             decks={ownDecks}
             flagsById={flagsById}
             cardsById={cardsById}
-            deckCardsByDeck={deckCardsByDeck}
             imagesByCard={imagesByCard}
-            onOpen={setPreviewDeckId}
+            onOpen={openPreviewDeck}
           />
           <DeckSection
             title="共有デッキ"
             decks={sharedDecks}
             flagsById={flagsById}
             cardsById={cardsById}
-            deckCardsByDeck={deckCardsByDeck}
             imagesByCard={imagesByCard}
-            onOpen={setPreviewDeckId}
+            onOpen={openPreviewDeck}
           />
           <DeckSection
             title="サンプルデッキ"
             decks={sampleDecks}
             flagsById={flagsById}
             cardsById={cardsById}
-            deckCardsByDeck={deckCardsByDeck}
             imagesByCard={imagesByCard}
-            onOpen={setPreviewDeckId}
+            onOpen={openPreviewDeck}
           />
         </div>
       )}
@@ -441,7 +489,7 @@ export default function DecksPage() {
         <div
           className="dm-card-detail-modal-backdrop"
           role="presentation"
-          onClick={() => setPreviewDeckId(null)}
+          onClick={closePreviewDeck}
         >
           <section
             className="dm-card-detail-modal dm-deck-preview-modal"
@@ -458,7 +506,7 @@ export default function DecksPage() {
               <button
                 type="button"
                 className="dm-dialog-close"
-                onClick={() => setPreviewDeckId(null)}
+                onClick={closePreviewDeck}
               >
                 ×
               </button>
@@ -466,18 +514,19 @@ export default function DecksPage() {
 
             <div className="dm-deck-preview-meta">
               <span>{previewDeckCards.reduce((total, card) => total + card.quantity, 0)}枚</span>
+              {previewLoading ? <span>読み込み中...</span> : null}
             </div>
 
             <div className="dm-deck-preview-grid">
               {previewDeckCards.map((deckCard) => {
-                const card = cardsById.get(deckCard.card_id);
+                const card = previewCardsById.get(deckCard.card_id);
                 if (!card) return null;
 
                 return (
                   <div key={deckCard.id} className="dm-deck-preview-card">
                     <CardViewer
                       card={card}
-                      images={imagesByCard.get(card.id) ?? []}
+                      images={previewImagesByCard.get(card.id) ?? []}
                       selectedImageId={deckCard.selected_image_id}
                       variant="compact"
                     />
@@ -512,7 +561,7 @@ export default function DecksPage() {
                 </Button>
               ) : null}
 
-              <Button variant="secondary" onClick={() => setPreviewDeckId(null)}>
+              <Button variant="secondary" onClick={closePreviewDeck}>
                 戻る
               </Button>
             </footer>

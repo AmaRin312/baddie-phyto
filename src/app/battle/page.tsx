@@ -9,7 +9,7 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
-import { loadDeckCardsByDeckIds, loadDecks } from "@/lib/decks/deckActions";
+import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlagsByIds } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import { getSupabaseLoadErrorMessage } from "@/lib/supabase/client";
@@ -33,27 +33,11 @@ function buildImagesByCard(images: CardImageRecord[]) {
   return map;
 }
 
-function buildDeckCardsByDeck(deckCards: DeckCardRecord[]) {
-  const map = new Map<string, DeckCardRecord[]>();
-  for (const deckCard of deckCards) {
-    map.set(deckCard.deck_id, [...(map.get(deckCard.deck_id) ?? []), deckCard]);
-  }
-  return map;
-}
-
-function collectBattleEntryCardIds(
-  decks: DeckRecord[],
-  deckCards: DeckCardRecord[],
-  flags: FlagRecord[]
-) {
+function collectBattleEntryCardIds(decks: DeckRecord[], flags: FlagRecord[]) {
   const ids = new Set<string>();
 
   for (const deck of decks) {
     if (deck.buddy_card_id) ids.add(deck.buddy_card_id);
-  }
-
-  for (const deckCard of deckCards) {
-    ids.add(deckCard.card_id);
   }
 
   for (const flag of flags) {
@@ -73,11 +57,12 @@ function BattleEntryPage() {
   const [message, setMessage] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [decks, setDecks] = useState<DeckRecord[]>([]);
-  const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState("");
+  const [selectedDeckCards, setSelectedDeckCards] = useState<DeckCardRecord[]>([]);
+  const [selectedDeckCardsLoading, setSelectedDeckCardsLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [eraFilter, setEraFilter] = useState<EraFilter>("all");
 
@@ -93,37 +78,22 @@ function BattleEntryPage() {
 
       const deckResult = await loadDecks();
 
-      const deckIds = (deckResult.data ?? []).map((deck) => deck.id);
       const flagIds = (deckResult.data ?? [])
         .map((deck) => deck.flag_id)
         .filter((value): value is string => typeof value === "string" && value.length > 0);
 
-      const [deckCardResult, flagResult] = await Promise.all([
-        loadDeckCardsByDeckIds(deckIds),
-        loadFlagsByIds(flagIds)
-      ]);
+      const flagResult = await loadFlagsByIds(flagIds);
 
-      const relatedCardIds = collectBattleEntryCardIds(
-        deckResult.data ?? [],
-        deckCardResult.data ?? [],
-        flagResult.data ?? []
-      );
+      const relatedCardIds = collectBattleEntryCardIds(deckResult.data ?? [], flagResult.data ?? []);
 
       const [cardResult, imageResult] = await Promise.all([
         loadCardsByIds(relatedCardIds),
         loadCardImagesByCardIds(relatedCardIds)
       ]);
 
-      if (
-        deckResult.error ||
-        deckCardResult.error ||
-        flagResult.error ||
-        cardResult.error ||
-        imageResult.error
-      ) {
+      if (deckResult.error || flagResult.error || cardResult.error || imageResult.error) {
         const targetError =
           deckResult.error ??
-          deckCardResult.error ??
           flagResult.error ??
           cardResult.error ??
           imageResult.error;
@@ -136,7 +106,6 @@ function BattleEntryPage() {
         );
       } else {
         setDecks(deckResult.data ?? []);
-        setDeckCards(deckCardResult.data ?? []);
         setFlags(flagResult.data ?? []);
         setCards(cardResult.data ?? []);
         setImages(imageResult.data ?? []);
@@ -148,10 +117,46 @@ function BattleEntryPage() {
     void loadPage();
   }, [router]);
 
+  useEffect(() => {
+    if (!selectedDeckId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSelectedDeckCards() {
+      setSelectedDeckCardsLoading(true);
+      const result = await loadDeckCards(selectedDeckId);
+      if (cancelled) {
+        return;
+      }
+
+      if (result.error) {
+        console.error(result.error);
+        setMessage(
+          getSupabaseLoadErrorMessage(
+            result.error,
+            "選択したデッキ内容の読み込みに失敗しました。"
+          )
+        );
+        setSelectedDeckCards([]);
+      } else {
+        setSelectedDeckCards(result.data ?? []);
+      }
+
+      setSelectedDeckCardsLoading(false);
+    }
+
+    void loadSelectedDeckCards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDeckId]);
+
   const cardsById = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const flagsById = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const imagesByCard = useMemo(() => buildImagesByCard(images), [images]);
-  const deckCardsByDeck = useMemo(() => buildDeckCardsByDeck(deckCards), [deckCards]);
 
   const filteredDecks = useMemo(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
@@ -195,9 +200,7 @@ function BattleEntryPage() {
     : null;
   const selectedBuddyDeckCard =
     selectedDeck && selectedDeck.buddy_card_id
-      ? deckCardsByDeck
-          .get(selectedDeck.id)
-          ?.find((deckCard) => deckCard.card_id === selectedDeck.buddy_card_id) ?? null
+      ? selectedDeckCards.find((deckCard) => deckCard.card_id === selectedDeck.buddy_card_id) ?? null
       : null;
 
   function openSoloBattle() {
@@ -216,19 +219,17 @@ function BattleEntryPage() {
     const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
     const flagCard = flag?.card_id ? cardsById.get(flag.card_id) ?? null : null;
     const buddyCard = deck.buddy_card_id ? cardsById.get(deck.buddy_card_id) ?? null : null;
-    const buddyDeckCard =
-      deck.buddy_card_id && deckCardsByDeck.get(deck.id)
-        ? deckCardsByDeck
-            .get(deck.id)
-            ?.find((deckCard) => deckCard.card_id === deck.buddy_card_id) ?? null
-        : null;
 
     return (
       <button
         key={deck.id}
         type="button"
         className={`dm-deck-library-card${selectedDeckId === deck.id ? " is-selected" : ""}`}
-        onClick={() => setSelectedDeckId(deck.id)}
+        onClick={() => {
+          setSelectedDeckCards([]);
+          setSelectedDeckCardsLoading(true);
+          setSelectedDeckId(deck.id);
+        }}
       >
         <span className="dm-deck-library-title">{deck.name}</span>
         <span className="dm-deck-library-images">
@@ -247,7 +248,6 @@ function BattleEntryPage() {
               <CardViewer
                 card={buddyCard}
                 images={imagesByCard.get(buddyCard.id) ?? []}
-                selectedImageId={buddyDeckCard?.selected_image_id ?? null}
                 variant="compact"
               />
             ) : null}
@@ -350,12 +350,10 @@ function BattleEntryPage() {
               <div className="dm-battle-entry-preview-meta">
                 <p>
                   枚数:{" "}
-                  {(deckCardsByDeck.get(selectedDeck.id) ?? []).reduce(
-                    (sum, item) => sum + item.quantity,
-                    0
-                  )}
+                  {selectedDeckCards.reduce((sum, item) => sum + item.quantity, 0)}
                   枚
                 </p>
+                {selectedDeckCardsLoading ? <p>枚数を更新中...</p> : null}
               </div>
 
               <div className="dm-dialog-actions">
