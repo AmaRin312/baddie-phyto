@@ -1,17 +1,19 @@
 "use client";
 
+import { memo } from "react";
 import type { MouseEvent } from "react";
 import { BattlePlayer } from "@/components/battle/BattlePlayer";
 import type {
   BattleCard,
   BattleDropInput,
-  BattleState,
-  BattleZoneId
+  BattleZoneId,
+  PlayerState
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
 type BattleBoardProps = {
-  battleState: BattleState;
+  selfPlayer: PlayerState;
+  opponentPlayer: PlayerState;
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
   draggedCard: BattleCard | null;
@@ -44,8 +46,9 @@ type BattleBoardProps = {
   ) => void;
 };
 
-export function BattleBoard({
-  battleState,
+function BattleBoardComponent({
+  selfPlayer,
+  opponentPlayer,
   cardMap,
   imagesByCard,
   draggedCard,
@@ -77,7 +80,7 @@ export function BattleBoard({
     >
       <BattlePlayer
         side="opponent"
-        player={battleState.players.opponent}
+        player={opponentPlayer}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
         draggedCard={draggedCard}
@@ -97,7 +100,7 @@ export function BattleBoard({
       />
       <BattlePlayer
         side="self"
-        player={battleState.players.self}
+        player={selfPlayer}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
         draggedCard={draggedCard}
@@ -118,3 +121,5 @@ export function BattleBoard({
     </section>
   );
 }
+
+export const BattleBoard = memo(BattleBoardComponent);

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { supabase, withSupabaseRetry } from "@/lib/supabase/client";
 
 export type Profile = {
   id: string;
@@ -30,11 +30,13 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
 
   if (userError || !userData.user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userData.user.id)
-    .maybeSingle();
+  const { data, error } = await withSupabaseRetry(() =>
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userData.user.id)
+      .maybeSingle()
+  );
 
   if (error) {
     console.warn("profiles select failed; falling back to auth user", error);
@@ -43,15 +45,17 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
 
   if (data) return data as Profile;
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("profiles")
-    .insert({
-      id: userData.user.id,
-      email: userData.user.email ?? null,
-      nickname: null
-    })
-    .select("*")
-    .single();
+  const { data: inserted, error: insertError } = await withSupabaseRetry(() =>
+    supabase
+      .from("profiles")
+      .insert({
+        id: userData.user.id,
+        email: userData.user.email ?? null,
+        nickname: null
+      })
+      .select("*")
+      .single()
+  );
 
   if (insertError) {
     console.warn("profiles insert failed; falling back to auth user", insertError);

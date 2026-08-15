@@ -2,30 +2,31 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { Button } from "@/components/common/button";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
   createDraftDeck,
   deleteDeck,
-  loadAllDeckCards,
+  loadDeckCardsByDeckIds,
   loadDecks,
   setDeckCard,
   updateDeckSettings
 } from "@/lib/decks/deckActions";
-import { loadFlags } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadFlagsByIds } from "@/lib/flags/flagActions";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
+import { getSupabaseLoadErrorMessage } from "@/lib/supabase/client";
 import type {
   CardImageRecord,
   CardRecord,
   DeckCardRecord,
   DeckEraKey,
   DeckRecord,
-  FlagWithCardRecord
+  FlagRecord
 } from "@/types/baddiePhyto";
 import { getDeckVisibilityLabel } from "@/types/baddiePhyto";
 
@@ -57,27 +58,47 @@ function buildDeckCardsByDeck(deckCards: DeckCardRecord[]) {
   return map;
 }
 
+function collectDeckLibraryCardIds(
+  decks: DeckRecord[],
+  deckCards: DeckCardRecord[],
+  flags: FlagRecord[]
+) {
+  const ids = new Set<string>();
+
+  for (const deck of decks) {
+    if (deck.buddy_card_id) ids.add(deck.buddy_card_id);
+  }
+
+  for (const deckCard of deckCards) {
+    ids.add(deckCard.card_id);
+  }
+
+  for (const flag of flags) {
+    if (flag.card_id) ids.add(flag.card_id);
+  }
+
+  return [...ids];
+}
+
 function getDeckEraFilterValue(deck: DeckRecord): EraFilter {
   return deck.era_key ?? "unset";
 }
 
-function DeckIconCard({
+const DeckIconCard = memo(function DeckIconCard({
   deck,
-  flag,
+  flagCard,
   buddy,
   buddySelectedImageId,
   imagesByCard,
   onOpen
 }: {
   deck: DeckRecord;
-  flag: FlagWithCardRecord | null;
+  flagCard: CardRecord | null;
   buddy: CardRecord | null;
   buddySelectedImageId: string | null;
   imagesByCard: Map<string, CardImageRecord[]>;
   onOpen: () => void;
 }) {
-  const flagCard = flag?.card ?? null;
-
   return (
     <button type="button" className="dm-deck-library-card" onDoubleClick={onOpen}>
       <span className="dm-deck-library-title">{deck.name}</span>
@@ -105,9 +126,9 @@ function DeckIconCard({
       </span>
     </button>
   );
-}
+});
 
-function DeckSection({
+const DeckSection = memo(function DeckSection({
   title,
   decks,
   flagsById,
@@ -118,7 +139,7 @@ function DeckSection({
 }: {
   title: string;
   decks: DeckRecord[];
-  flagsById: Map<string, FlagWithCardRecord>;
+  flagsById: Map<string, FlagRecord>;
   cardsById: Map<string, CardRecord>;
   deckCardsByDeck: Map<string, DeckCardRecord[]>;
   imagesByCard: Map<string, CardImageRecord[]>;
@@ -137,6 +158,7 @@ function DeckSection({
         <div className="dm-deck-library-grid">
           {decks.map((deck) => {
             const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
+            const flagCard = flag?.card_id ? cardsById.get(flag.card_id) ?? null : null;
             const buddy = deck.buddy_card_id ? cardsById.get(deck.buddy_card_id) ?? null : null;
             const buddyDeckCard =
               deckCardsByDeck
@@ -147,7 +169,7 @@ function DeckSection({
               <DeckIconCard
                 key={deck.id}
                 deck={deck}
-                flag={flag}
+                flagCard={flagCard}
                 buddy={buddy}
                 buddySelectedImageId={buddyDeckCard?.selected_image_id ?? null}
                 imagesByCard={imagesByCard}
@@ -159,13 +181,13 @@ function DeckSection({
       ) : null}
     </section>
   );
-}
+});
 
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
   const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
-  const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
+  const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
@@ -194,12 +216,27 @@ export default function DecksPage() {
 
       setCurrentUserId(profile.id);
 
-      const [deckResult, deckCardResult, flagResult, cardResult, imageResult] = await Promise.all([
-        loadDecks(),
-        loadAllDeckCards(),
-        loadFlags(),
-        loadCards(),
-        loadCardImages()
+      const deckResult = await loadDecks();
+
+      const deckIds = (deckResult.data ?? []).map((deck) => deck.id);
+      const flagIds = (deckResult.data ?? [])
+        .map((deck) => deck.flag_id)
+        .filter((value): value is string => typeof value === "string" && value.length > 0);
+
+      const [deckCardResult, flagResult] = await Promise.all([
+        loadDeckCardsByDeckIds(deckIds),
+        loadFlagsByIds(flagIds)
+      ]);
+
+      const relatedCardIds = collectDeckLibraryCardIds(
+        deckResult.data ?? [],
+        deckCardResult.data ?? [],
+        flagResult.data ?? []
+      );
+
+      const [cardResult, imageResult] = await Promise.all([
+        loadCardsByIds(relatedCardIds),
+        loadCardImagesByCardIds(relatedCardIds)
       ]);
 
       if (
@@ -209,14 +246,14 @@ export default function DecksPage() {
         cardResult.error ||
         imageResult.error
       ) {
-        console.error(
+        const targetError =
           deckResult.error ??
-            deckCardResult.error ??
-            flagResult.error ??
-            cardResult.error ??
-            imageResult.error
-        );
-        setMessage("デッキ情報の読み込みに失敗しました。");
+          deckCardResult.error ??
+          flagResult.error ??
+          cardResult.error ??
+          imageResult.error;
+        console.error(targetError);
+        setMessage(getSupabaseLoadErrorMessage(targetError, "デッキ情報の読み込みに失敗しました。"));
       } else {
         setDecks(deckResult.data ?? []);
         setDeckCards(deckCardResult.data ?? []);

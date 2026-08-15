@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
@@ -52,6 +52,8 @@ import {
 } from "@/types/baddiePhyto";
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
+const SEARCH_RESULT_ROW_HEIGHT = 156;
+const SEARCH_RESULT_OVERSCAN = 4;
 
 function getFlagName(flag?: FlagWithCardRecord | null) {
   return flag?.name || flag?.card?.name || "未選択";
@@ -85,6 +87,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [isFlagPickerOpen, setIsFlagPickerOpen] = useState(false);
   const [isBuddyPickerOpen, setIsBuddyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [searchListScrollTop, setSearchListScrollTop] = useState(0);
+  const [searchListHeight, setSearchListHeight] = useState(720);
+  const searchListRef = useRef<HTMLDivElement | null>(null);
 
   const reload = useCallback(async (currentDeckId: string) => {
     const [
@@ -236,6 +241,41 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     selectedBuddyCardId,
     selectedFlag?.card_id
   ]);
+  const visibleSearchRange = useMemo(() => {
+    const viewportRowCount = Math.max(1, Math.ceil(searchListHeight / SEARCH_RESULT_ROW_HEIGHT));
+    const startIndex = Math.max(
+      0,
+      Math.floor(searchListScrollTop / SEARCH_RESULT_ROW_HEIGHT) - SEARCH_RESULT_OVERSCAN
+    );
+    const endIndex = Math.min(
+      filteredCards.length,
+      startIndex + viewportRowCount + SEARCH_RESULT_OVERSCAN * 2
+    );
+
+    return {
+      startIndex,
+      endIndex,
+      topPadding: startIndex * SEARCH_RESULT_ROW_HEIGHT,
+      bottomPadding: Math.max(0, (filteredCards.length - endIndex) * SEARCH_RESULT_ROW_HEIGHT)
+    };
+  }, [filteredCards.length, searchListHeight, searchListScrollTop]);
+  const visibleFilteredCards = useMemo(
+    () => filteredCards.slice(visibleSearchRange.startIndex, visibleSearchRange.endIndex),
+    [filteredCards, visibleSearchRange.endIndex, visibleSearchRange.startIndex]
+  );
+
+  useEffect(() => {
+    const element = searchListRef.current;
+    if (!element) return;
+
+    const updateHeight = () => setSearchListHeight(element.clientHeight || 720);
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
 
   const mainDeckTotal = draftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
   const selectedDeckCard = selectedDeckCardId
@@ -669,14 +709,25 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 />
               </form>
 
-              <div className="dm-deck-list">
-                {filteredCards.map((card) => {
+              <div
+                ref={searchListRef}
+                className="dm-deck-list"
+                onScroll={(event) => setSearchListScrollTop(event.currentTarget.scrollTop)}
+              >
+                {visibleSearchRange.topPadding > 0 ? (
+                  <div
+                    aria-hidden="true"
+                    style={{ height: `${visibleSearchRange.topPadding}px` }}
+                  />
+                ) : null}
+                {visibleFilteredCards.map((card) => {
                   const existing = draftDeckCardMap.get(card.id);
                   return (
                     <button
                       key={card.id}
                       type="button"
                       className="dm-deck-row dm-deck-row-button"
+                      style={{ minHeight: `${SEARCH_RESULT_ROW_HEIGHT - 10}px` }}
                       onClick={() => openCardDetail(card.id)}
                     >
                       <span className="dm-deck-card-cell">
@@ -707,6 +758,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </button>
                   );
                 })}
+                {visibleSearchRange.bottomPadding > 0 ? (
+                  <div
+                    aria-hidden="true"
+                    style={{ height: `${visibleSearchRange.bottomPadding}px` }}
+                  />
+                ) : null}
                 {filteredCards.length === 0 && (
                   <p className="dm-muted-text">条件に合うカードがありません。</p>
                 )}

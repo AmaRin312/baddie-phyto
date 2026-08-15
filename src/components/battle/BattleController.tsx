@@ -70,16 +70,16 @@ import {
 } from "@/lib/battle/menus/battleContextMenu";
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import {
-  loadAllDeckCards,
   loadDeck,
   loadDeckCards,
+  loadDeckCardsByDeckIds,
   loadDecks
 } from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import { loadShortcutSettings } from "@/lib/shortcuts/shortcutSettings";
 import type { ShortcutActionId, ShortcutSettings } from "@/lib/shortcuts/shortcutTypes";
 import {
@@ -482,18 +482,9 @@ export function BattleController() {
     setMessage("");
     setSyncMessage("");
 
-    const [
-      deckResult,
-      deckCardsResult,
-      cardResult,
-      imageResult,
-      shortcutResult,
-      abilityMapResult
-    ] = await Promise.all([
+    const [deckResult, deckCardsResult, shortcutResult, abilityMapResult] = await Promise.all([
       loadDeck(deckId),
       loadDeckCards(deckId),
-      loadCards(),
-      loadCardImages(),
       loadShortcutSettings(),
       loadBattleCardAbilityMap()
     ]);
@@ -504,7 +495,7 @@ export function BattleController() {
     if (!resolvedDeck || deckCardsResult.error) {
       const [fallbackDecksResult, fallbackDeckCardsResult] = await Promise.all([
         loadDecks(),
-        loadAllDeckCards()
+        loadDeckCardsByDeckIds([deckId])
       ]);
 
       if (!resolvedDeck && !fallbackDecksResult.error) {
@@ -513,25 +504,13 @@ export function BattleController() {
       }
 
       if ((deckCardsResult.error || !resolvedDeckCards) && !fallbackDeckCardsResult.error) {
-        resolvedDeckCards = (fallbackDeckCardsResult.data ?? []).filter(
-          (deckCard) => deckCard.deck_id === deckId
-        );
+        resolvedDeckCards = fallbackDeckCardsResult.data ?? [];
       }
     }
 
-    if (
-      deckResult.error ||
-      cardResult.error ||
-      imageResult.error ||
-      !resolvedDeck ||
-      resolvedDeckCards == null
-    ) {
+    if (!resolvedDeck || resolvedDeckCards == null) {
       console.error(
-        deckResult.error ??
-          deckCardsResult.error ??
-          cardResult.error ??
-          imageResult.error ??
-          new Error("deck data is unavailable")
+        deckResult.error ?? deckCardsResult.error ?? new Error("deck data is unavailable")
       );
       setMessage("Battle開始に必要なデッキ情報の読み込みに失敗しました。");
       setLoading(false);
@@ -554,6 +533,28 @@ export function BattleController() {
     if (flagResult.error || !flagResult.data) {
       console.error(flagResult.error);
       setMessage("フラッグ情報の読み込みに失敗しました。");
+      setLoading(false);
+      return;
+    }
+
+    const relatedCardIds = [
+      ...new Set(
+        [
+          ...resolvedDeckCards.map((deckCard) => deckCard.card_id),
+          resolvedDeck.buddy_card_id,
+          flagResult.data.card_id
+        ].filter((value): value is string => typeof value === "string" && value.length > 0)
+      )
+    ];
+
+    const [cardResult, imageResult] = await Promise.all([
+      loadCardsByIds(relatedCardIds),
+      loadCardImagesByCardIds(relatedCardIds)
+    ]);
+
+    if (cardResult.error || imageResult.error) {
+      console.error(cardResult.error ?? imageResult.error);
+      setMessage("Battle開始に必要なカード情報の読み込みに失敗しました。");
       setLoading(false);
       return;
     }
@@ -761,13 +762,32 @@ export function BattleController() {
     return map;
   }, [images]);
 
-  const activeCard = findBattleCardByInstanceId(
-    battleState,
-    battleState?.activeViewerCardInstanceId ?? null
+  const activeCard = useMemo(
+    () =>
+      findBattleCardByInstanceId(
+        battleState,
+        battleState?.activeViewerCardInstanceId ?? null
+      ),
+    [battleState]
   );
-  const viewerCards = [viewerSlots.left, viewerSlots.right]
-    .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
-    .filter((card): card is BattleCard => card != null);
+  const viewerCards = useMemo(
+    () =>
+      [viewerSlots.left, viewerSlots.right]
+        .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
+        .filter((card): card is BattleCard => card != null),
+    [battleState, viewerSlots.left, viewerSlots.right]
+  );
+  const viewerCompositeGroups = useMemo(() => {
+    const groups = new Map<string, BattleCard[]>();
+    if (!battleState) return groups;
+    for (const viewerCard of viewerCards) {
+      groups.set(
+        viewerCard.instanceId,
+        findCompositeGroupCardsInBattleState(battleState, viewerCard)
+      );
+    }
+    return groups;
+  }, [battleState, viewerCards]);
   const activeAbilityNotification =
     activeAbilityNotificationId == null
       ? null
@@ -780,7 +800,11 @@ export function BattleController() {
 
   useEffect(() => {
     const activeViewerId = battleState?.activeViewerCardInstanceId ?? null;
-    setViewerSlots((current) => pushViewerSlots(current, activeViewerId));
+    const frameId = window.requestAnimationFrame(() => {
+      setViewerSlots((current) => pushViewerSlots(current, activeViewerId));
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [battleState?.activeViewerCardInstanceId]);
   const activeAbilityNotificationSourceCard = activeAbilityNotification
     ? findBattleCardByInstanceId(
@@ -803,6 +827,16 @@ export function BattleController() {
     () => new Set(soulSelection.instanceIds),
     [soulSelection.instanceIds]
   );
+  const draggedCard = dragSelection?.sourceCard ?? null;
+  const draggedInstanceCount = dragSelection?.instanceIds.length ?? 0;
+  const draggedSoulCard = soulDragSelection?.sourceSoulCard ?? null;
+  const draggedSoulInstanceCount = soulDragSelection?.instanceIds.length ?? 0;
+  const placementTargetZones = useMemo(
+    () => (selectionMode?.type === "zone" ? new Set(selectionMode.allowedZones) : undefined),
+    [selectionMode]
+  );
+  const placementTargetPlayerId =
+    selectionMode?.type === "zone" ? selectionMode.playerId : undefined;
   const lookedDeckCards = useMemo(() => {
     if (!battleState?.deckLook) return [];
     const deckCards = battleState.players[battleState.deckLook.playerId].zones.deck.cards;
@@ -2247,13 +2281,14 @@ export function BattleController() {
       </aside>
 
       <BattleBoard
-        battleState={battleState}
+        selfPlayer={battleState.players.self}
+        opponentPlayer={battleState.players.opponent}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
-        draggedCard={dragSelection?.sourceCard ?? null}
-        draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
-        draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
-        draggedSoulInstanceCount={soulDragSelection?.instanceIds.length ?? 0}
+        draggedCard={draggedCard}
+        draggedInstanceCount={draggedInstanceCount}
+        draggedSoulCard={draggedSoulCard}
+        draggedSoulInstanceCount={draggedSoulInstanceCount}
         selectedInstanceIds={selectedInstanceIds}
         onSelectCard={handleSelectCard}
         onDoubleClickCard={handleDoubleClickCard}
@@ -2261,14 +2296,8 @@ export function BattleController() {
         onDragStartCard={handleDragStartCard}
         onDragEndCard={handleDragEndCard}
         onDropCard={handleDropCard}
-        placementTargetZones={
-          selectionMode?.type === "zone"
-            ? new Set(selectionMode.allowedZones)
-            : undefined
-        }
-        placementTargetPlayerId={
-          selectionMode?.type === "zone" ? selectionMode.playerId : undefined
-        }
+        placementTargetZones={placementTargetZones}
+        placementTargetPlayerId={placementTargetPlayerId}
         onPlacementZoneClick={(zoneId, event, playerId) => {
           if (selectionMode?.type !== "zone" || selectionMode.playerId !== playerId) {
             return;
@@ -2283,15 +2312,17 @@ export function BattleController() {
       />
 
       <BattleSidebar
-        battleState={battleState}
+        selfHandCards={battleState.players.self.zones.hand.cards}
+        opponentHandCards={battleState.players.opponent.zones.hand.cards}
         activeCard={activeCard}
         viewerCards={viewerCards}
+        viewerCompositeGroups={viewerCompositeGroups}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
-        draggedCard={dragSelection?.sourceCard ?? null}
-        draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
-        draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
-        draggedSoulInstanceCount={soulDragSelection?.instanceIds.length ?? 0}
+        draggedCard={draggedCard}
+        draggedInstanceCount={draggedInstanceCount}
+        draggedSoulCard={draggedSoulCard}
+        draggedSoulInstanceCount={draggedSoulInstanceCount}
         selectedInstanceIds={selectedInstanceIds}
         selectedSoulInstanceIds={selectedSoulInstanceIds}
         viewerPinned={viewerPinned}

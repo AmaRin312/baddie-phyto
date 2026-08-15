@@ -1,8 +1,9 @@
-﻿import { getDisplayCard } from "@/lib/cards/cardPresentation";
+import { memo, useMemo } from "react";
+import { getDisplayCard } from "@/lib/cards/cardPresentation";
 import type {
   CardImageRecord,
   CardOrientation,
-  CardRecord,
+  CardRecord
 } from "@/types/baddiePhyto";
 import styles from "./CardViewer.module.css";
 
@@ -20,41 +21,73 @@ function formatValue(value: number | null) {
   return value == null ? "-" : value.toLocaleString();
 }
 
-export function CardViewer({
+function CardViewerComponent({
   card,
   images = [],
   selectedImageId,
   className = "",
   variant = "viewer",
   faceDown = false,
-  displayOrientation = "vertical",
+  displayOrientation = "vertical"
 }: CardViewerProps) {
-  const displayCard = getDisplayCard({ card, images, selectedImageId });
-  const rootClassName = [
-    styles.viewer,
-    variant === "compact" ? styles.compact : "",
-    variant === "board" ? styles.board : "",
-    displayOrientation === "horizontal" ? styles.horizontal : "",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const displayCard = useMemo(
+    () => getDisplayCard({ card, images, selectedImageId }),
+    [card, images, selectedImageId]
+  );
+
+  const rootClassName = useMemo(
+    () =>
+      [
+        "dm-card-viewer",
+        `dm-card-viewer--${variant}`,
+        `dm-card-viewer--${displayOrientation}`,
+        styles.viewer,
+        variant === "compact" ? styles.compact : "",
+        variant === "board" ? styles.board : "",
+        displayOrientation === "horizontal" ? styles.horizontal : "",
+        className
+      ]
+        .filter(Boolean)
+        .join(" "),
+    [className, displayOrientation, variant]
+  );
 
   if (faceDown) {
     return (
-      <article className={rootClassName} aria-label="裏向きカード">
+      <article
+        className={rootClassName}
+        data-card-viewer=""
+        data-variant={variant}
+        data-display-orientation={displayOrientation}
+        aria-label="裏向きカード"
+      >
         <div className={styles.faceDown}>BF</div>
       </article>
     );
   }
 
-  const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
+  const imageSrc =
+    variant === "viewer"
+      ? displayCard.imageUrl
+      : displayCard.thumbnailUrl ?? displayCard.imageUrl;
 
   if (!displayCard.useHtmlCard && imageSrc) {
     return (
-      <article className={rootClassName} aria-label={displayCard.name}>
+      <article
+        className={rootClassName}
+        data-card-viewer=""
+        data-variant={variant}
+        data-display-orientation={displayOrientation}
+        aria-label={displayCard.name}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={styles.image} src={imageSrc} alt={displayCard.name} />
+        <img
+          className={styles.image}
+          src={imageSrc}
+          alt={displayCard.name}
+          loading="lazy"
+          decoding="async"
+        />
       </article>
     );
   }
@@ -62,7 +95,13 @@ export function CardViewer({
   const sizeOrType = displayCard.size == null ? displayCard.cardType : String(displayCard.size);
 
   return (
-    <article className={rootClassName} aria-label={displayCard.name}>
+    <article
+      className={rootClassName}
+      data-card-viewer=""
+      data-variant={variant}
+      data-display-orientation={displayOrientation}
+      aria-label={displayCard.name}
+    >
       <div className={styles.htmlCard}>
         <div className={styles.topLine}>
           <span className={styles.sizeOrType}>{sizeOrType}</span>
@@ -88,3 +127,5 @@ export function CardViewer({
     </article>
   );
 }
+
+export const CardViewer = memo(CardViewerComponent);

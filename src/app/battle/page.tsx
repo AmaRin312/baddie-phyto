@@ -8,10 +8,11 @@ import { Button } from "@/components/common/button";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
-import { loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
-import { loadFlags } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
+import { loadDeckCardsByDeckIds, loadDecks } from "@/lib/decks/deckActions";
+import { loadFlagsByIds } from "@/lib/flags/flagActions";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
+import { getSupabaseLoadErrorMessage } from "@/lib/supabase/client";
 import {
   DECK_ERA_OPTIONS,
   type CardImageRecord,
@@ -19,7 +20,7 @@ import {
   type DeckCardRecord,
   type DeckEraKey,
   type DeckRecord,
-  type FlagWithCardRecord
+  type FlagRecord
 } from "@/types/baddiePhyto";
 
 type EraFilter = "all" | DeckEraKey | "unset";
@@ -40,6 +41,28 @@ function buildDeckCardsByDeck(deckCards: DeckCardRecord[]) {
   return map;
 }
 
+function collectBattleEntryCardIds(
+  decks: DeckRecord[],
+  deckCards: DeckCardRecord[],
+  flags: FlagRecord[]
+) {
+  const ids = new Set<string>();
+
+  for (const deck of decks) {
+    if (deck.buddy_card_id) ids.add(deck.buddy_card_id);
+  }
+
+  for (const deckCard of deckCards) {
+    ids.add(deckCard.card_id);
+  }
+
+  for (const flag of flags) {
+    if (flag.card_id) ids.add(flag.card_id);
+  }
+
+  return [...ids];
+}
+
 function getDeckEraFilterValue(deck: DeckRecord): EraFilter {
   return deck.era_key ?? "unset";
 }
@@ -51,7 +74,7 @@ function BattleEntryPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [decks, setDecks] = useState<DeckRecord[]>([]);
   const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
-  const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
+  const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState("");
@@ -68,14 +91,28 @@ function BattleEntryPage() {
 
       setCurrentUserId(profile.id);
 
-      const [deckResult, deckCardResult, flagResult, cardResult, imageResult] =
-        await Promise.all([
-          loadDecks(),
-          loadAllDeckCards(),
-          loadFlags(),
-          loadCards(),
-          loadCardImages()
-        ]);
+      const deckResult = await loadDecks();
+
+      const deckIds = (deckResult.data ?? []).map((deck) => deck.id);
+      const flagIds = (deckResult.data ?? [])
+        .map((deck) => deck.flag_id)
+        .filter((value): value is string => typeof value === "string" && value.length > 0);
+
+      const [deckCardResult, flagResult] = await Promise.all([
+        loadDeckCardsByDeckIds(deckIds),
+        loadFlagsByIds(flagIds)
+      ]);
+
+      const relatedCardIds = collectBattleEntryCardIds(
+        deckResult.data ?? [],
+        deckCardResult.data ?? [],
+        flagResult.data ?? []
+      );
+
+      const [cardResult, imageResult] = await Promise.all([
+        loadCardsByIds(relatedCardIds),
+        loadCardImagesByCardIds(relatedCardIds)
+      ]);
 
       if (
         deckResult.error ||
@@ -84,14 +121,19 @@ function BattleEntryPage() {
         cardResult.error ||
         imageResult.error
       ) {
-        console.error(
+        const targetError =
           deckResult.error ??
-            deckCardResult.error ??
-            flagResult.error ??
-            cardResult.error ??
-            imageResult.error
+          deckCardResult.error ??
+          flagResult.error ??
+          cardResult.error ??
+          imageResult.error;
+        console.error(targetError);
+        setMessage(
+          getSupabaseLoadErrorMessage(
+            targetError,
+            "対戦開始に必要なデッキ情報の読み込みに失敗しました。"
+          )
         );
-        setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
         setDecks(deckResult.data ?? []);
         setDeckCards(deckCardResult.data ?? []);
@@ -145,7 +187,9 @@ function BattleEntryPage() {
     ? decks.find((deck) => deck.id === selectedDeckId) ?? null
     : null;
   const selectedFlag = selectedDeck?.flag_id ? flagsById.get(selectedDeck.flag_id) ?? null : null;
-  const selectedFlagCard = selectedFlag?.card ?? null;
+  const selectedFlagCard = selectedFlag?.card_id
+    ? cardsById.get(selectedFlag.card_id) ?? null
+    : null;
   const selectedBuddyCard = selectedDeck?.buddy_card_id
     ? cardsById.get(selectedDeck.buddy_card_id) ?? null
     : null;
@@ -170,7 +214,7 @@ function BattleEntryPage() {
 
   function renderDeckCard(deck: DeckRecord) {
     const flag = deck.flag_id ? flagsById.get(deck.flag_id) ?? null : null;
-    const flagCard = flag?.card ?? null;
+    const flagCard = flag?.card_id ? cardsById.get(flag.card_id) ?? null : null;
     const buddyCard = deck.buddy_card_id ? cardsById.get(deck.buddy_card_id) ?? null : null;
     const buddyDeckCard =
       deck.buddy_card_id && deckCardsByDeck.get(deck.id)

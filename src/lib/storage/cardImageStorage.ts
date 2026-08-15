@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { supabase, withSupabaseRetry } from "@/lib/supabase/client";
 import type { CardImageRecord } from "@/types/baddiePhyto";
 
 const BUCKET_NAME = "card-images";
@@ -10,13 +10,35 @@ function getExtension(file: File) {
 }
 
 export async function loadCardImages(cardId?: string) {
-  let query = supabase
-    .from("card_images")
-    .select("*")
-    .order("is_default", { ascending: false })
-    .order("created_at");
-  if (cardId) query = query.eq("card_id", cardId);
-  return await query.returns<CardImageRecord[]>();
+  return await withSupabaseRetry(async () => {
+    let query = supabase
+      .from("card_images")
+      .select("*")
+      .order("is_default", { ascending: false })
+      .order("created_at");
+    if (cardId) query = query.eq("card_id", cardId);
+    return await query.returns<CardImageRecord[]>();
+  });
+}
+
+export async function loadCardImagesByCardIds(cardIds: string[]) {
+  const normalizedIds = [...new Set(cardIds.filter(Boolean))];
+  if (normalizedIds.length === 0) {
+    return {
+      data: [] as CardImageRecord[],
+      error: null
+    };
+  }
+
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("card_images")
+      .select("*")
+      .in("card_id", normalizedIds)
+      .order("is_default", { ascending: false })
+      .order("created_at")
+      .returns<CardImageRecord[]>()
+  );
 }
 
 export async function uploadCardImage(input: {

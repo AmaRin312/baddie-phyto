@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { MouseEvent } from "react";
 import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
 import { SoulCardList } from "@/components/battle/SoulCardList";
@@ -12,19 +13,19 @@ import {
   canDropSingleCard,
   canDropSingleSoulCard
 } from "@/lib/battle/battleActions";
-import { findCompositeGroupCardsInBattleState } from "@/lib/battle/compositeCards";
 import type {
   BattleCard,
   BattleDropInput,
-  BattleState,
   BattleZoneId
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
 type BattleSidebarProps = {
-  battleState: BattleState;
+  selfHandCards: BattleCard[];
+  opponentHandCards: BattleCard[];
   activeCard: BattleCard | null;
   viewerCards: BattleCard[];
+  viewerCompositeGroups: Map<string, BattleCard[]>;
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
   draggedCard: BattleCard | null;
@@ -85,7 +86,7 @@ type HandCardsProps = {
   selectedInstanceIds: ReadonlySet<string>;
 };
 
-function HandCards({
+const HandCards = memo(function HandCards({
   cards,
   self,
   cardMap,
@@ -191,12 +192,14 @@ function HandCards({
       })}
     </div>
   );
-}
+});
 
-export function BattleSidebar({
-  battleState,
+function BattleSidebarComponent({
+  selfHandCards,
+  opponentHandCards,
   activeCard,
   viewerCards,
+  viewerCompositeGroups,
   cardMap,
   imagesByCard,
   draggedCard,
@@ -221,7 +224,7 @@ export function BattleSidebar({
     const cardRecord = cardMap.get(card.cardId);
     if (!cardRecord) return null;
 
-    const compositeCards = findCompositeGroupCardsInBattleState(battleState, card);
+    const compositeCards = viewerCompositeGroups.get(card.instanceId) ?? [card];
     if (compositeCards.length > 1) {
       return (
         <BattleCompositeCardView
@@ -249,7 +252,7 @@ export function BattleSidebar({
     <aside className="bf-right-panel" aria-label="battle sidebar">
       <section className="bf-side-panel-card">
         <HandCards
-          cards={battleState.players.opponent.zones.hand.cards}
+          cards={opponentHandCards}
           cardMap={cardMap}
           imagesByCard={imagesByCard}
           draggedCard={draggedCard}
@@ -304,7 +307,7 @@ export function BattleSidebar({
       <section className="bf-side-panel-card is-self-hand">
         <HandCards
           self
-          cards={battleState.players.self.zones.hand.cards}
+          cards={selfHandCards}
           cardMap={cardMap}
           imagesByCard={imagesByCard}
           draggedCard={draggedCard}
@@ -322,3 +325,5 @@ export function BattleSidebar({
     </aside>
   );
 }
+
+export const BattleSidebar = memo(BattleSidebarComponent);

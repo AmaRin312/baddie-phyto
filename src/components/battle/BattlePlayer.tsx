@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { MouseEvent } from "react";
 import { BattleZone } from "@/components/battle/BattleZone";
 import type {
@@ -67,7 +68,7 @@ const ZONE_CONFIGS: readonly ZoneConfig[] = [
   { zoneId: "deck", label: "デッキ", stack: true, showCount: true }
 ];
 
-export function BattlePlayer({
+function BattlePlayerComponent({
   player,
   side,
   cardMap,
@@ -128,3 +129,5 @@ export function BattlePlayer({
     </section>
   );
 }
+
+export const BattlePlayer = memo(BattlePlayerComponent);

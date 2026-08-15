@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { supabase, withSupabaseRetry } from "@/lib/supabase/client";
 import type {
   CardOrientation,
   CardRecord,
@@ -53,23 +53,43 @@ async function ensureFlagForFlagCard(card: CardRecord) {
 }
 
 export async function loadCards(options?: { activeOnly?: boolean }) {
-  let query = supabase.from("cards").select("*").order("name");
+  return await withSupabaseRetry(async () => {
+    let query = supabase.from("cards").select("*").order("name");
 
-  if (options?.activeOnly) query = query.eq("is_active", true);
-  return await query;
+    if (options?.activeOnly) query = query.eq("is_active", true);
+    return await query;
+  });
+}
+
+export async function loadCardsByIds(cardIds: string[], options?: { activeOnly?: boolean }) {
+  const normalizedIds = [...new Set(cardIds.filter(Boolean))];
+  if (normalizedIds.length === 0) {
+    return {
+      data: [] as CardRecord[],
+      error: null
+    };
+  }
+
+  return await withSupabaseRetry(async () => {
+    let query = supabase.from("cards").select("*").in("id", normalizedIds).order("name");
+    if (options?.activeOnly) query = query.eq("is_active", true);
+    return await query.returns<CardRecord[]>();
+  });
 }
 
 export async function searchCardRecords(input?: {
   keyword?: string;
   includeInactive?: boolean;
 }) {
-  let query = supabase.from("cards").select("*").order("name");
-  const keyword = input?.keyword?.trim();
+  return await withSupabaseRetry(async () => {
+    let query = supabase.from("cards").select("*").order("name");
+    const keyword = input?.keyword?.trim();
 
-  if (keyword) query = query.ilike("name", `%${keyword}%`);
-  if (!input?.includeInactive) query = query.eq("is_active", true);
+    if (keyword) query = query.ilike("name", `%${keyword}%`);
+    if (!input?.includeInactive) query = query.eq("is_active", true);
 
-  return await query.returns<CardRecord[]>();
+    return await query.returns<CardRecord[]>();
+  });
 }
 
 export async function searchCards(input?: {
@@ -87,7 +107,9 @@ export async function searchCards(input?: {
 }
 
 export async function loadCard(cardId: string) {
-  return await supabase.from("cards").select("*").eq("id", cardId).maybeSingle();
+  return await withSupabaseRetry(() =>
+    supabase.from("cards").select("*").eq("id", cardId).maybeSingle()
+  );
 }
 
 export async function createCard(input: CreateCardInput) {

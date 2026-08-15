@@ -1,34 +1,74 @@
-﻿import { supabase } from "@/lib/supabase/client";
-import type { DeckCardRecord, DeckEraKey, DeckRecord, DeckVisibility } from "@/types/baddiePhyto";
+import { supabase, withSupabaseRetry } from "@/lib/supabase/client";
+import type {
+  DeckCardRecord,
+  DeckEraKey,
+  DeckRecord,
+  DeckVisibility
+} from "@/types/baddiePhyto";
+
+const DECK_COLUMNS =
+  "id, owner_id, name, flag_id, buddy_card_id, selected_flag_image_id, deck_visibility, era_key, created_at, updated_at";
 
 export async function loadDecks() {
-  return await supabase
-    .from("decks")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .returns<DeckRecord[]>();
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("decks")
+      .select(DECK_COLUMNS)
+      .order("updated_at", { ascending: false })
+      .returns<DeckRecord[]>()
+  );
 }
 
 export async function loadDeck(deckId: string) {
-  return await supabase.from("decks").select("*").eq("id", deckId).maybeSingle<DeckRecord>();
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("decks")
+      .select(DECK_COLUMNS)
+      .eq("id", deckId)
+      .maybeSingle<DeckRecord>()
+  );
 }
 
 export async function loadDeckCards(deckId: string) {
-  return await supabase
-    .from("deck_cards")
-    .select("*")
-    .eq("deck_id", deckId)
-    .order("sort_order")
-    .returns<DeckCardRecord[]>();
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("deck_cards")
+      .select("*")
+      .eq("deck_id", deckId)
+      .order("sort_order")
+      .returns<DeckCardRecord[]>()
+  );
 }
 
 export async function loadAllDeckCards() {
-  return await supabase
-    .from("deck_cards")
-    .select("*")
-    .order("deck_id")
-    .order("sort_order")
-    .returns<DeckCardRecord[]>();
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("deck_cards")
+      .select("*")
+      .order("deck_id")
+      .order("sort_order")
+      .returns<DeckCardRecord[]>()
+  );
+}
+
+export async function loadDeckCardsByDeckIds(deckIds: string[]) {
+  const normalizedIds = [...new Set(deckIds.filter(Boolean))];
+  if (normalizedIds.length === 0) {
+    return {
+      data: [] as DeckCardRecord[],
+      error: null
+    };
+  }
+
+  return await withSupabaseRetry(() =>
+    supabase
+      .from("deck_cards")
+      .select("*")
+      .in("deck_id", normalizedIds)
+      .order("deck_id")
+      .order("sort_order")
+      .returns<DeckCardRecord[]>()
+  );
 }
 
 export async function createDeck(input: {
@@ -43,7 +83,7 @@ export async function createDeck(input: {
     p_flag_id: input.flagId,
     p_buddy_card_id: input.buddyCardId,
     p_deck_visibility: input.deckVisibility ?? "private",
-    p_era_key: input.eraKey ?? null,
+    p_era_key: input.eraKey ?? null
   });
 }
 
@@ -56,7 +96,7 @@ export async function createDraftDeck(input?: {
   if (userError || !userData.user) {
     return {
       data: null,
-      error: userError ?? new Error("ログインが必要です。"),
+      error: userError ?? new Error("ログインが必要です。")
     };
   }
 
@@ -69,7 +109,7 @@ export async function createDraftDeck(input?: {
       buddy_card_id: null,
       selected_flag_image_id: null,
       deck_visibility: input?.deckVisibility ?? "private",
-      era_key: input?.eraKey ?? null,
+      era_key: input?.eraKey ?? null
     })
     .select("id")
     .single<{ id: string }>();
@@ -92,10 +132,10 @@ export async function updateDeckSettings(input: {
       buddy_card_id: input.buddyCardId,
       selected_flag_image_id: input.selectedFlagImageId,
       deck_visibility: input.deckVisibility,
-      era_key: input.eraKey ?? null,
+      era_key: input.eraKey ?? null
     })
     .eq("id", input.deckId)
-    .select("*")
+    .select(DECK_COLUMNS)
     .single<DeckRecord>();
 }
 
@@ -111,7 +151,7 @@ export async function setDeckCard(input: {
     p_card_id: input.cardId,
     p_quantity: input.quantity,
     p_sort_order: input.sortOrder,
-    p_selected_image_id: input.selectedImageId,
+    p_selected_image_id: input.selectedImageId
   });
 }
 
