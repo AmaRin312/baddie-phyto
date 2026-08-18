@@ -9,6 +9,12 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
+import {
+  readCachedDeckCards,
+  readDeckEntryCache,
+  writeCachedDeckCards,
+  writeDeckEntryCache
+} from "@/lib/decks/deckEntryCache";
 import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlagsByIds } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
@@ -75,6 +81,14 @@ function BattleEntryPage() {
       }
 
       setCurrentUserId(profile.id);
+      const cachedEntry = readDeckEntryCache();
+      if (cachedEntry) {
+        setDecks(cachedEntry.decks);
+        setFlags(cachedEntry.flags);
+        setCards(cachedEntry.cards);
+        setImages(cachedEntry.images);
+        setLoading(false);
+      }
 
       const deckResult = await loadDecks();
 
@@ -98,17 +112,32 @@ function BattleEntryPage() {
           cardResult.error ??
           imageResult.error;
         console.error(targetError);
-        setMessage(
-          getSupabaseLoadErrorMessage(
-            targetError,
-            "対戦開始に必要なデッキ情報の読み込みに失敗しました。"
-          )
-        );
+        if (cachedEntry) {
+          setMessage(
+            `${getSupabaseLoadErrorMessage(
+              targetError,
+              "対戦開始に必要なデッキ情報の読み込みに失敗しました。"
+            )} 保存済みのデッキ一覧を表示しています。`
+          );
+        } else {
+          setMessage(
+            getSupabaseLoadErrorMessage(
+              targetError,
+              "対戦開始に必要なデッキ情報の読み込みに失敗しました。"
+            )
+          );
+        }
       } else {
         setDecks(deckResult.data ?? []);
         setFlags(flagResult.data ?? []);
         setCards(cardResult.data ?? []);
         setImages(imageResult.data ?? []);
+        writeDeckEntryCache({
+          decks: deckResult.data ?? [],
+          flags: flagResult.data ?? [],
+          cards: cardResult.data ?? [],
+          images: imageResult.data ?? []
+        });
       }
 
       setLoading(false);
@@ -133,15 +162,28 @@ function BattleEntryPage() {
 
       if (result.error) {
         console.error(result.error);
-        setMessage(
-          getSupabaseLoadErrorMessage(
-            result.error,
-            "選択したデッキ内容の読み込みに失敗しました。"
-          )
-        );
-        setSelectedDeckCards([]);
+        const cachedDeckCards = readCachedDeckCards(selectedDeckId);
+        if (cachedDeckCards) {
+          setMessage(
+            `${getSupabaseLoadErrorMessage(
+              result.error,
+              "選択したデッキ内容の読み込みに失敗しました。"
+            )} 保存済みのデッキ内容を表示しています。`
+          );
+          setSelectedDeckCards(cachedDeckCards);
+        } else {
+          setMessage(
+            getSupabaseLoadErrorMessage(
+              result.error,
+              "選択したデッキ内容の読み込みに失敗しました。"
+            )
+          );
+          setSelectedDeckCards([]);
+        }
       } else {
-        setSelectedDeckCards(result.data ?? []);
+        const nextDeckCards = result.data ?? [];
+        setSelectedDeckCards(nextDeckCards);
+        writeCachedDeckCards(selectedDeckId, nextDeckCards);
       }
 
       setSelectedDeckCardsLoading(false);

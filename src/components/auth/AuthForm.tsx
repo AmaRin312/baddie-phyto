@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -8,75 +7,62 @@ type AuthMode = "login" | "signup";
 
 type AuthFormProps = {
   mode: AuthMode;
+  initialMessage?: string;
 };
 
-export function AuthForm({ mode }: AuthFormProps) {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+const MODE_TEXT: Record<AuthMode, { button: string; helper: string }> = {
+  login: {
+    button: "Discordでログイン",
+    helper: "Discordアカウントでログインします。"
+  },
+  signup: {
+    button: "Discordで登録",
+    helper: "Discordアカウントでアカウント登録します。"
+  }
+};
+
+export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
+  const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
 
-  const isLogin = mode === "login";
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleDiscordLogin() {
     setLoading(true);
     setMessage("");
 
-    const result = isLogin
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/home`
-          }
-        });
+    const redirectTo =
+      typeof window === "undefined"
+        ? undefined
+        : `${window.location.origin}/auth/callback`;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "discord",
+      options: {
+        redirectTo
+      }
+    });
 
     setLoading(false);
 
-    if (result.error) {
-      setMessage(result.error.message);
+    if (error) {
+      setMessage(error.message);
       return;
     }
-
-    if (isLogin || result.data.session) {
-      router.replace("/home");
-      return;
-    }
-
-    setMessage("確認メールを送信しました。メール内のリンクから認証してください。");
   }
 
   return (
-    <form className="dm-auth-form" onSubmit={handleSubmit}>
-      <label>
-        メールアドレス
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
-      </label>
+    <div className="dm-auth-form">
+      <p className="dm-muted-text">{MODE_TEXT[mode].helper}</p>
 
-      <label>
-        パスワード
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-          minLength={6}
-        />
-      </label>
-
-      <button className="dm-button primary" type="submit" disabled={loading}>
-        {loading ? "処理中..." : isLogin ? "ログイン" : "アカウント登録"}
+      <button
+        className="dm-button primary"
+        type="button"
+        disabled={loading}
+        onClick={handleDiscordLogin}
+      >
+        {loading ? "Discordへ移動中..." : MODE_TEXT[mode].button}
       </button>
 
       {message && <p className="dm-form-message">{message}</p>}
-    </form>
+    </div>
   );
 }

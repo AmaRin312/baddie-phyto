@@ -12,6 +12,10 @@ import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCards } from "@/lib/cards/cardActions";
 import {
+  mergeDeckEntryCacheDeck,
+  writeCachedDeckCards
+} from "@/lib/decks/deckEntryCache";
+import {
   loadDeck,
   loadDeckCards,
   setDeckCard,
@@ -156,6 +160,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setImages(imageResult.data ?? []);
     setCardPrintings(printingSearchResult.printings);
     setCardSets(printingSearchResult.sets);
+    writeCachedDeckCards(currentDeckId, nextDeckCards);
     setLoading(false);
   }, []);
 
@@ -324,6 +329,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       return;
     }
 
+    mergeDeckEntryCacheDeck(settingsResult.data);
     const draftMap = createDeckCardDraftMap(draftDeckCards);
     const savedMap = createDeckCardDraftMap(savedDeckCardDrafts);
     const cardIds = Array.from(new Set([...draftMap.keys(), ...savedMap.keys()]));
@@ -356,6 +362,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         return;
       }
     }
+
+    writeCachedDeckCards(
+      deck.id,
+      draftDeckCards
+        .filter((item) => item.quantity > 0)
+        .map((item) => ({
+          id: `${deck.id}:${item.cardId}`,
+          deck_id: deck.id,
+          card_id: item.cardId,
+          quantity: item.quantity,
+          sort_order: item.sortOrder,
+          selected_image_id: item.selectedImageId,
+          created_at: "",
+          updated_at: ""
+        }))
+    );
 
     setSavingDeck(false);
     router.push("/decks");

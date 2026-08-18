@@ -78,6 +78,7 @@ import {
   loadDeckCardsByDeckIds,
   loadDecks
 } from "@/lib/decks/deckActions";
+import { readCachedDeckCards, readDeckEntryCache } from "@/lib/decks/deckEntryCache";
 import { loadFlag } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import { loadShortcutSettings } from "@/lib/shortcuts/shortcutSettings";
@@ -506,6 +507,17 @@ export function BattleController() {
       if ((deckCardsResult.error || !resolvedDeckCards) && !fallbackDeckCardsResult.error) {
         resolvedDeckCards = fallbackDeckCardsResult.data ?? [];
       }
+    }
+
+    const cachedEntry = readDeckEntryCache();
+    const cachedDeckCards = readCachedDeckCards(deckId);
+
+    if (!resolvedDeck && cachedEntry) {
+      resolvedDeck = cachedEntry.decks.find((deck) => deck.id === deckId) ?? null;
+    }
+
+    if ((deckCardsResult.error || !resolvedDeckCards) && cachedDeckCards) {
+      resolvedDeckCards = cachedDeckCards;
     }
 
     if (!resolvedDeck || resolvedDeckCards == null) {

@@ -10,6 +10,14 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
+  mergeDeckEntryCacheDeck,
+  readDeckEntryCache,
+  removeCachedDeckCards,
+  removeDeckEntryCacheDeck,
+  writeCachedDeckCards,
+  writeDeckEntryCache
+} from "@/lib/decks/deckEntryCache";
+import {
   createDraftDeck,
   deleteDeck,
   loadDeckCards,
@@ -195,6 +203,14 @@ export default function DecksPage() {
       }
 
       setCurrentUserId(profile.id);
+      const cachedEntry = readDeckEntryCache();
+      if (cachedEntry) {
+        setDecks(cachedEntry.decks);
+        setFlags(cachedEntry.flags);
+        setCards(cachedEntry.cards);
+        setImages(cachedEntry.images);
+        setLoading(false);
+      }
 
       const deckResult = await loadDecks();
 
@@ -218,12 +234,29 @@ export default function DecksPage() {
           cardResult.error ??
           imageResult.error;
         console.error(targetError);
-        setMessage(getSupabaseLoadErrorMessage(targetError, "デッキ情報の読み込みに失敗しました。"));
+        if (cachedEntry) {
+          setMessage(
+            `${getSupabaseLoadErrorMessage(
+              targetError,
+              "デッキ情報の読み込みに失敗しました。"
+            )} 保存済みのデッキ一覧を表示しています。`
+          );
+        } else {
+          setMessage(
+            getSupabaseLoadErrorMessage(targetError, "デッキ情報の読み込みに失敗しました。")
+          );
+        }
       } else {
         setDecks(deckResult.data ?? []);
         setFlags(flagResult.data ?? []);
         setCards(cardResult.data ?? []);
         setImages(imageResult.data ?? []);
+        writeDeckEntryCache({
+          decks: deckResult.data ?? [],
+          flags: flagResult.data ?? [],
+          cards: cardResult.data ?? [],
+          images: imageResult.data ?? []
+        });
       }
 
       setLoading(false);
@@ -283,6 +316,9 @@ export default function DecksPage() {
         setPreviewDeckCards(nextDeckCards);
         setPreviewCards(cardResult.data ?? []);
         setPreviewImages(imageResult.data ?? []);
+        if (previewDeckId) {
+          writeCachedDeckCards(previewDeckId, nextDeckCards);
+        }
       }
 
       setPreviewLoading(false);
@@ -369,6 +405,10 @@ export default function DecksPage() {
       return;
     }
 
+    if (settingsResult.data) {
+      mergeDeckEntryCacheDeck(settingsResult.data);
+    }
+
     for (const sourceCard of sourceCards) {
       const result = await setDeckCard({
         deckId: nextDeckId,
@@ -385,6 +425,8 @@ export default function DecksPage() {
         return;
       }
     }
+
+    writeCachedDeckCards(nextDeckId, sourceCards);
 
     router.push(`/decks/${nextDeckId}`);
   }
@@ -406,6 +448,8 @@ export default function DecksPage() {
     }
 
     setDecks((current) => current.filter((item) => item.id !== deck.id));
+    removeDeckEntryCacheDeck(deck.id);
+    removeCachedDeckCards(deck.id);
     setPreviewDeckId(null);
     setDeletingDeckId(null);
   }
