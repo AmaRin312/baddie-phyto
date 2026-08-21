@@ -27,6 +27,12 @@ export function AuthCallbackClient() {
       }
 
       if (!code) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          router.replace("/home");
+          return;
+        }
+
         router.replace(
           `/login?message=${encodeURIComponent("Discordログイン情報を取得できませんでした。")}`
         );
@@ -41,6 +47,14 @@ export function AuthCallbackClient() {
 
       if (error) {
         router.replace(`/login?message=${encodeURIComponent(error.message)}`);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        router.replace(
+          `/login?message=${encodeURIComponent("ログインセッションの取得に失敗しました。")}`
+        );
         return;
       }
 

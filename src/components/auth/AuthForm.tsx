@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
@@ -22,8 +23,37 @@ const MODE_TEXT: Record<AuthMode, { button: string; helper: string }> = {
 };
 
 export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
+  const router = useRouter();
   const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function redirectIfAuthenticated() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (data.session) {
+        router.replace("/home");
+      }
+    }
+
+    void redirectIfAuthenticated();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "SIGNED_IN" && session) {
+        router.replace("/home");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   async function handleDiscordLogin() {
     setLoading(true);
