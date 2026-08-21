@@ -2376,8 +2376,8 @@ select {
   --bf-red: #dc2626;
   --bf-card-back: linear-gradient(145deg, #020617, #1e3a8a 55%, #020617);
   --bf-sidebar-width: 210px;
-  --bf-right-panel-width: 780px;
-  --bf-col-gauge: 92px;
+  --bf-right-panel-width: 860px;
+  --bf-col-gauge: 116px;
   --bf-col-main: 116px;
   --bf-col-side: 116px;
   --bf-battle-card-w: 112px;
@@ -2550,6 +2550,7 @@ select {
 .bf-zone-gauge {
   grid-area: gauge;
   justify-self: end;
+  transform: translateX(-50px);
 }
 
 .bf-zone-item {
@@ -2557,8 +2558,9 @@ select {
   min-height: 130px;
   align-self: start;
   justify-self: center;
-  transform: translateY(-118%);
-  z-index: 3;
+  width: calc(var(--bf-battle-card-w) * 2);
+  transform: translateY(-118px);
+  z-index: 4;
 }
 
 .bf-zone-left {
@@ -2566,15 +2568,15 @@ select {
   min-height: 60px;
   max-height: 86px;
   width: var(--bf-battle-card-w);
-  transform: translateY(8%);
+  transform: translateY(12px);
 }
 
 .bf-zone-center {
   grid-area: center;
   min-height: 60px;
   max-height: 86px;
-  width: calc(var(--bf-battle-card-w) * 2 + 12px);
-  transform: translateY(8%);
+  width: calc(var(--bf-battle-card-w) * 2);
+  transform: translateY(-8px);
 }
 
 .bf-zone-right {
@@ -2582,7 +2584,7 @@ select {
   min-height: 60px;
   max-height: 86px;
   width: var(--bf-battle-card-w);
-  transform: translateY(8%);
+  transform: translateY(12px);
 }
 
 .bf-zone-resolution {
@@ -2590,14 +2592,14 @@ select {
   min-height: 92px;
   max-height: 120px;
   padding: 18px 8px 8px;
-  transform: translateY(-90%);
+  transform: translateY(-132%);
 }
 
 .bf-zone-drop {
   grid-area: drop;
   min-height: 60px;
   max-height: 86px;
-  transform: translateY(40%);
+  transform: translateY(22px);
 }
 
 .bf-zone-set {
@@ -2631,7 +2633,7 @@ select {
   min-height: 130px;
   align-self: end;
   justify-self: center;
-  transform: translateY(0);
+  transform: translateY(-16px);
   z-index: 1;
 }
 
@@ -2735,11 +2737,16 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0;
 }
 
 .bf-zone-center .bf-area-stack-zone {
-  width: calc(var(--bf-battle-card-w) * 2 + 12px);
+  width: calc(var(--bf-battle-card-w) * 2);
+  justify-content: center;
+}
+
+.bf-zone-item .bf-area-stack-zone {
+  width: calc(var(--bf-battle-card-w) * 2);
   justify-content: center;
 }
 
@@ -2970,7 +2977,7 @@ select {
   height: calc(100vh - 20px);
   min-height: calc(100vh - 20px);
   display: grid;
-  grid-template-rows: 108px 1fr 360px;
+  grid-template-rows: 108px 1fr 390px;
   gap: 10px;
   overflow: hidden;
 }
@@ -3027,9 +3034,9 @@ select {
 }
 
 .bf-hand-row.is-self .bf-hand-card-button {
-  width: 174px;
-  height: 248px;
-  margin-right: -48px;
+  width: 188px;
+  height: 268px;
+  margin-right: -44px;
   border-radius: 10px;
 }
 

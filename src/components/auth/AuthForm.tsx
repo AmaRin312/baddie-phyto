@@ -34,19 +34,26 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
         ? undefined
         : `${window.location.origin}/auth/callback`;
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: {
         redirectTo
       }
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setMessage(error.message);
       return;
     }
+
+    if (data?.url && typeof window !== "undefined") {
+      window.location.assign(data.url);
+      return;
+    }
+
+    setLoading(false);
+    setMessage("DiscordログインURLを取得できませんでした。Supabase の Discord Provider 設定を確認してください。");
   }
 
   return (

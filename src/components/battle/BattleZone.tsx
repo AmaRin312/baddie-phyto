@@ -13,6 +13,7 @@ import {
   getAreaStacks,
   isAreaStackZone
 } from "@/lib/battle/battleActions";
+import { getBattleCardPresentation } from "@/lib/battle/battleCardPresentation";
 import { getCompositeGroupCards } from "@/lib/battle/compositeCards";
 import type { BattleCard, BattleDropInput, BattleZoneId } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
@@ -65,10 +66,6 @@ const GAUGE_ROW_OFFSET = 18;
 
 function shouldShowFace(card: BattleCard) {
   return card.visibility !== "face_down";
-}
-
-function getBattleCardBaseOrientation(card: BattleCard) {
-  return card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical";
 }
 
 export function BattleZone({
@@ -140,7 +137,7 @@ export function BattleZone({
 
   useEffect(() => {
     const resetTimerId =
-      draggedCard == null
+      draggedSingleCard == null
         ? window.setTimeout(() => setHeldStackId(null), 0)
         : null;
 
@@ -154,7 +151,7 @@ export function BattleZone({
         holdTimerRef.current = null;
       }
     };
-  }, [draggedCard]);
+  }, [draggedSingleCard]);
 
   function clearHoldTimer() {
     if (holdTimerRef.current == null) return;
@@ -216,19 +213,12 @@ export function BattleZone({
   ) {
     const isSelected = selectedInstanceIds.has(battleCard.instanceId);
     const isDragging = draggedSingleCard?.instanceId === battleCard.instanceId;
-    const baseOrientation = getBattleCardBaseOrientation(battleCard);
-    const isRotated =
-      !rotateCard &&
-      ((baseOrientation === "vertical" && battleCard.orientation === "horizontal") ||
-        (baseOrientation === "horizontal" && battleCard.orientation === "vertical"));
-    const isHorizontalBase =
-      rotateCard ||
-      (baseOrientation === "horizontal" && battleCard.orientation === "horizontal");
+    const presentation = getBattleCardPresentation(battleCard, { rotateCard });
 
     return (
       <button
         type="button"
-        className={`${className}${isRotated ? " is-rotated" : ""}${isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}`}
+        className={`${className}${presentation.isRotated ? " is-rotated" : ""}${presentation.isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}`}
         style={input?.style}
         draggable={canDragBattleCard({ card: battleCard, playerId })}
         onDragEnter={input?.onDragEnter}
@@ -262,7 +252,7 @@ export function BattleZone({
           selectedImageId={battleCard.selectedImageId}
           isPublic={input?.forceFaceDown ? false : shouldShowFace(battleCard)}
           variant="board"
-          displayOrientation={rotateCard ? "horizontal" : baseOrientation}
+          displayOrientation={presentation.displayOrientation}
         />
         {input?.badge}
       </button>
@@ -342,23 +332,15 @@ export function BattleZone({
             const isSelected = selectedInstanceIds.has(areaTopCard.instanceId);
             const isDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
-            const baseOrientation = getBattleCardBaseOrientation(areaTopCard);
-            const isRotated =
-              !rotateCard &&
-              ((baseOrientation === "vertical" &&
-                areaTopCard.orientation === "horizontal") ||
-                (baseOrientation === "horizontal" &&
-                  areaTopCard.orientation === "vertical"));
-            const isHorizontalBase =
-              rotateCard ||
-              (baseOrientation === "horizontal" &&
-                areaTopCard.orientation === "horizontal");
+            const presentation = getBattleCardPresentation(areaTopCard, {
+              rotateCard,
+            });
 
             return (
               <button
                 key={areaStack.stackId}
                 type="button"
-                className={`bf-card-button bf-area-stack-card${isRotated ? " is-rotated" : ""}${isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${presentation.isRotated ? " is-rotated" : ""}${presentation.isHorizontalBase ? " is-horizontal-base" : ""}${isSelected ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
                 onDragLeave={() => handleAreaStackDragLeave(areaStack.stackId)}
@@ -410,7 +392,7 @@ export function BattleZone({
                     selectedImageId={areaTopCard.selectedImageId}
                     isPublic={shouldShowFace(areaTopCard)}
                     variant="board"
-                    displayOrientation={baseOrientation}
+                    displayOrientation={presentation.displayOrientation}
                   />
                 )}
                 {areaStack.cards.length > 1 && (

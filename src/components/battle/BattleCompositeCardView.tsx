@@ -2,6 +2,7 @@
 
 import { BoardCard } from "@/components/cards/BoardCard";
 import { CardViewer } from "@/components/cards/CardViewer";
+import { getBattleCardPresentation } from "@/lib/battle/battleCardPresentation";
 import { getBattleCompositeRole } from "@/lib/battle/compositeCards";
 import type { BattleCard } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
@@ -18,10 +19,6 @@ function getRoleLabel(card: BattleCard) {
   if (role === "heaven") return "天";
   if (role === "earth") return "地";
   return "";
-}
-
-function getDisplayOrientation(card: BattleCard) {
-  return card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical";
 }
 
 export function BattleCompositeCardView({
@@ -42,8 +39,8 @@ export function BattleCompositeCardView({
 
   if (visibleCards.length === 0) return null;
 
-  const isHorizontal = visibleCards.some(
-    ({ battleCard }) => battleCard.orientation === "horizontal",
+  const isHorizontal = visibleCards.some(({ battleCard }) =>
+    getBattleCardPresentation(battleCard).displayOrientation === "horizontal",
   );
 
   return (
@@ -63,7 +60,7 @@ export function BattleCompositeCardView({
               selectedImageId={battleCard.selectedImageId}
               isPublic={battleCard.visibility !== "face_down"}
               variant="board"
-              displayOrientation={getDisplayOrientation(battleCard)}
+              displayOrientation={getBattleCardPresentation(battleCard).displayOrientation}
             />
           ) : (
             <CardViewer
@@ -71,7 +68,7 @@ export function BattleCompositeCardView({
               images={imagesByCard.get(cardRecord.id) ?? []}
               selectedImageId={battleCard.selectedImageId}
               faceDown={battleCard.visibility === "face_down"}
-              displayOrientation={getDisplayOrientation(battleCard)}
+              displayOrientation={getBattleCardPresentation(battleCard).displayOrientation}
             />
           )}
         </div>

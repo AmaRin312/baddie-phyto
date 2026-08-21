@@ -6,6 +6,7 @@ import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCard
 import { SoulCardList } from "@/components/battle/SoulCardList";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { CardViewer } from "@/components/cards/CardViewer";
+import { getBattleCardPresentation } from "@/lib/battle/battleCardPresentation";
 import {
   canDragBattleCard,
   canDropMultipleCards,
@@ -241,9 +242,7 @@ function BattleSidebarComponent({
         card={cardRecord}
         images={imagesByCard.get(cardRecord.id) ?? []}
         selectedImageId={card.selectedImageId}
-        displayOrientation={
-          card.meta.baseOrientation === "horizontal" ? "horizontal" : "vertical"
-        }
+        displayOrientation={getBattleCardPresentation(card).displayOrientation}
       />
     );
   }
