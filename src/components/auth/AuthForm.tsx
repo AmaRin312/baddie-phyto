@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -24,13 +24,41 @@ const MODE_TEXT: Record<AuthMode, { button: string; helper: string }> = {
 
 export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    async function redirectIfAuthenticated() {
+    async function resolveAuthState() {
+      const code = searchParams.get("code");
+      const errorDescription = searchParams.get("error_description");
+      const errorCode = searchParams.get("error");
+      const nextPath = searchParams.get("next") || "/home";
+
+      if (errorCode || errorDescription) {
+        if (!mounted) return;
+        setMessage(errorDescription ?? "Discordログインに失敗しました。");
+        return;
+      }
+
+      if (code) {
+        setLoading(true);
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!mounted) return;
+
+        if (error) {
+          setLoading(false);
+          setMessage(error.message);
+          return;
+        }
+
+        router.replace(nextPath);
+        return;
+      }
+
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       if (data.session) {
@@ -38,7 +66,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
       }
     }
 
-    void redirectIfAuthenticated();
+    void resolveAuthState();
 
     const {
       data: { subscription },
@@ -53,7 +81,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   async function handleDiscordLogin() {
     setLoading(true);
