@@ -1,85 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
 
 type AuthFormProps = {
   mode: AuthMode;
+  initialMessage?: string;
 };
 
-export function AuthForm({ mode }: AuthFormProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+const MODE_TEXT: Record<AuthMode, { button: string; helper: string }> = {
+  login: {
+    button: "Discordでログイン",
+    helper: "Discordアカウントでログインします。"
+  },
+  signup: {
+    button: "Discordで登録",
+    helper: "Discordアカウントでアカウント登録します。"
+  }
+};
+
+export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
+  const router = useRouter();
+  const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
 
-  const isLogin = mode === "login";
+  useEffect(() => {
+    let mounted = true;
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    async function redirectIfAuthenticated() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (data.session) {
+        router.replace("/home");
+      }
+    }
+
+    void redirectIfAuthenticated();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "SIGNED_IN" && session) {
+        router.replace("/home");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
+  async function handleDiscordLogin() {
     setLoading(true);
     setMessage("");
 
-    const result = isLogin
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/home`
-          }
-        });
+    const redirectTo =
+      typeof window === "undefined"
+        ? undefined
+        : `${window.location.origin}/auth/callback?next=${encodeURIComponent("/home")}`;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "discord",
+      options: {
+        redirectTo,
+        scopes: "identify email"
+      }
+    });
+
+    if (error) {
+      setLoading(false);
+      setMessage(error.message);
+      return;
+    }
+
+    if (data?.url && typeof window !== "undefined") {
+      window.location.assign(data.url);
+      return;
+    }
 
     setLoading(false);
-
-    if (result.error) {
-      setMessage(result.error.message);
-      return;
-    }
-
-    if (isLogin) {
-      window.location.href = "/home";
-      return;
-    }
-
-    if (result.data.session) {
-      window.location.href = "/home";
-      return;
-    }
-
-    setMessage("確認メールを送信しました。メール内のリンクから認証してください。");
+    setMessage("DiscordログインURLを取得できませんでした。Supabase の Discord Provider 設定を確認してください。");
   }
 
   return (
-    <form className="dm-auth-form" onSubmit={handleSubmit}>
-      <label>
-        メールアドレス
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
-      </label>
+    <div className="dm-auth-form">
+      <p className="dm-muted-text">{MODE_TEXT[mode].helper}</p>
 
-      <label>
-        パスワード
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-          minLength={6}
-        />
-      </label>
-
-      <button className="dm-button primary" type="submit" disabled={loading}>
-        {loading ? "処理中..." : isLogin ? "ログイン" : "アカウント作成"}
+      <button
+        className="dm-button primary"
+        type="button"
+        disabled={loading}
+        onClick={handleDiscordLogin}
+      >
+        {loading ? "Discordへ移動中..." : MODE_TEXT[mode].button}
       </button>
 
       {message && <p className="dm-form-message">{message}</p>}
-    </form>
+    </div>
   );
 }
