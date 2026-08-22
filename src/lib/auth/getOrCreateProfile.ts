@@ -13,6 +13,14 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
 
   if (userError || !userData.user) return null;
 
+  const fallbackProfile: Profile = {
+    id: userData.user.id,
+    email: userData.user.email ?? null,
+    nickname: null,
+    created_at: userData.user.created_at ?? new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
@@ -20,8 +28,8 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     .maybeSingle();
 
   if (error) {
-    console.error(error);
-    return null;
+    console.warn("profiles read failed; using auth user as fallback profile.", error);
+    return fallbackProfile;
   }
 
   if (data) return data as Profile;
@@ -37,8 +45,11 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     .single();
 
   if (insertError) {
-    console.error(insertError);
-    return null;
+    console.warn(
+      "profiles insert failed; using auth user as fallback profile.",
+      insertError
+    );
+    return fallbackProfile;
   }
 
   return inserted as Profile;
