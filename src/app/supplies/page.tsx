@@ -86,16 +86,20 @@ export default function SuppliesPage() {
       loadBattleSupplySettings(userId)
     ]);
 
-    if (supplyResult.error || settingsResult.error) {
-      console.error(supplyResult.error ?? settingsResult.error);
-      setMessage(
-        "サプライ情報の読み込みに失敗しました。battle_supplies SQL が未適用の可能性があります。"
-      );
-      return;
+    if (supplyResult.error) {
+      console.warn("battle_supplies is not available yet.", supplyResult.error);
+      setSupplies([]);
+      setMessage("サプライ機能はまだ未設定です。必要なら SQL を適用してください。");
+    } else {
+      setSupplies(supplyResult.data ?? []);
     }
 
-    setSupplies(supplyResult.data ?? []);
-    setSettings(settingsResult.data ?? null);
+    if (settingsResult.error) {
+      console.warn("battle_supply_settings is not available yet.", settingsResult.error);
+      setSettings(null);
+    } else {
+      setSettings(settingsResult.data ?? null);
+    }
   }
 
   useEffect(() => {

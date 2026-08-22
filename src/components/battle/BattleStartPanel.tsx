@@ -145,7 +145,7 @@ export function BattleStartPanel() {
 
       setCurrentUserId(profile.id);
       const [deckResult, deckCardResult, flagResult, cardResult, imageResult] =
-        await Promise.all([
+        await Promise.allSettled([
           loadDecks(),
           loadAllDeckCards(),
           loadFlags(),
@@ -153,27 +153,28 @@ export function BattleStartPanel() {
           loadCardImages()
         ]);
 
-      if (
-        deckResult.error ||
-        deckCardResult.error ||
-        flagResult.error ||
-        cardResult.error ||
-        imageResult.error
-      ) {
-        console.error(
-          deckResult.error ??
-            deckCardResult.error ??
-            flagResult.error ??
-            cardResult.error ??
-            imageResult.error
-        );
+      const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
+      const deckCardsResponse =
+        deckCardResult.status === "fulfilled" ? deckCardResult.value : null;
+      const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
+      const cardsResponse = cardResult.status === "fulfilled" ? cardResult.value : null;
+      const imagesResponse = imageResult.status === "fulfilled" ? imageResult.value : null;
+
+      if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
+        console.error(decksResponse?.error ?? deckCardsResponse?.error);
         setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
-        setDecks((deckResult.data ?? []) as DeckRecord[]);
-        setDeckCards(deckCardResult.data ?? []);
-        setFlags(flagResult.data ?? []);
-        setCards((cardResult.data ?? []) as CardRecord[]);
-        setImages(imageResult.data ?? []);
+        setDecks((decksResponse.data ?? []) as DeckRecord[]);
+        setDeckCards(deckCardsResponse.data ?? []);
+        setFlags(flagsResponse?.error ? [] : flagsResponse?.data ?? []);
+        setCards((cardsResponse?.error ? [] : (cardsResponse?.data ?? [])) as CardRecord[]);
+        setImages(imagesResponse?.error ? [] : imagesResponse?.data ?? []);
+        if (flagsResponse?.error || cardsResponse?.error || imagesResponse?.error) {
+          console.warn(
+            "Optional battle-start metadata failed to load.",
+            flagsResponse?.error ?? cardsResponse?.error ?? imagesResponse?.error
+          );
+        }
       }
 
       await refreshRooms();

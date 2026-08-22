@@ -8,23 +8,47 @@ export type Profile = {
   updated_at: string;
 };
 
-export async function getOrCreateProfile(): Promise<Profile | null> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (userError || !userData.user) return null;
+async function getAuthenticatedUser() {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (!userError && userData.user) {
+      return { user: userData.user, error: null };
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.user) {
+      return { user: sessionData.session.user, error: null };
+    }
+
+    if (attempt < 3) {
+      await wait(250 * (attempt + 1));
+    }
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  return { user: userData.user ?? null, error: userError ?? null };
+}
+
+export async function getOrCreateProfile(): Promise<Profile | null> {
+  const { user, error: userError } = await getAuthenticatedUser();
+  if (userError || !user) return null;
 
   const fallbackProfile: Profile = {
-    id: userData.user.id,
-    email: userData.user.email ?? null,
+    id: user.id,
+    email: user.email ?? null,
     nickname: null,
-    created_at: userData.user.created_at ?? new Date().toISOString(),
+    created_at: user.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
 
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", userData.user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (error) {
@@ -37,8 +61,8 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
   const { data: inserted, error: insertError } = await supabase
     .from("profiles")
     .insert({
-      id: userData.user.id,
-      email: userData.user.email ?? null,
+      id: user.id,
+      email: user.email ?? null,
       nickname: null
     })
     .select("*")

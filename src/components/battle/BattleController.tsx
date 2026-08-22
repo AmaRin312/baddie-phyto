@@ -430,7 +430,7 @@ export function BattleController() {
       supplySettingsResult,
       roomResult
     ] =
-      await Promise.all([
+      await Promise.allSettled([
         loadDeck(deckId),
         loadDeckCards(deckId),
         loadCards(),
@@ -439,36 +439,43 @@ export function BattleController() {
         loadBattleCardAbilityMap(),
         loadBattleSupplies(),
         loadBattleSupplySettings(profile.id),
-        isRealtimeBattle ? loadBattleRoom(roomId) : { data: null, error: null }
+        isRealtimeBattle ? loadBattleRoom(roomId) : Promise.resolve({ data: null, error: null })
       ]);
 
+    const deckResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
+    const deckCardsResponse =
+      deckCardsResult.status === "fulfilled" ? deckCardsResult.value : null;
+    const cardResponse = cardResult.status === "fulfilled" ? cardResult.value : null;
+    const imageResponse = imageResult.status === "fulfilled" ? imageResult.value : null;
+    const shortcutResponse =
+      shortcutResult.status === "fulfilled" ? shortcutResult.value : null;
+    const abilityMapResponse =
+      abilityMapResult.status === "fulfilled" ? abilityMapResult.value : null;
+    const supplyResponse = supplyResult.status === "fulfilled" ? supplyResult.value : null;
+    const supplySettingsResponse =
+      supplySettingsResult.status === "fulfilled" ? supplySettingsResult.value : null;
+    const roomResponse = roomResult.status === "fulfilled" ? roomResult.value : null;
+
     if (
-      deckResult.error ||
-      deckCardsResult.error ||
-      cardResult.error ||
-      imageResult.error ||
-      abilityMapResult.error ||
-      !deckResult.data
+      !deckResponse ||
+      !deckCardsResponse ||
+      deckResponse.error ||
+      deckCardsResponse.error ||
+      !deckResponse.data
     ) {
-      console.error(
-        deckResult.error ??
-          deckCardsResult.error ??
-          cardResult.error ??
-          imageResult.error ??
-          abilityMapResult.error
-      );
+      console.error(deckResponse?.error ?? deckCardsResponse?.error);
       setMessage("Battle開始に必要なデッキ情報の読み込みに失敗しました。");
       setLoading(false);
       return;
     }
 
-    if (!deckResult.data.flag_id || !deckResult.data.buddy_card_id) {
+    if (!deckResponse.data.flag_id || !deckResponse.data.buddy_card_id) {
       setMessage("Battle開始には、デッキ編集画面でフラッグとバディを選択してください。");
       setLoading(false);
       return;
     }
 
-    const flagResult = await loadFlag(deckResult.data.flag_id);
+    const flagResult = await loadFlag(deckResponse.data.flag_id);
     if (flagResult.error || !flagResult.data) {
       console.error(flagResult.error);
       setMessage("フラッグ情報の読み込みに失敗しました。");
@@ -478,16 +485,16 @@ export function BattleController() {
 
     try {
       const activeCardIds = new Set(
-        ((cardResult.data ?? []) as CardRecord[])
+        (((cardResponse?.error ? [] : cardResponse?.data) ?? []) as CardRecord[])
           .filter((card) => card.is_active)
           .map((card) => card.id)
       );
-      const activeDeckCards = (deckCardsResult.data ?? []).filter((deckCard) =>
+      const activeDeckCards = (deckCardsResponse.data ?? []).filter((deckCard) =>
         activeCardIds.has(deckCard.card_id)
       );
       const resetSource: BattleResetSource = {
         flag: flagResult.data,
-        buddyCardId: deckResult.data.buddy_card_id,
+        buddyCardId: deckResponse.data.buddy_card_id,
         deckCards: activeDeckCards
       };
       const freshBattleState = createInitialBattleState(resetSource);
@@ -558,31 +565,31 @@ export function BattleController() {
       }
 
       resetSourceRef.current = resetSource;
-      setCards((cardResult.data ?? []) as CardRecord[]);
-      setImages(imageResult.data ?? []);
-      setBattleDeck(deckResult.data);
-      if (supplyResult.error) {
-        console.warn("Battle supplies are not available yet.", supplyResult.error);
+      setCards((((cardResponse?.error ? [] : cardResponse?.data) ?? []) as CardRecord[]));
+      setImages(imageResponse?.error ? [] : imageResponse?.data ?? []);
+      setBattleDeck(deckResponse.data);
+      if (supplyResponse?.error) {
+        console.warn("Battle supplies are not available yet.", supplyResponse.error);
       } else {
-        setBattleSupplies(supplyResult.data ?? []);
+        setBattleSupplies(supplyResponse?.data ?? []);
       }
-      if (supplySettingsResult.error) {
+      if (supplySettingsResponse?.error) {
         console.warn(
           "Battle supply settings are not available yet.",
-          supplySettingsResult.error
+          supplySettingsResponse.error
         );
       } else {
-        setBattleSupplySettings(supplySettingsResult.data ?? null);
+        setBattleSupplySettings(supplySettingsResponse?.data ?? null);
       }
-      if (roomResult.error) {
-        console.warn("Battle room supply metadata is not available yet.", roomResult.error);
+      if (roomResponse?.error) {
+        console.warn("Battle room supply metadata is not available yet.", roomResponse.error);
       }
-      const selfSupplyDeck = deckResult.data;
+      const selfSupplyDeck = deckResponse.data;
       const opponentDeckId =
-        isRealtimeBattle && selfSeat && roomResult.data
+        isRealtimeBattle && selfSeat && roomResponse?.data
           ? selfSeat === "player1"
-            ? roomResult.data.guest_deck_id
-            : roomResult.data.host_deck_id
+            ? roomResponse.data.guest_deck_id
+            : roomResponse.data.host_deck_id
           : null;
       const opponentDeckResult = opponentDeckId
         ? await loadDeck(opponentDeckId)
@@ -611,11 +618,11 @@ export function BattleController() {
         );
       }
       setPlayerSupplySettings({
-        self: selfSettingsResult.data ?? supplySettingsResult.data ?? null,
+        self: selfSettingsResult.data ?? supplySettingsResponse?.data ?? null,
         opponent: opponentSettingsResult.data ?? null
       });
-      setCardAbilityMap(abilityMapResult.data);
-      setShortcutSettings(shortcutResult.data);
+      setCardAbilityMap(abilityMapResponse?.error ? new Map() : abilityMapResponse?.data ?? new Map());
+      setShortcutSettings(shortcutResponse?.data ?? mergeWithDefaultShortcuts(null));
       setBattleState(initialState);
     } catch (error) {
       console.error(error);
@@ -1178,14 +1185,13 @@ export function BattleController() {
     });
   }, [changeableDecks, deckChangeEraKey, deckChangeSearchText]);
 
-  useEffect(() => {
-    if (!showDeckChangePopup) return;
-    if (filteredChangeableDecks.length === 0) return;
+  const resolvedDeckChangeTargetId = useMemo(() => {
+    if (filteredChangeableDecks.length === 0) return "";
     if (filteredChangeableDecks.some((deck) => deck.id === deckChangeTargetId)) {
-      return;
+      return deckChangeTargetId;
     }
-    setDeckChangeTargetId(filteredChangeableDecks[0].id);
-  }, [deckChangeTargetId, filteredChangeableDecks, showDeckChangePopup]);
+    return filteredChangeableDecks[0].id;
+  }, [deckChangeTargetId, filteredChangeableDecks]);
 
   async function handleOpenDeckChangePopup() {
     setDeckChangeLoading(true);
@@ -1222,8 +1228,8 @@ export function BattleController() {
   }
 
   async function handleConfirmDeckChange() {
-    if (!deckChangeTargetId || !roomId) return;
-    if (deckChangeTargetId === deckId) {
+    if (!resolvedDeckChangeTargetId || !roomId) return;
+    if (resolvedDeckChangeTargetId === deckId) {
       setShowDeckChangePopup(false);
       return;
     }
@@ -1244,8 +1250,8 @@ export function BattleController() {
       }
 
       window.location.href = buildBattleUrl({
-        deckId: deckChangeTargetId,
-        roomId: createSoloRoomId(deckChangeTargetId),
+        deckId: resolvedDeckChangeTargetId,
+        roomId: createSoloRoomId(resolvedDeckChangeTargetId),
         seat: "player1",
         mode: "solo"
       });
@@ -1262,7 +1268,7 @@ export function BattleController() {
       updateBattleRoomDeck({
         roomId,
         seat: selfSeat,
-        deckId: deckChangeTargetId
+        deckId: resolvedDeckChangeTargetId
       }),
       deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
     ]);
@@ -1278,7 +1284,7 @@ export function BattleController() {
     }
 
     window.location.href = buildBattleUrl({
-      deckId: deckChangeTargetId,
+      deckId: resolvedDeckChangeTargetId,
       roomId,
       seat: selfSeat,
       mode: "match"
@@ -2636,7 +2642,7 @@ export function BattleController() {
               <button
                 type="button"
                 onClick={() => void handleConfirmDeckChange()}
-                disabled={deckChangeLoading || !deckChangeTargetId}
+                disabled={deckChangeLoading || !resolvedDeckChangeTargetId}
               >
                 {deckChangeLoading ? "変更中..." : "このデッキに変更"}
               </button>
@@ -2686,7 +2692,7 @@ export function BattleController() {
                 <select
                   id="battle-deck-change-select"
                   className="dm-input"
-                  value={deckChangeTargetId}
+                  value={resolvedDeckChangeTargetId}
                   onChange={(event) => setDeckChangeTargetId(event.target.value)}
                   disabled={deckChangeLoading}
                 >
@@ -2704,9 +2710,9 @@ export function BattleController() {
 
               <div className="bf-deck-change-summary">
                 <span>候補 {filteredChangeableDecks.length}件</span>
-                {deckChangeTargetId && (
+                {resolvedDeckChangeTargetId && (
                   <span>
-                    選択中 {filteredChangeableDecks.find((deck) => deck.id === deckChangeTargetId)?.name ?? "未選択"}
+                    選択中 {filteredChangeableDecks.find((deck) => deck.id === resolvedDeckChangeTargetId)?.name ?? "未選択"}
                   </span>
                 )}
               </div>

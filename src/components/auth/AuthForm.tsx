@@ -44,25 +44,14 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
       }
 
       if (code) {
-        setLoading(true);
-
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!mounted) return;
-
-        if (error) {
-          setLoading(false);
-          setMessage(error.message);
-          return;
-        }
-
-        router.replace(nextPath);
+        router.replace(`/auth/callback?${searchParams.toString()}`);
         return;
       }
 
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       if (data.session) {
-        router.replace("/home");
+        router.replace(nextPath);
       }
     }
 
