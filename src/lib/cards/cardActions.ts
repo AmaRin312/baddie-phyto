@@ -6,6 +6,67 @@ import type {
   CardType
 } from "@/types/baddiePhyto";
 
+const CARD_SELECT_COLUMNS = [
+  "id",
+  "name",
+  "worlds",
+  "races",
+  "orientation",
+  "size",
+  "power",
+  "defense",
+  "critical",
+  "card_text",
+  "card_type",
+  "is_dragon",
+  "is_corner_king",
+  "is_hyakki",
+  "is_chaos",
+  "is_generic",
+  "is_heaven",
+  "is_hell",
+  "is_original",
+  "is_active",
+  "created_at",
+  "updated_at"
+].join(",");
+
+const CARD_CACHE_TTL_MS = 60_000;
+
+type CachedCardResponse = {
+  data: CardRecord[] | null;
+  error: { message: string } | null;
+};
+
+type CardListCacheEntry = {
+  expiresAt: number;
+  value: CachedCardResponse | null;
+};
+
+const cardListCache = new Map<string, CardListCacheEntry>();
+const cardListInFlight = new Map<string, Promise<CachedCardResponse>>();
+
+function getCachedCardResponse(key: string): CachedCardResponse | null {
+  const cached = cardListCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    cardListCache.delete(key);
+    return null;
+  }
+  return cached.value;
+}
+
+function setCachedCardResponse(key: string, value: CachedCardResponse) {
+  cardListCache.set(key, {
+    expiresAt: Date.now() + CARD_CACHE_TTL_MS,
+    value
+  });
+}
+
+function clearCardCache() {
+  cardListCache.clear();
+}
+
 export type CreateCardInput = {
   name: string;
   worlds: string[];
@@ -54,17 +115,75 @@ async function ensureFlagForFlagCard(card: CardRecord) {
 }
 
 export async function loadCards(options?: { activeOnly?: boolean }) {
-  let query = supabase.from("cards").select("*").order("name");
+  const cacheKey = options?.activeOnly ? "cards:active" : "cards:all";
+  const cached = getCachedCardResponse(cacheKey);
+  if (cached) return cached;
+  const inFlight = cardListInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  let query = supabase.from("cards").select(CARD_SELECT_COLUMNS).order("name");
 
   if (options?.activeOnly) query = query.eq("is_active", true);
-  return await query;
+  const request: Promise<CachedCardResponse> = (async () => {
+    try {
+      const result = await query.returns<CardRecord[]>();
+      if (!result.error) {
+        setCachedCardResponse(cacheKey, result);
+      }
+      return result;
+    } finally {
+      cardListInFlight.delete(cacheKey);
+    }
+  })();
+
+  cardListInFlight.set(cacheKey, request);
+  return request;
+}
+
+export async function loadCardsByIds(cardIds: readonly string[]) {
+  const uniqueCardIds = [...new Set(cardIds.filter(Boolean))];
+
+  if (uniqueCardIds.length === 0) {
+    return {
+      data: [] as CardRecord[],
+      error: null
+    };
+  }
+
+  const cacheKey = `cards:ids:${uniqueCardIds.slice().sort().join(",")}`;
+  const cached = getCachedCardResponse(cacheKey);
+  if (cached) return cached;
+  const inFlight = cardListInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const request: Promise<CachedCardResponse> = (async () => {
+    try {
+      const result = await supabase
+        .from("cards")
+        .select(CARD_SELECT_COLUMNS)
+        .in("id", uniqueCardIds)
+        .order("name")
+        .returns<CardRecord[]>();
+
+      if (!result.error) {
+        setCachedCardResponse(cacheKey, result);
+      }
+
+      return result;
+    } finally {
+      cardListInFlight.delete(cacheKey);
+    }
+  })();
+
+  cardListInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function searchCardRecords(input?: {
   keyword?: string;
   includeInactive?: boolean;
 }) {
-  let query = supabase.from("cards").select("*").order("name");
+  let query = supabase.from("cards").select(CARD_SELECT_COLUMNS).order("name");
   const keyword = input?.keyword?.trim();
 
   if (keyword) query = query.ilike("name", `%${keyword}%`);
@@ -88,7 +207,11 @@ export async function searchCards(input?: {
 }
 
 export async function loadCard(cardId: string) {
-  return await supabase.from("cards").select("*").eq("id", cardId).maybeSingle();
+  return await supabase
+    .from("cards")
+    .select(CARD_SELECT_COLUMNS)
+    .eq("id", cardId)
+    .maybeSingle();
 }
 
 export async function createCard(input: CreateCardInput) {
@@ -121,6 +244,10 @@ export async function createCard(input: CreateCardInput) {
   if ((input.autoCreateFlag ?? true) && !result.error && result.data) {
     const flagResult = await ensureFlagForFlagCard(result.data);
     if (flagResult.error) return { ...result, error: flagResult.error };
+  }
+
+  if (!result.error) {
+    clearCardCache();
   }
 
   return result;
@@ -159,13 +286,25 @@ export async function updateCard(cardId: string, input: CreateCardInput) {
     if (flagResult.error) return { ...result, error: flagResult.error };
   }
 
+  if (!result.error) {
+    clearCardCache();
+  }
+
   return result;
 }
 
 export async function setCardActive(cardId: string, isActive: boolean) {
-  return await supabase.from("cards").update({ is_active: isActive }).eq("id", cardId);
+  const result = await supabase.from("cards").update({ is_active: isActive }).eq("id", cardId);
+  if (!result.error) {
+    clearCardCache();
+  }
+  return result;
 }
 
 export async function deleteCard(cardId: string) {
-  return await supabase.from("cards").delete().eq("id", cardId);
+  const result = await supabase.from("cards").delete().eq("id", cardId);
+  if (!result.error) {
+    clearCardCache();
+  }
+  return result;
 }

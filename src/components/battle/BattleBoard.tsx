@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { BattlePlayer } from "@/components/battle/BattlePlayer";
 import type { MouseEvent } from "react";
 import type {
@@ -49,9 +50,12 @@ type BattleBoardProps = {
     event: MouseEvent<HTMLDivElement>,
     playerId: "self" | "opponent"
   ) => void;
+  onChangeLife?: (amount: number) => void;
+  onRollDice?: () => void;
+  onClearDice?: () => void;
 };
 
-export function BattleBoard({
+function BattleBoardComponent({
   battleState,
   cardMap,
   imagesByCard,
@@ -71,7 +75,10 @@ export function BattleBoard({
   placementTargetPlayerId,
   sleeveImageUrls,
   playmatImageUrls,
-  onPlacementZoneClick
+  onPlacementZoneClick,
+  onChangeLife,
+  onRollDice,
+  onClearDice
 }: BattleBoardProps) {
   const isPlacementMode = placementTargetZones != null;
 
@@ -130,7 +137,12 @@ export function BattleBoard({
         placementTargetZones={placementTargetZones}
         placementTargetPlayerId={placementTargetPlayerId}
         onPlacementZoneClick={onPlacementZoneClick}
+        onChangeLife={onChangeLife}
+        onRollDice={onRollDice}
+        onClearDice={onClearDice}
       />
     </section>
   );
 }
+
+export const BattleBoard = memo(BattleBoardComponent);

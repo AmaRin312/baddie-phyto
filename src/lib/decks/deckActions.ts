@@ -6,41 +6,195 @@ import type {
   DeckVisibility
 } from "@/types/baddiePhyto";
 
+const DECK_SELECT_COLUMNS = [
+  "id",
+  "owner_id",
+  "name",
+  "flag_id",
+  "buddy_card_id",
+  "selected_flag_image_id",
+  "selected_buddy_image_id",
+  "sleeve_supply_id",
+  "playmat_supply_id",
+  "deck_visibility",
+  "era_key",
+  "created_at",
+  "updated_at"
+].join(",");
+
+const DECK_CARD_SELECT_COLUMNS = [
+  "id",
+  "deck_id",
+  "card_id",
+  "selected_image_id",
+  "quantity",
+  "sort_order",
+  "created_at",
+  "updated_at"
+].join(",");
+
+const DECK_CACHE_TTL_MS = 60_000;
+
+type CachedDeckListResponse = {
+  data: DeckRecord[] | null;
+  error: { message: string } | null;
+};
+
+type CachedDeckResponse = {
+  data: DeckRecord | null;
+  error: { message: string } | null;
+};
+
+type CachedDeckCardListResponse = {
+  data: DeckCardRecord[] | null;
+  error: { message: string } | null;
+};
+
+const decksCache = new Map<string, { expiresAt: number; value: CachedDeckListResponse }>();
+const deckCache = new Map<string, { expiresAt: number; value: CachedDeckResponse }>();
+const deckCardsCache = new Map<
+  string,
+  { expiresAt: number; value: CachedDeckCardListResponse }
+>();
+const decksInFlight = new Map<string, Promise<CachedDeckListResponse>>();
+const deckInFlight = new Map<string, Promise<CachedDeckResponse>>();
+const deckCardsInFlight = new Map<string, Promise<CachedDeckCardListResponse>>();
+
+function getTimedCache<T>(cache: Map<string, { expiresAt: number; value: T }>, key: string) {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return cached.value;
+}
+
+function setTimedCache<T>(
+  cache: Map<string, { expiresAt: number; value: T }>,
+  key: string,
+  value: T
+) {
+  cache.set(key, {
+    expiresAt: Date.now() + DECK_CACHE_TTL_MS,
+    value
+  });
+}
+
+function clearDeckCaches() {
+  decksCache.clear();
+  deckCache.clear();
+  deckCardsCache.clear();
+}
+
 function isMissingColumnError(error: { code?: string; message: string }, columnName: string) {
   return error.code === "PGRST204" || error.message.includes(columnName);
 }
 
 export async function loadDecks() {
-  return await supabase
-    .from("decks")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .returns<DeckRecord[]>();
+  const cached = getTimedCache(decksCache, "all");
+  if (cached) return cached;
+  const inFlight = decksInFlight.get("all");
+  if (inFlight) return inFlight;
+
+  const request: Promise<CachedDeckListResponse> = (async () => {
+    try {
+      const result = await supabase
+        .from("decks")
+        .select(DECK_SELECT_COLUMNS)
+        .order("updated_at", { ascending: false })
+        .returns<DeckRecord[]>();
+      if (!result.error) {
+        setTimedCache(decksCache, "all", result);
+      }
+      return result;
+    } finally {
+      decksInFlight.delete("all");
+    }
+  })();
+
+  decksInFlight.set("all", request);
+  return request;
 }
 
 export async function loadDeck(deckId: string) {
-  return await supabase
-    .from("decks")
-    .select("*")
-    .eq("id", deckId)
-    .maybeSingle<DeckRecord>();
+  const cached = getTimedCache(deckCache, deckId);
+  if (cached) return cached;
+  const inFlight = deckInFlight.get(deckId);
+  if (inFlight) return inFlight;
+
+  const request: Promise<CachedDeckResponse> = (async () => {
+    try {
+      const result = await supabase
+        .from("decks")
+        .select(DECK_SELECT_COLUMNS)
+        .eq("id", deckId)
+        .maybeSingle<DeckRecord>();
+      if (!result.error) {
+        setTimedCache(deckCache, deckId, result);
+      }
+      return result;
+    } finally {
+      deckInFlight.delete(deckId);
+    }
+  })();
+
+  deckInFlight.set(deckId, request);
+  return request;
 }
 
 export async function loadDeckCards(deckId: string) {
-  return await supabase
-    .from("deck_cards")
-    .select("*")
-    .eq("deck_id", deckId)
-    .order("sort_order")
-    .returns<DeckCardRecord[]>();
+  const cacheKey = `deck:${deckId}`;
+  const cached = getTimedCache(deckCardsCache, cacheKey);
+  if (cached) return cached;
+  const inFlight = deckCardsInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const request: Promise<CachedDeckCardListResponse> = (async () => {
+    try {
+      const result = await supabase
+        .from("deck_cards")
+        .select(DECK_CARD_SELECT_COLUMNS)
+        .eq("deck_id", deckId)
+        .order("sort_order")
+        .returns<DeckCardRecord[]>();
+      if (!result.error) {
+        setTimedCache(deckCardsCache, cacheKey, result);
+      }
+      return result;
+    } finally {
+      deckCardsInFlight.delete(cacheKey);
+    }
+  })();
+
+  deckCardsInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function loadAllDeckCards() {
-  return await supabase
-    .from("deck_cards")
-    .select("*")
-    .order("sort_order")
-    .returns<DeckCardRecord[]>();
+  const cached = getTimedCache(deckCardsCache, "all");
+  if (cached) return cached;
+  const inFlight = deckCardsInFlight.get("all");
+  if (inFlight) return inFlight;
+
+  const request: Promise<CachedDeckCardListResponse> = (async () => {
+    try {
+      const result = await supabase
+        .from("deck_cards")
+        .select(DECK_CARD_SELECT_COLUMNS)
+        .order("sort_order")
+        .returns<DeckCardRecord[]>();
+      if (!result.error) {
+        setTimedCache(deckCardsCache, "all", result);
+      }
+      return result;
+    } finally {
+      deckCardsInFlight.delete("all");
+    }
+  })();
+
+  deckCardsInFlight.set("all", request);
+  return request;
 }
 
 export async function createDeck(input: {
@@ -49,12 +203,16 @@ export async function createDeck(input: {
   buddyCardId: string;
   deckVisibility?: DeckVisibility;
 }) {
-  return await supabase.rpc("create_deck", {
+  const result = await supabase.rpc("create_deck", {
     p_name: input.name,
     p_flag_id: input.flagId,
     p_buddy_card_id: input.buddyCardId,
     p_deck_visibility: input.deckVisibility ?? "private"
   });
+  if (!result.error) {
+    clearDeckCaches();
+  }
+  return result;
 }
 
 export async function createDraftDeck(input?: {
@@ -89,14 +247,21 @@ export async function createDraftDeck(input?: {
     .single<{ id: string }>();
 
   if (!result.error || !isMissingColumnError(result.error, "era_key")) {
+    if (!result.error) {
+      clearDeckCaches();
+    }
     return result;
   }
 
-  return await supabase
+  const fallbackResult = await supabase
     .from("decks")
     .insert(baseInsert)
     .select("id")
     .single<{ id: string }>();
+  if (!fallbackResult.error) {
+    clearDeckCaches();
+  }
+  return fallbackResult;
 }
 
 export async function updateDeckSettings(input: {
@@ -140,6 +305,9 @@ export async function updateDeckSettings(input: {
       isMissingColumnError(result.error, "playmat_supply_id")
     )
   ) {
+    if (!result.error) {
+      clearDeckCaches();
+    }
     return result;
   }
 
@@ -157,15 +325,22 @@ export async function updateDeckSettings(input: {
     !updateWithoutOptionalColumns.error ||
     !isMissingColumnError(updateWithoutOptionalColumns.error, "selected_buddy_image_id")
   ) {
+    if (!updateWithoutOptionalColumns.error) {
+      clearDeckCaches();
+    }
     return updateWithoutOptionalColumns;
   }
 
-  return await supabase
+  const fallbackResult = await supabase
     .from("decks")
     .update(baseUpdate)
     .eq("id", input.deckId)
     .select("*")
     .single<DeckRecord>();
+  if (!fallbackResult.error) {
+    clearDeckCaches();
+  }
+  return fallbackResult;
 }
 
 export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
@@ -253,6 +428,8 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
     }
   }
 
+  clearDeckCaches();
+
   return {
     data: insertResult.data,
     error: null
@@ -266,15 +443,23 @@ export async function setDeckCard(input: {
   sortOrder: number;
   selectedImageId: string | null;
 }) {
-  return await supabase.rpc("set_deck_card", {
+  const result = await supabase.rpc("set_deck_card", {
     p_deck_id: input.deckId,
     p_card_id: input.cardId,
     p_quantity: input.quantity,
     p_sort_order: input.sortOrder,
     p_selected_image_id: input.selectedImageId
   });
+  if (!result.error) {
+    clearDeckCaches();
+  }
+  return result;
 }
 
 export async function deleteDeck(deckId: string) {
-  return await supabase.from("decks").delete().eq("id", deckId);
+  const result = await supabase.from("decks").delete().eq("id", deckId);
+  if (!result.error) {
+    clearDeckCaches();
+  }
+  return result;
 }

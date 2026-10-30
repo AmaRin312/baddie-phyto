@@ -79,11 +79,11 @@ import {
 } from "@/lib/battle/menus/battleContextMenu";
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import { loadDeck, loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlag } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
   loadBattleSupplies,
@@ -109,6 +109,7 @@ import type {
   BattleSupplyRecord,
   BattleSupplySettingsRecord,
   CardImageRecord,
+  DeckCardRecord,
   DeckRecord,
   CardRecord,
   DeckEraKey
@@ -422,8 +423,6 @@ export function BattleController() {
     const [
       deckResult,
       deckCardsResult,
-      cardResult,
-      imageResult,
       shortcutResult,
       abilityMapResult,
       supplyResult,
@@ -433,8 +432,6 @@ export function BattleController() {
       await Promise.allSettled([
         loadDeck(deckId),
         loadDeckCards(deckId),
-        loadCards(),
-        loadCardImages(),
         loadShortcutSettings(),
         loadBattleCardAbilityMap(),
         loadBattleSupplies(),
@@ -445,8 +442,6 @@ export function BattleController() {
     const deckResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
     const deckCardsResponse =
       deckCardsResult.status === "fulfilled" ? deckCardsResult.value : null;
-    const cardResponse = cardResult.status === "fulfilled" ? cardResult.value : null;
-    const imageResponse = imageResult.status === "fulfilled" ? imageResult.value : null;
     const shortcutResponse =
       shortcutResult.status === "fulfilled" ? shortcutResult.value : null;
     const abilityMapResponse =
@@ -484,12 +479,25 @@ export function BattleController() {
     }
 
     try {
+      const battleCardIds = [
+        ...new Set(
+          [
+            deckResponse.data.flag_id ? flagResult.data.card_id : null,
+            deckResponse.data.buddy_card_id,
+            ...(deckCardsResponse.data ?? []).map((deckCard: DeckCardRecord) => deckCard.card_id)
+          ].filter(Boolean)
+        )
+      ] as string[];
+      const [cardResponse, imageResponse] = await Promise.all([
+        loadCardsByIds(battleCardIds),
+        loadCardImagesByCardIds(battleCardIds)
+      ]);
       const activeCardIds = new Set(
-        (((cardResponse?.error ? [] : cardResponse?.data) ?? []) as CardRecord[])
+        (((cardResponse.error ? [] : cardResponse.data) ?? []) as unknown as CardRecord[])
           .filter((card) => card.is_active)
           .map((card) => card.id)
       );
-      const activeDeckCards = (deckCardsResponse.data ?? []).filter((deckCard) =>
+      const activeDeckCards = (deckCardsResponse.data ?? []).filter((deckCard: DeckCardRecord) =>
         activeCardIds.has(deckCard.card_id)
       );
       const resetSource: BattleResetSource = {
@@ -565,7 +573,7 @@ export function BattleController() {
       }
 
       resetSourceRef.current = resetSource;
-      setCards((((cardResponse?.error ? [] : cardResponse?.data) ?? []) as CardRecord[]));
+      setCards((((cardResponse?.error ? [] : cardResponse?.data) ?? []) as unknown as CardRecord[]));
       setImages(imageResponse?.error ? [] : imageResponse?.data ?? []);
       setBattleDeck(deckResponse.data);
       if (supplyResponse?.error) {
@@ -1113,6 +1121,34 @@ export function BattleController() {
     setPendingHyakuganPopup(null);
   }
 
+  function handleChangeSelfLife(amount: number) {
+    executeCommand({
+      type: "CHANGE_LIFE",
+      payload: {
+        playerId: "self",
+        amount
+      }
+    });
+  }
+
+  function handleRollSelfDice() {
+    executeCommand({
+      type: "ROLL_DICE",
+      payload: {
+        playerId: "self"
+      }
+    });
+  }
+
+  function handleClearSelfDice() {
+    executeCommand({
+      type: "CLEAR_DICE",
+      payload: {
+        playerId: "self"
+      }
+    });
+  }
+
   function handleDeleteRoomState() {
     if (!roomId) return;
     const confirmed = window.confirm(
@@ -1205,7 +1241,7 @@ export function BattleController() {
 
     const currentUserId = currentUserIdRef.current ?? "";
     const visibleDecks = (deckResult.data ?? []).filter(
-      (deck) =>
+      (deck: DeckRecord) =>
         (deck.owner_id === currentUserId ||
           deck.deck_visibility === "public" ||
           deck.deck_visibility === "default") &&
@@ -1216,7 +1252,7 @@ export function BattleController() {
     setDeckChangeSearchText("");
     setDeckChangeEraKey("");
     setDeckChangeTargetId(
-      visibleDecks.find((deck) => deck.id === battleDeck?.id)?.id ??
+      visibleDecks.find((deck: DeckRecord) => deck.id === battleDeck?.id)?.id ??
         visibleDecks[0]?.id ??
         ""
     );
@@ -2552,6 +2588,9 @@ export function BattleController() {
         onDragEndCard={handleDragEndCard}
         onDropCard={handleDropCard}
         onDoubleClickZone={handleDoubleClickZone}
+        onChangeLife={handleChangeSelfLife}
+        onRollDice={handleRollSelfDice}
+        onClearDice={handleClearSelfDice}
         placementTargetZones={
           selectionMode?.type === "zone"
             ? new Set(selectionMode.allowedZones)

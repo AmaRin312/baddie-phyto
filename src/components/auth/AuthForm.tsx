@@ -22,6 +22,26 @@ const MODE_TEXT: Record<AuthMode, { button: string; helper: string }> = {
   }
 };
 
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function hasActiveSession() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) return true;
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (!userError && userData.user) return true;
+
+    if (attempt < 2) {
+      await wait(200 * (attempt + 1));
+    }
+  }
+
+  return false;
+}
+
 export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,7 +52,6 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     let mounted = true;
 
     async function resolveAuthState() {
-      const code = searchParams.get("code");
       const errorDescription = searchParams.get("error_description");
       const errorCode = searchParams.get("error");
       const nextPath = searchParams.get("next") || "/home";
@@ -43,15 +62,13 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
         return;
       }
 
-      if (code) {
-        router.replace(`/auth/callback?${searchParams.toString()}`);
-        return;
-      }
-
-      const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-      if (data.session) {
-        router.replace(nextPath);
+
+      const sessionReady = await hasActiveSession();
+      if (!mounted) return;
+
+      if (sessionReady) {
+        window.location.replace(nextPath);
       }
     }
 
@@ -62,7 +79,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "SIGNED_IN" && session) {
-        router.replace("/home");
+        window.location.replace(searchParams.get("next") || "/home");
       }
     });
 

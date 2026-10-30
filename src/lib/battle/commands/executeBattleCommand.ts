@@ -3,6 +3,7 @@ import {
   addSoulCardFaceUp,
   applyRuleChange,
   changeLife,
+  clearDice,
   clearDeckLook,
   drawCard,
   lookTopDeck,
@@ -23,6 +24,7 @@ import {
   returnLookedCards,
   revealDeckCards,
   resolveBiriKinataNotification,
+  rollDice,
   setViewerCard,
   shuffleDeck,
   stackCardOnAreaCard,
@@ -53,6 +55,10 @@ export function executeBattleCommand(
       return toggleCardOrientation(state, command.payload);
     case "CHANGE_LIFE":
       return changeLife(state, command.payload);
+    case "ROLL_DICE":
+      return rollDice(state, command.payload);
+    case "CLEAR_DICE":
+      return clearDice(state, command.payload);
     case "LOOK_TOP_DECK":
       return lookTopDeck(state, command.payload);
     case "REVEAL_DECK_CARD":

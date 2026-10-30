@@ -2,6 +2,7 @@ import type { BattleZoneId } from "@/types/battle";
 import type {
   DeckPosition,
   ApplyRuleChangeInput,
+  ClearDiceInput,
   ClearDeckLookInput,
   LookTopDeckInput,
   MoveRevealedCardInput,
@@ -12,6 +13,7 @@ import type {
   ReorderLookedCardsInput,
   ReturnLookedCardsInput,
   RevealDeckCardsInput,
+  RollDiceInput,
   SwapAreaStacksInput
 } from "@/lib/battle/battleActions";
 
@@ -87,6 +89,16 @@ export type ChangeLifeCommand = {
     playerId: "self" | "opponent";
     amount: number;
   };
+};
+
+export type RollDiceCommand = {
+  type: "ROLL_DICE";
+  payload: RollDiceInput;
+};
+
+export type ClearDiceCommand = {
+  type: "CLEAR_DICE";
+  payload: ClearDiceInput;
 };
 
 export type LookTopDeckCommand = {
@@ -246,6 +258,8 @@ export type BattleCommand =
     | SetViewerCardCommand
     | ToggleCardOrientationCommand
     | ChangeLifeCommand
+    | RollDiceCommand
+    | ClearDiceCommand
     | LookTopDeckCommand
     | RevealDeckCardCommand
     | MoveRevealedCardCommand

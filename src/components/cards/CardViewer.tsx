@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { getDisplayCard } from "@/lib/cards/cardPresentation";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 import styles from "./CardViewer.module.css";
@@ -19,7 +20,7 @@ function formatValue(value: number | null) {
   return value == null ? "-" : value.toLocaleString();
 }
 
-export function CardViewer({
+function CardViewerComponent({
   card,
   images = [],
   selectedImageId,
@@ -51,6 +52,8 @@ export function CardViewer({
             className={styles.image}
             src={faceDownImageUrl}
             alt="??????"
+            loading={variant === "viewer" ? "eager" : "lazy"}
+            decoding="async"
             draggable={false}
           />
         ) : (
@@ -85,6 +88,8 @@ export function CardViewer({
           src={imageSrc}
           alt={displayCard.name}
           style={imageStyle}
+          loading={variant === "viewer" ? "eager" : "lazy"}
+          decoding="async"
           draggable={false}
         />
       </article>
@@ -121,3 +126,43 @@ export function CardViewer({
     </article>
   );
 }
+
+function areImagesEqual(
+  left: readonly CardImageRecord[] | undefined,
+  right: readonly CardImageRecord[] | undefined
+) {
+  const leftImages = left ?? [];
+  const rightImages = right ?? [];
+  if (leftImages === rightImages) return true;
+  if (leftImages.length !== rightImages.length) return false;
+
+  for (let index = 0; index < leftImages.length; index += 1) {
+    if (
+      leftImages[index]?.id !== rightImages[index]?.id ||
+      leftImages[index]?.image_path !== rightImages[index]?.image_path ||
+      leftImages[index]?.thumbnail_path !== rightImages[index]?.thumbnail_path ||
+      leftImages[index]?.is_default !== rightImages[index]?.is_default ||
+      leftImages[index]?.created_at !== rightImages[index]?.created_at
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export const CardViewer = memo(CardViewerComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.card.id === nextProps.card.id &&
+    prevProps.card.updated_at === nextProps.card.updated_at &&
+    prevProps.selectedImageId === nextProps.selectedImageId &&
+    prevProps.className === nextProps.className &&
+    prevProps.variant === nextProps.variant &&
+    prevProps.faceDown === nextProps.faceDown &&
+    prevProps.forcePortrait === nextProps.forcePortrait &&
+    prevProps.forcePortraitZoomPercent === nextProps.forcePortraitZoomPercent &&
+    prevProps.faceDownImageUrl === nextProps.faceDownImageUrl &&
+    prevProps.preserveOrientation === nextProps.preserveOrientation &&
+    areImagesEqual(prevProps.images, nextProps.images)
+  );
+});

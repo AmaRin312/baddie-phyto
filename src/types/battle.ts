@@ -43,10 +43,16 @@ export type LifeState = {
   value: number;
 };
 
+export type DiceState = {
+  value: 1 | 2 | 3 | 4 | 5 | 6;
+  rolledAt: string;
+};
+
 export type PlayerState = {
   id: BattlePlayerId;
   name: string;
   life: LifeState;
+  dice: DiceState | null;
   zones: Record<BattleZoneId, BattleZone>;
 };
 

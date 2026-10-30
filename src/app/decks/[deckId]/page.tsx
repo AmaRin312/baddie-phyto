@@ -19,8 +19,8 @@ import {
   setDeckCard,
   updateDeckSettings
 } from "@/lib/decks/deckActions";
-import { loadFlags } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadFlagsLite } from "@/lib/flags/flagActions";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
   loadBattleSupplies
@@ -54,7 +54,7 @@ import {
   type DeckCardRecord,
   type DeckRecord,
   type DeckVisibility,
-  type FlagWithCardRecord
+  type FlagRecord
 } from "@/types/baddiePhyto";
 
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
@@ -71,8 +71,8 @@ const DECK_SEARCH_TYPE_ORDER: Record<CardRecord["card_type"], number> = {
   other: 6
 };
 
-function getFlagName(flag?: FlagWithCardRecord | null) {
-  return flag?.name || flag?.card?.name || "未選択";
+function getFlagName(flag?: FlagRecord | null, card?: CardRecord | null) {
+  return flag?.name || card?.name || "未選択";
 }
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
@@ -90,7 +90,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [saveDefaultAlsoPrivate, setSaveDefaultAlsoPrivate] = useState(false);
   const [deckEra, setDeckEra] = useState<DeckEraKey | "">("");
   const [currentUserId, setCurrentUserId] = useState("");
-  const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
+  const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [cardPrintings, setCardPrintings] = useState<CardPrintingSearchRecord[]>([]);
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
@@ -114,6 +114,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
+  const [searchScrollTop, setSearchScrollTop] = useState(0);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -122,15 +123,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckCardsResult,
       flagResult,
       cardResult,
-      imageResult,
       printingSearchResult,
       supplyResult
     ] = await Promise.all([
       loadDeck(currentDeckId),
       loadDeckCards(currentDeckId),
-      loadFlags({ selectableOnly: true, activeOnly: true }),
+      loadFlagsLite({ selectableOnly: true, activeOnly: true }),
       loadCards(),
-      loadCardImages(),
       loadDeckCardPrintingSearchData(),
       loadBattleSupplies()
     ]);
@@ -140,7 +139,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckCardsResult.error ||
       flagResult.error ||
       cardResult.error ||
-      imageResult.error ||
       printingSearchResult.error ||
       supplyResult.error ||
       !deckResult.data
@@ -150,7 +148,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           deckCardsResult.error ??
           flagResult.error ??
           cardResult.error ??
-          imageResult.error ??
           printingSearchResult.error ??
           supplyResult.error
       );
@@ -160,15 +157,25 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
 
     const nextDeck = deckResult.data;
-    const nextCards = (cardResult.data ?? []) as CardRecord[];
-    const nextFlags = (flagResult.data ?? []).filter(
-      (flag) =>
+    const nextCards = (cardResult.data ?? []) as unknown as CardRecord[];
+    const nextCardMap = new Map(nextCards.map((card) => [card.id, card]));
+    const nextFlags = ((flagResult.data ?? []) as FlagRecord[]).filter(
+      (flag: FlagRecord) =>
         Boolean(flag.card_id) &&
         flag.is_active &&
         flag.can_be_selected_as_flag &&
-        flag.card?.card_type === "flag_card" &&
-        flag.card?.is_active
+        nextCardMap.get(flag.card_id ?? "")?.card_type === "flag_card" &&
+        nextCardMap.get(flag.card_id ?? "")?.is_active
     );
+    const imageCardIds = [
+      ...new Set(
+        [
+          ...(deckCardsResult.data ?? []).map((deckCard: DeckCardRecord) => deckCard.card_id),
+          ...nextFlags.map((flag) => flag.card_id).filter(Boolean)
+        ].filter(Boolean)
+      )
+    ] as string[];
+    const imageResult = await loadCardImagesByCardIds(imageCardIds);
 
     setDeck(nextDeck);
     setIsNewDeckDraft(false);
@@ -187,7 +194,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDraftDeckCards(createDeckCardDrafts(nextDeckCards));
     setFlags(nextFlags);
     setCards(nextCards);
-    setImages(imageResult.data ?? []);
+    setImages(imageResult.error ? [] : imageResult.data ?? []);
     setBattleSupplies(supplyResult.data ?? []);
     setCardPrintings(printingSearchResult.printings);
     setCardSets(printingSearchResult.sets);
@@ -206,11 +213,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
       setCurrentUserId(profile.id);
       if (resolvedDeckId === "new") {
-        const [flagResult, cardResult, imageResult, printingSearchResult, supplyResult] =
+        const [flagResult, cardResult, printingSearchResult, supplyResult] =
           await Promise.all([
-            loadFlags({ selectableOnly: true, activeOnly: true }),
+            loadFlagsLite({ selectableOnly: true, activeOnly: true }),
             loadCards(),
-            loadCardImages(),
             loadDeckCardPrintingSearchData(),
             loadBattleSupplies()
           ]);
@@ -218,14 +224,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         if (
           flagResult.error ||
           cardResult.error ||
-          imageResult.error ||
           printingSearchResult.error ||
           supplyResult.error
         ) {
           console.error(
             flagResult.error ??
               cardResult.error ??
-              imageResult.error ??
               printingSearchResult.error ??
               supplyResult.error
           );
@@ -234,15 +238,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           return;
         }
 
-        const nextCards = (cardResult.data ?? []) as CardRecord[];
-        const nextFlags = (flagResult.data ?? []).filter(
-          (flag) =>
-            Boolean(flag.card_id) &&
-            flag.is_active &&
-            flag.can_be_selected_as_flag &&
-            flag.card?.card_type === "flag_card" &&
-            flag.card?.is_active
+        const nextCards = (cardResult.data ?? []) as unknown as CardRecord[];
+        const nextCardMap = new Map(nextCards.map((card) => [card.id, card]));
+          const nextFlags = ((flagResult.data ?? []) as FlagRecord[]).filter(
+            (flag: FlagRecord) =>
+              Boolean(flag.card_id) &&
+              flag.is_active &&
+              flag.can_be_selected_as_flag &&
+              nextCardMap.get(flag.card_id ?? "")?.card_type === "flag_card" &&
+              nextCardMap.get(flag.card_id ?? "")?.is_active
         );
+        const imageCardIds = [
+          ...new Set(nextFlags.map((flag) => flag.card_id).filter(Boolean))
+        ] as string[];
+        const imageResult = await loadCardImagesByCardIds(imageCardIds);
 
         setDeck(null);
         setIsNewDeckDraft(true);
@@ -260,7 +269,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setDraftDeckCards([]);
         setFlags(nextFlags);
         setCards(nextCards);
-        setImages(imageResult.data ?? []);
+        setImages(imageResult.error ? [] : imageResult.data ?? []);
         setBattleSupplies(supplyResult.data ?? []);
         setCardPrintings(printingSearchResult.printings);
         setCardSets(printingSearchResult.sets);
@@ -302,7 +311,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   );
 
   const selectedFlag = flagMap.get(selectedFlagId) ?? null;
-  const selectedFlagCard = selectedFlag?.card ?? null;
+  const selectedFlagCard = selectedFlag?.card_id
+    ? cardMap.get(selectedFlag.card_id) ?? null
+    : null;
   const effectiveSelectedBuddyCardId =
     selectedBuddyCardId && draftDeckCardMap.has(selectedBuddyCardId)
       ? selectedBuddyCardId
@@ -391,6 +402,48 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     () => filteredCards.slice(safeSearchPage * 100, safeSearchPage * 100 + 100),
     [filteredCards, safeSearchPage]
   );
+  const SEARCH_ROW_HEIGHT = 86;
+  const SEARCH_OVERSCAN = 6;
+  const SEARCH_VIEWPORT_HEIGHT = 520;
+  const searchVisibleRange = useMemo(() => {
+    const startIndex = Math.max(
+      0,
+      Math.floor(searchScrollTop / SEARCH_ROW_HEIGHT) - SEARCH_OVERSCAN
+    );
+    const visibleCount =
+      Math.ceil(SEARCH_VIEWPORT_HEIGHT / SEARCH_ROW_HEIGHT) + SEARCH_OVERSCAN * 2;
+    const endIndex = Math.min(visibleFilteredCards.length, startIndex + visibleCount);
+    return { startIndex, endIndex };
+  }, [searchScrollTop, visibleFilteredCards.length]);
+  const virtualizedFilteredCards = useMemo(
+    () => visibleFilteredCards.slice(searchVisibleRange.startIndex, searchVisibleRange.endIndex),
+    [searchVisibleRange.endIndex, searchVisibleRange.startIndex, visibleFilteredCards]
+  );
+  const activeDraftDeckCards = useMemo(
+    () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
+    [cardMap, draftDeckCards]
+  );
+  const visibleImageCardIds = useMemo(() => {
+    return [
+      ...new Set(
+        [
+          ...activeDraftDeckCards.map((draft) => draft.cardId),
+          ...visibleFilteredCards.map((card) => card.id),
+          selectedFlagCard?.id,
+          selectedBuddyCard?.id,
+          detailCard?.id,
+          previewCard?.id
+        ].filter(Boolean)
+      )
+    ] as string[];
+  }, [
+    activeDraftDeckCards,
+    visibleFilteredCards,
+    selectedFlagCard?.id,
+    selectedBuddyCard?.id,
+    detailCard?.id,
+    previewCard?.id
+  ]);
   const previewCardIndex = previewCardId
     ? filteredCards.findIndex((card) => card.id === previewCardId)
     : -1;
@@ -400,10 +453,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     previewCardIndex >= 0 && previewCardIndex < filteredCards.length - 1
       ? filteredCards[previewCardIndex + 1]
       : null;
-  const activeDraftDeckCards = useMemo(
-    () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
-    [cardMap, draftDeckCards]
-  );
   const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
   const canEditDeck = Boolean(
     currentUserId && (isNewDeckDraft || (deck && deck.owner_id === currentUserId))
@@ -436,6 +485,40 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         shouldCopyDefaultDeckToPrivate ||
         !areDeckCardDraftsEqual(savedDeckCardDrafts, draftDeckCards)
       : false;
+
+  useEffect(() => {
+    const missingCardIds = visibleImageCardIds.filter(
+      (cardId) => !imagesByCard.has(cardId)
+    );
+
+    if (missingCardIds.length === 0) return;
+
+    let cancelled = false;
+
+    async function loadVisibleImages() {
+      const result = await loadCardImagesByCardIds(missingCardIds);
+      if (cancelled || result.error || !result.data?.length) return;
+
+      setImages((current) => {
+        const knownIds = new Set(current.map((image) => image.id));
+        const next = [...current];
+
+        for (const image of result.data ?? []) {
+          if (knownIds.has(image.id)) continue;
+          knownIds.add(image.id);
+          next.push(image);
+        }
+
+        return next;
+      });
+    }
+
+    void loadVisibleImages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imagesByCard, visibleImageCardIds]);
 
   async function handleSaveDeck() {
     if (!canEditDeck) {
@@ -471,6 +554,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       targetDeck = createdDeckResult.data;
       setDeck(targetDeck);
       setIsNewDeckDraft(false);
+    }
+
+    if (!targetDeck) {
+      setMessage("保存対象のデッキ情報が見つかりません。");
+      setSavingDeck(false);
+      return;
     }
 
     const settingsResult = await updateDeckSettings({
@@ -619,6 +708,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   function handleSearchFiltersChange(nextFilters: DeckCardSearchFilters) {
     setSearchPage(0);
+    setSearchScrollTop(0);
     setSearchFilters(nextFilters);
   }
 
@@ -755,7 +845,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     onClick={() => setFlagPickerOpen(true)}
                     disabled={!canEditDeck}
                   >
-                    <span>{selectedFlag ? getFlagName(selectedFlag) : "選択してください"}</span>
+                    <span>
+                      {selectedFlag
+                        ? getFlagName(selectedFlag, selectedFlagCard)
+                        : "選択してください"}
+                    </span>
                     <small>変更</small>
                   </button>
                 </label>
@@ -1050,8 +1144,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 />
               </form>
 
-              <div className="dm-deck-list dm-deck-search-results">
-                {visibleFilteredCards.map((card) => {
+              <div
+                className="dm-deck-list dm-deck-search-results"
+                onScroll={(event) => {
+                  setSearchScrollTop(event.currentTarget.scrollTop);
+                }}
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    height: `${visibleFilteredCards.length * SEARCH_ROW_HEIGHT}px`
+                  }}
+                >
+                  {virtualizedFilteredCards.map((card, virtualIndex) => {
+                  const actualIndex = searchVisibleRange.startIndex + virtualIndex;
                   const existing = draftDeckCardMap.get(card.id);
                   return (
                     <button
@@ -1060,6 +1166,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       className={`dm-deck-row dm-deck-row-button dm-deck-search-card${
                         draggedSearchCardId === card.id ? " is-dragging" : ""
                       }`}
+                      style={{
+                        position: "absolute",
+                        top: `${actualIndex * SEARCH_ROW_HEIGHT}px`,
+                        left: 0,
+                        right: 0
+                      }}
                       draggable={canEditDeck}
                       onClick={() => setPreviewCardId(card.id)}
                       onDragStart={(event) => {
@@ -1099,7 +1211,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       </span>
                     </button>
                   );
-                })}
+                  })}
+                </div>
                 {filteredCards.length === 0 && (
                   <p className="dm-muted-text">条件に合うカードがありません。</p>
                 )}
@@ -1183,38 +1296,42 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   <small>あとで選択します</small>
                 </span>
               </button>
-              {flags.map((flag) => (
-                <button
-                  key={flag.id}
-                  type="button"
-                  className={`dm-deck-picker-option${
-                    selectedFlagId === flag.id ? " is-selected" : ""
-                  }`}
-                  disabled={!canEditDeck}
-                  onClick={() => {
-                    setSelectedFlagId(flag.id);
-                    setSelectedFlagImageId("");
-                    setSearchPage(0);
-                    setFlagPickerOpen(false);
-                  }}
-                >
-                  {flag.card && (
-                    <CardViewer
-                      card={flag.card}
-                      images={imagesByCard.get(flag.card.id) ?? []}
-                      selectedImageId={null}
-                      variant="compact"
-                    />
-                  )}
-                  <span>
-                    <b>{getFlagName(flag)}</b>
-                    <small>
-                      手札{flag.initial_hand} / ゲージ{flag.initial_gauge} / ライフ
-                      {flag.initial_life}
-                    </small>
-                  </span>
-                </button>
-              ))}
+              {flags.map((flag) => {
+                const flagCard = flag.card_id ? cardMap.get(flag.card_id) ?? null : null;
+                return (
+                  <button
+                    key={flag.id}
+                    type="button"
+                    className={`dm-deck-picker-option${
+                      selectedFlagId === flag.id ? " is-selected" : ""
+                    }`}
+                    disabled={!canEditDeck}
+                    onClick={() => {
+                      setSelectedFlagId(flag.id);
+                      setSelectedFlagImageId("");
+                      setSearchPage(0);
+                      setFlagPickerOpen(false);
+                    }}
+                  >
+                    {flagCard && (
+                      <CardViewer
+                        card={flagCard}
+                        images={imagesByCard.get(flagCard.id) ?? []}
+                        selectedImageId={null}
+                        variant="compact"
+                        forcePortrait
+                      />
+                    )}
+                    <span>
+                      <b>{getFlagName(flag, flagCard)}</b>
+                      <small>
+                        手札{flag.initial_hand} / ゲージ{flag.initial_gauge} / ライフ
+                        {flag.initial_life}
+                      </small>
+                    </span>
+                  </button>
+                );
+              })}
               {flags.length === 0 && (
                 <p className="dm-muted-text">選択できるフラッグがありません。</p>
               )}

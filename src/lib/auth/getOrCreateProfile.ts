@@ -8,6 +8,12 @@ export type Profile = {
   updated_at: string;
 };
 
+const PROFILE_CACHE_TTL_MS = 60_000;
+
+let cachedProfile: Profile | null = null;
+let cachedProfileAt = 0;
+let inFlightProfilePromise: Promise<Profile | null> | null = null;
+
 async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -34,6 +40,15 @@ async function getAuthenticatedUser() {
 }
 
 export async function getOrCreateProfile(): Promise<Profile | null> {
+  if (cachedProfile && Date.now() - cachedProfileAt < PROFILE_CACHE_TTL_MS) {
+    return cachedProfile;
+  }
+
+  if (inFlightProfilePromise) {
+    return inFlightProfilePromise;
+  }
+
+  inFlightProfilePromise = (async () => {
   const { user, error: userError } = await getAuthenticatedUser();
   if (userError || !user) return null;
 
@@ -53,10 +68,16 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
 
   if (error) {
     console.warn("profiles read failed; using auth user as fallback profile.", error);
+    cachedProfile = fallbackProfile;
+    cachedProfileAt = Date.now();
     return fallbackProfile;
   }
 
-  if (data) return data as Profile;
+  if (data) {
+    cachedProfile = data as Profile;
+    cachedProfileAt = Date.now();
+    return data as Profile;
+  }
 
   const { data: inserted, error: insertError } = await supabase
     .from("profiles")
@@ -73,8 +94,19 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
       "profiles insert failed; using auth user as fallback profile.",
       insertError
     );
+    cachedProfile = fallbackProfile;
+    cachedProfileAt = Date.now();
     return fallbackProfile;
   }
 
+  cachedProfile = inserted as Profile;
+  cachedProfileAt = Date.now();
   return inserted as Profile;
+  })();
+
+  try {
+    return await inFlightProfilePromise;
+  } finally {
+    inFlightProfilePromise = null;
+  }
 }

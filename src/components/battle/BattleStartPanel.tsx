@@ -14,17 +14,17 @@ import {
   type BattleRoomRecord
 } from "@/lib/battle/battleRooms";
 import type { BattlePlayerSeat } from "@/lib/battle/battlePlayerStateSync";
-import { loadCards } from "@/lib/cards/cardActions";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
-import { loadFlags } from "@/lib/flags/flagActions";
-import { loadCardImages } from "@/lib/storage/cardImageStorage";
+import { loadFlagsLite } from "@/lib/flags/flagActions";
+import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getDeckEraLabel,
   type CardImageRecord,
   type CardRecord,
   type DeckCardRecord,
   type DeckRecord,
-  type FlagWithCardRecord
+  type FlagRecord
 } from "@/types/baddiePhyto";
 
 function findDisplayImageId(
@@ -69,7 +69,7 @@ export function BattleStartPanel() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
   const [deckCards, setDeckCards] = useState<DeckCardRecord[]>([]);
-  const [flags, setFlags] = useState<FlagWithCardRecord[]>([]);
+  const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [rooms, setRooms] = useState<BattleRoomRecord[]>([]);
@@ -144,35 +144,54 @@ export function BattleStartPanel() {
       }
 
       setCurrentUserId(profile.id);
-      const [deckResult, deckCardResult, flagResult, cardResult, imageResult] =
-        await Promise.allSettled([
-          loadDecks(),
-          loadAllDeckCards(),
-          loadFlags(),
-          loadCards(),
-          loadCardImages()
-        ]);
+      const [deckResult, deckCardResult, flagResult] = await Promise.allSettled([
+        loadDecks(),
+        loadAllDeckCards(),
+        loadFlagsLite()
+      ]);
 
       const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
       const deckCardsResponse =
         deckCardResult.status === "fulfilled" ? deckCardResult.value : null;
       const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
-      const cardsResponse = cardResult.status === "fulfilled" ? cardResult.value : null;
-      const imagesResponse = imageResult.status === "fulfilled" ? imageResult.value : null;
 
       if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
         console.error(decksResponse?.error ?? deckCardsResponse?.error);
         setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
-        setDecks((decksResponse.data ?? []) as DeckRecord[]);
-        setDeckCards(deckCardsResponse.data ?? []);
-        setFlags(flagsResponse?.error ? [] : flagsResponse?.data ?? []);
-        setCards((cardsResponse?.error ? [] : (cardsResponse?.data ?? [])) as CardRecord[]);
-        setImages(imagesResponse?.error ? [] : imagesResponse?.data ?? []);
-        if (flagsResponse?.error || cardsResponse?.error || imagesResponse?.error) {
+        const nextDecks = (decksResponse.data ?? []) as unknown as DeckRecord[];
+        const nextDeckCards = deckCardsResponse.data ?? [];
+        const nextFlags = ((flagsResponse?.error ? [] : flagsResponse?.data ?? []) ??
+          []) as FlagRecord[];
+
+        setDecks(nextDecks);
+        setDeckCards(nextDeckCards);
+        setFlags(nextFlags);
+
+        const relatedCardIds = [
+          ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
+          ...nextFlags.map((flag: FlagRecord) => flag.card_id).filter(Boolean)
+        ] as string[];
+
+        const [cardsResponse, imagesResponse] = await Promise.allSettled([
+          loadCardsByIds(relatedCardIds),
+          loadCardImagesByCardIds(relatedCardIds)
+        ]);
+
+        const nextCardsResponse =
+          cardsResponse.status === "fulfilled" ? cardsResponse.value : null;
+        const nextImagesResponse =
+          imagesResponse.status === "fulfilled" ? imagesResponse.value : null;
+
+        setCards(
+          (nextCardsResponse?.error ? [] : (nextCardsResponse?.data ?? [])) as unknown as CardRecord[]
+        );
+        setImages(nextImagesResponse?.error ? [] : nextImagesResponse?.data ?? []);
+
+        if (flagsResponse?.error || nextCardsResponse?.error || nextImagesResponse?.error) {
           console.warn(
             "Optional battle-start metadata failed to load.",
-            flagsResponse?.error ?? cardsResponse?.error ?? imagesResponse?.error
+            flagsResponse?.error ?? nextCardsResponse?.error ?? nextImagesResponse?.error
           );
         }
       }
@@ -256,7 +275,7 @@ export function BattleStartPanel() {
 
   function renderDeckSummary(deck: DeckRecord) {
     const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
-    const flagCard = flag?.card ?? null;
+    const flagCard = flag?.card_id ? cardMap.get(flag.card_id) ?? null : null;
     const buddyCard = deck.buddy_card_id
       ? cardMap.get(deck.buddy_card_id) ?? null
       : null;

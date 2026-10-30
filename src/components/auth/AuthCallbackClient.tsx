@@ -4,6 +4,26 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForSessionReady() {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) return true;
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (!userError && userData.user) return true;
+
+    if (attempt < 9) {
+      await wait(250);
+    }
+  }
+
+  return false;
+}
+
 export function AuthCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,9 +48,9 @@ export function AuthCallbackClient() {
       }
 
       if (!code) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          router.replace(nextPath);
+        const sessionReady = await waitForSessionReady();
+        if (sessionReady) {
+          window.location.replace(nextPath);
           return;
         }
 
@@ -51,8 +71,8 @@ export function AuthCallbackClient() {
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      const sessionReady = await waitForSessionReady();
+      if (!sessionReady) {
         router.replace(
           `/login?message=${encodeURIComponent("ログインセッションの取得に失敗しました。")}`
         );
@@ -60,7 +80,7 @@ export function AuthCallbackClient() {
       }
 
       setMessage("ログインに成功しました。ホームへ移動します...");
-      router.replace(nextPath);
+      window.location.replace(nextPath);
     }
 
     void handleCallback();

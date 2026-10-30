@@ -71,7 +71,7 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
       setCards([]);
     } else {
       setCards(
-        ((cardResult.data ?? []) as CardRecord[]).filter(
+        ((cardResult.data ?? []) as unknown as CardRecord[]).filter(
           (card) => card.card_type === "flag_card" && card.is_active
         )
       );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Button } from "@/components/common/button";
 import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
@@ -57,7 +57,7 @@ function SearchSection(props: {
   );
 }
 
-export function DeckCardSearchPanel({
+function DeckCardSearchPanelComponent({
   filters,
   worlds,
   sets,
@@ -404,3 +404,5 @@ export function DeckCardSearchPanel({
     </div>
   );
 }
+
+export const DeckCardSearchPanel = memo(DeckCardSearchPanelComponent);

@@ -78,7 +78,7 @@ function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
   );
 }
 
-function isBattleCardRested(card: BattleCard, _cardRecord: CardRecord | null | undefined) {
+function isBattleCardRested(card: BattleCard) {
   if (card.meta.isRested === true) return true;
   if (card.meta.isRested === false) return false;
   return false;
@@ -312,7 +312,7 @@ export function BattleZone({
             const areaIsDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
             if (!areaCardRecord) return null;
-            const areaIsRested = isBattleCardRested(areaTopCard, areaCardRecord);
+            const areaIsRested = isBattleCardRested(areaTopCard);
             const areaIsNativeHorizontal =
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
 
@@ -457,7 +457,7 @@ export function BattleZone({
             })
           ) : topCard && cardRecord ? (
             (() => {
-              const isRested = isBattleCardRested(topCard, cardRecord);
+              const isRested = isBattleCardRested(topCard);
               const isNativeHorizontal =
                 preserveBattleOrientation && cardRecord.orientation === "horizontal";
 

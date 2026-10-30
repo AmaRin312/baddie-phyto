@@ -85,49 +85,87 @@ type CardPrintingQueryRow = {
   } | null;
 };
 
+const DECK_CARD_PRINTING_CACHE_TTL_MS = 300_000;
+let deckCardPrintingCache:
+  | {
+      expiresAt: number;
+      value: {
+        printings: CardPrintingSearchRecord[];
+        sets: DeckCardSetOption[];
+        error: string | null;
+      };
+    }
+  | null = null;
+let deckCardPrintingInFlight: Promise<{
+  printings: CardPrintingSearchRecord[];
+  sets: DeckCardSetOption[];
+  error: string | null;
+}> | null = null;
+
 export async function loadDeckCardPrintingSearchData(): Promise<{
   printings: CardPrintingSearchRecord[];
   sets: DeckCardSetOption[];
   error: string | null;
 }> {
-  const { data, error } = await supabase
-    .from("card_printings")
-    .select("card_id,card_sets(id,set_code,name,era_key)")
-    .returns<CardPrintingQueryRow[]>();
-
-  if (error) {
-    return { printings: [], sets: [], error: error.message };
+  if (deckCardPrintingCache && deckCardPrintingCache.expiresAt > Date.now()) {
+    return deckCardPrintingCache.value;
+  }
+  if (deckCardPrintingInFlight) {
+    return deckCardPrintingInFlight;
   }
 
-  const setMap = new Map<string, DeckCardSetOption>();
-  const printings: CardPrintingSearchRecord[] = [];
+  deckCardPrintingInFlight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from("card_printings")
+        .select("card_id,card_sets(id,set_code,name,era_key)")
+        .returns<CardPrintingQueryRow[]>();
+      if (error) {
+        return { printings: [], sets: [], error: error.message };
+      }
 
-  (data ?? []).forEach((row) => {
-    const set = row.card_sets;
-    if (!set) return;
-    const eraKey = set.era_key ?? "first";
-    setMap.set(set.id, {
-      id: set.id,
-      setCode: set.set_code,
-      name: set.name,
-      eraKey
-    });
-    printings.push({
-      cardId: row.card_id,
-      setId: set.id,
-      setCode: set.set_code,
-      setName: set.name,
-      eraKey
-    });
-  });
+      const setMap = new Map<string, DeckCardSetOption>();
+      const printings: CardPrintingSearchRecord[] = [];
 
-  return {
-    printings,
-    sets: Array.from(setMap.values()).sort((left, right) =>
-      (left.name ?? left.setCode).localeCompare(right.name ?? right.setCode, "ja")
-    ),
-    error: null
-  };
+      (data ?? []).forEach((row) => {
+        const set = row.card_sets;
+        if (!set) return;
+        const eraKey = set.era_key ?? "first";
+        setMap.set(set.id, {
+          id: set.id,
+          setCode: set.set_code,
+          name: set.name,
+          eraKey
+        });
+        printings.push({
+          cardId: row.card_id,
+          setId: set.id,
+          setCode: set.set_code,
+          setName: set.name,
+          eraKey
+        });
+      });
+
+      const result = {
+        printings,
+        sets: Array.from(setMap.values()).sort((left, right) =>
+          (left.name ?? left.setCode).localeCompare(right.name ?? right.setCode, "ja")
+        ),
+        error: null
+      };
+
+      deckCardPrintingCache = {
+        expiresAt: Date.now() + DECK_CARD_PRINTING_CACHE_TTL_MS,
+        value: result
+      };
+
+      return result;
+    } finally {
+      deckCardPrintingInFlight = null;
+    }
+  })();
+
+  return deckCardPrintingInFlight;
 }
 
 export function getDeckCardSearchOptions(cards: CardRecord[]) {

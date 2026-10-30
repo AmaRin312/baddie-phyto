@@ -29,7 +29,7 @@ export default function NewFlagPage() {
         setMessage(`フラッグカード候補の読み込みに失敗しました。${error.message}`);
       } else {
         setCards(
-          ((data ?? []) as CardRecord[]).filter(
+          ((data ?? []) as unknown as CardRecord[]).filter(
             (card) => card.card_type === "flag_card" && card.is_active
           )
         );

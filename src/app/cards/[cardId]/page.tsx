@@ -65,7 +65,8 @@ export default function CardEditPage({ params }: CardEditPageProps) {
       setCard(null);
       return;
     }
-    setCard(cardResult.data as CardRecord);
+    const nextCard = cardResult.data as unknown as CardRecord;
+    setCard(nextCard);
     setImages(imageResult.data ?? []);
   }
 

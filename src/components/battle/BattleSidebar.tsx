@@ -245,9 +245,9 @@ export function BattleSidebar({
     viewerCards.length > 0 ? viewerCards.slice(0, 2) : activeCard ? [activeCard] : [];
 
   return (
-    <aside className="bf-right-panel" aria-label="??????">
+    <aside className="bf-right-panel" aria-label="対戦サイドバー">
       <section className="bf-side-panel-card">
-        <h2>????</h2>
+        <h2>相手手札</h2>
         <HandCards
           cards={battleState.players.opponent.zones.hand.cards}
           cardMap={cardMap}
@@ -268,7 +268,7 @@ export function BattleSidebar({
 
       <section className="bf-side-panel-card bf-viewer-panel">
         <div className="bf-viewer-panel-header">
-          <h2>?????</h2>
+          <h2>ビューアー</h2>
           <button
             type="button"
             className={`bf-viewer-pin${viewerPinned ? " is-pinned" : ""}`}
@@ -278,7 +278,7 @@ export function BattleSidebar({
               onToggleViewerPin();
             }}
           >
-            ??
+            📌
           </button>
         </div>
         <div className="bf-viewer-grid">
@@ -314,11 +314,11 @@ export function BattleSidebar({
               );
             })
           ) : (
-            <p className="bf-viewer-empty">?????????????????</p>
+            <p className="bf-viewer-empty">表示中のカードはありません</p>
           )}
           {normalizedViewerCards.length === 1 && (
             <div className="bf-single-viewer is-empty">
-              <p className="bf-viewer-empty">2??</p>
+              <p className="bf-viewer-empty">2枚目</p>
             </div>
           )}
         </div>
@@ -335,7 +335,7 @@ export function BattleSidebar({
       </section>
 
       <section className="bf-side-panel-card is-self-hand">
-        <h2>????</h2>
+        <h2>自分手札</h2>
         <HandCards
           self
           cards={battleState.players.self.zones.hand.cards}

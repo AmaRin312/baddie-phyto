@@ -231,6 +231,15 @@ export type ChangeLifeInput = {
   amount: number;
 };
 
+export type RollDiceInput = {
+  playerId: BattlePlayerId;
+  random?: () => number;
+};
+
+export type ClearDiceInput = {
+  playerId: BattlePlayerId;
+};
+
 export type MoveSoulToSoulInput = {
   parentInstanceId: string;
   soulInstanceId: string;
@@ -326,6 +335,7 @@ function clonePlayer(player: PlayerState): PlayerState {
   return {
     ...player,
     life: { ...player.life },
+    dice: player.dice ? { ...player.dice } : null,
     zones: Object.fromEntries(
       Object.entries(player.zones).map(([zoneId, zone]) => [
         zoneId,
@@ -1402,6 +1412,30 @@ export function changeLife(
 ): BattleState {
   const nextState = cloneBattleState(state);
   nextState.players[input.playerId].life.value += input.amount;
+  return nextState;
+}
+
+export function rollDice(
+  state: BattleState,
+  input: RollDiceInput
+): BattleState {
+  const nextState = cloneBattleState(state);
+  const random = input.random ?? Math.random;
+  const value = Math.floor(random() * 6) + 1;
+  nextState.players[input.playerId].dice = {
+    value: Math.min(6, Math.max(1, value)) as 1 | 2 | 3 | 4 | 5 | 6,
+    rolledAt: new Date().toISOString()
+  };
+  return nextState;
+}
+
+export function clearDice(
+  state: BattleState,
+  input: ClearDiceInput
+): BattleState {
+  if (!state.players[input.playerId].dice) return state;
+  const nextState = cloneBattleState(state);
+  nextState.players[input.playerId].dice = null;
   return nextState;
 }
 

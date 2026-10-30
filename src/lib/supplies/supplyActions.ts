@@ -6,6 +6,19 @@ import type {
 } from "@/types/baddiePhyto";
 
 const SUPPLY_BUCKET_NAME = "battle-supplies";
+const SUPPLY_CACHE_TTL_MS = 300_000;
+type CachedBattleSuppliesResponse = {
+  data: BattleSupplyRecord[] | null;
+  error: { message: string } | null;
+};
+const battleSuppliesCache = new Map<
+  string,
+  { expiresAt: number; value: CachedBattleSuppliesResponse }
+>();
+const battleSuppliesInFlight = new Map<
+  string,
+  Promise<CachedBattleSuppliesResponse>
+>();
 
 function getExtension(file: File) {
   if (file.type === "image/png") return "png";
@@ -19,6 +32,14 @@ export function getPublicSupplyImageUrl(path?: string | null) {
 }
 
 export async function loadBattleSupplies(type?: BattleSupplyType) {
+  const cacheKey = `supplies:${type ?? "all"}`;
+  const cached = battleSuppliesCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+  const inFlight = battleSuppliesInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
   let query = supabase
     .from("battle_supplies")
     .select("*")
@@ -27,7 +48,23 @@ export async function loadBattleSupplies(type?: BattleSupplyType) {
 
   if (type) query = query.eq("supply_type", type);
 
-  return await query.returns<BattleSupplyRecord[]>();
+  const request: Promise<CachedBattleSuppliesResponse> = (async () => {
+    try {
+      const result = await query.returns<BattleSupplyRecord[]>();
+      if (!result.error) {
+        battleSuppliesCache.set(cacheKey, {
+          expiresAt: Date.now() + SUPPLY_CACHE_TTL_MS,
+          value: result
+        });
+      }
+      return result;
+    } finally {
+      battleSuppliesInFlight.delete(cacheKey);
+    }
+  })();
+
+  battleSuppliesInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function uploadBattleSupply(input: {
@@ -61,6 +98,10 @@ export async function uploadBattleSupply(input: {
     await supabase.storage.from(SUPPLY_BUCKET_NAME).remove([imagePath]);
   }
 
+  if (!insertResult.error) {
+    battleSuppliesCache.clear();
+  }
+
   return insertResult;
 }
 
@@ -72,7 +113,11 @@ export async function deleteBattleSupply(supply: Pick<BattleSupplyRecord, "id" |
 
   if (updateResult.error) return updateResult;
 
-  return await supabase.storage.from(SUPPLY_BUCKET_NAME).remove([supply.image_path]);
+  const result = await supabase.storage.from(SUPPLY_BUCKET_NAME).remove([supply.image_path]);
+  if (!updateResult.error) {
+    battleSuppliesCache.clear();
+  }
+  return result;
 }
 
 export async function loadBattleSupplySettings(userId: string) {

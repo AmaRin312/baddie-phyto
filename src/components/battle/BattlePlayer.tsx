@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { memo } from "react";
 import { BattleZone } from "@/components/battle/BattleZone";
 import type { CSSProperties, MouseEvent } from "react";
 import type {
@@ -50,9 +51,12 @@ type BattlePlayerProps = {
     event: MouseEvent<HTMLDivElement>,
     playerId: "self" | "opponent"
   ) => void;
+  onChangeLife?: (amount: number) => void;
+  onRollDice?: () => void;
+  onClearDice?: () => void;
 };
 
-export function BattlePlayer({
+function BattlePlayerComponent({
   player,
   side,
   cardMap,
@@ -73,7 +77,10 @@ export function BattlePlayer({
   onDoubleClickZone,
   placementTargetZones,
   placementTargetPlayerId,
-  onPlacementZoneClick
+  onPlacementZoneClick,
+  onChangeLife,
+  onRollDice,
+  onClearDice
 }: BattlePlayerProps) {
   const isOpponent = side === "opponent";
   const boardHalfStyle = playmatImageUrl
@@ -89,8 +96,63 @@ export function BattlePlayer({
       }`}
       style={boardHalfStyle}
     >
-      <div className="bf-life-badge">
-        LIFE {player.life.value}
+      <div className="bf-life-badge" aria-label={`${player.name}のライフ`}>
+        <span>LIFE {player.life.value}</span>
+        {!isOpponent && onChangeLife && (
+          <span className="bf-life-controls" aria-label="ライフ操作">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onChangeLife(-1);
+              }}
+            >
+              -
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onChangeLife(1);
+              }}
+            >
+              +
+            </button>
+          </span>
+        )}
+      </div>
+      <div className="bf-dice-panel" aria-label={`${player.name}のサイコロ`}>
+        {player.dice ? (
+          <span className="bf-dice-value">{player.dice.value}</span>
+        ) : (
+          <span className="bf-dice-empty">-</span>
+        )}
+        {!isOpponent && (
+          <span className="bf-dice-controls">
+            {onRollDice && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRollDice();
+                }}
+              >
+                振る
+              </button>
+            )}
+            {player.dice && onClearDice && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClearDice();
+                }}
+              >
+                消す
+              </button>
+            )}
+          </span>
+        )}
       </div>
       <div className="bf-player-board-wrap">
         <div className={`bf-player-board${isOpponent ? " is-mirrored" : ""}`}>
@@ -381,4 +443,6 @@ export function BattlePlayer({
     </section>
   );
 }
+
+export const BattlePlayer = memo(BattlePlayerComponent);
 
