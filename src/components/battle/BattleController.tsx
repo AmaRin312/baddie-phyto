@@ -29,6 +29,7 @@ import {
   disbandBattleRoom,
   loadBattleRoom,
   PREALLOCATED_BATTLE_ROOMS,
+  leaveBattleRoomBeforeDeckSelection,
   releaseBattleRoom,
   updateBattleRoomDeck
 } from "@/lib/battle/battleRooms";
@@ -53,7 +54,6 @@ import {
   deleteSyncedPlayerBattleStates,
   getOpponentSeat,
   getCurrentBattleUserId,
-  leaveBattleRoomBeforeDeckSelection,
   loadSyncedPlayerBattleStates,
   mapSyncedSeatStatesToPlayers,
   normalizeBattlePlayerSeat,
