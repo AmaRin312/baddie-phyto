@@ -1,7 +1,6 @@
 export type BattleShortcutBlockState = {
   isShortcutCaptureOpen?: boolean;
   isBattleActionPopupOpen?: boolean;
-  isContextMenuOpen?: boolean;
   isSelectionModeOpen?: boolean;
   isDeckCountPopupOpen?: boolean;
   isDeckBrowserPopupOpen?: boolean;

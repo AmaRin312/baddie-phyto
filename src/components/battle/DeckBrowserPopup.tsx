@@ -176,7 +176,7 @@ export function DeckBrowserPopup({
       size="fullscreen"
       onClose={onClose}
       lightBackdrop
-      className="bf-deck-browser-popup"
+      className={`bf-deck-browser-popup${mode === "browse" ? " is-browse-mode" : ""}`}
       contentClassName="bf-deck-browser-content"
       footer={
         <>

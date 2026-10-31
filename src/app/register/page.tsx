@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 
 export default function RegisterPage() {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    void getOrCreateProfile().then((profile) => setIsAdmin(Boolean(profile?.is_admin)));
+  }, []);
+
   return (
     <AppShell>
       <div className="dm-app-grid">
@@ -38,6 +46,26 @@ export default function RegisterPage() {
             </Link>
           </div>
         </AppCard>
+
+        <AppCard
+          title="サプライ登録"
+          description="デッキや対戦画面で使うスリーブ・プレイマットを登録します。"
+        >
+          <Link href="/supplies" className="dm-button primary">
+            サプライ登録
+          </Link>
+        </AppCard>
+
+        {isAdmin && (
+          <AppCard
+            title="管理者設定"
+            description="サイト全体で使用するデフォルトスリーブを設定します。"
+          >
+            <Link href="/admin" className="dm-button secondary">
+              管理者画面
+            </Link>
+          </AppCard>
+        )}
       </div>
     </AppShell>
   );

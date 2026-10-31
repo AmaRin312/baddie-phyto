@@ -12,6 +12,7 @@ import {
   canDropSingleSoulCard
 } from "@/lib/battle/battleActions";
 import { findCompositeGroupCardsInBattleState } from "@/lib/battle/compositeCards";
+import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import type { MouseEvent } from "react";
 import type {
   BattleCard,
@@ -169,6 +170,7 @@ function HandCards({
                 event.preventDefault();
                 return;
               }
+              setBattleCardDragImage(event.currentTarget, event.dataTransfer);
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", battleCard.instanceId);
               onDragStartCard(battleCard, self ? "self" : "opponent");

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/button";
 import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
@@ -20,6 +20,7 @@ import {
 type DeckCardSearchPanelProps = {
   filters: DeckCardSearchFilters;
   worlds: string[];
+  initialWorlds?: string[];
   sets: DeckCardSetOption[];
   onChange: (filters: DeckCardSearchFilters) => void;
 };
@@ -60,6 +61,7 @@ function SearchSection(props: {
 function DeckCardSearchPanelComponent({
   filters,
   worlds,
+  initialWorlds = [],
   sets,
   onChange
 }: DeckCardSearchPanelProps) {
@@ -70,6 +72,12 @@ function DeckCardSearchPanelComponent({
     eras: false,
     attributes: false
   });
+
+  useEffect(() => {
+    if (filters.worlds.length === 0 && initialWorlds.length > 0) {
+      onChange({ ...filters, worlds: initialWorlds });
+    }
+  }, [filters, initialWorlds, onChange]);
 
   const setsByEra = useMemo(() => {
     const map = new Map<DeckCardEraKey, DeckCardSetOption[]>();

@@ -13,7 +13,6 @@ import { AbilityNotificationListPanel } from "@/components/battle/AbilityNotific
 import { AbilityCardTargetPopup } from "@/components/battle/AbilityCardTargetPopup";
 import { BiriKinataTargetPopup } from "@/components/battle/BiriKinataTargetPopup";
 import { BattleBoard } from "@/components/battle/BattleBoard";
-import { BattleContextMenu } from "@/components/battle/BattleContextMenu";
 import { BattlePopup } from "@/components/battle/BattlePopup";
 import { BattleSidebar } from "@/components/battle/BattleSidebar";
 import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
@@ -29,6 +28,8 @@ import {
   deleteBattleRoom,
   disbandBattleRoom,
   loadBattleRoom,
+  PREALLOCATED_BATTLE_ROOMS,
+  releaseBattleRoom,
   updateBattleRoomDeck
 } from "@/lib/battle/battleRooms";
 import {
@@ -52,6 +53,7 @@ import {
   deleteSyncedPlayerBattleStates,
   getOpponentSeat,
   getCurrentBattleUserId,
+  leaveBattleRoomBeforeDeckSelection,
   loadSyncedPlayerBattleStates,
   mapSyncedSeatStatesToPlayers,
   normalizeBattlePlayerSeat,
@@ -72,11 +74,6 @@ import type {
   BattleCardAbilityMap
 } from "@/lib/battle/abilities/abilityTypes";
 import { createInitialBattleState } from "@/lib/battle/createInitialBattleState";
-import {
-  buildBattleContextMenu,
-  type BattleMenuItem,
-  type BattlePlacementSource
-} from "@/lib/battle/menus/battleContextMenu";
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
@@ -87,7 +84,7 @@ import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
   loadBattleSupplies,
-  loadBattleSupplySettings
+  loadSiteSupplySettings
 } from "@/lib/supplies/supplyActions";
 import { loadShortcutSettings } from "@/lib/shortcuts/shortcutSettings";
 import type { ShortcutActionId, ShortcutSettings } from "@/lib/shortcuts/shortcutTypes";
@@ -107,7 +104,7 @@ import type {
 } from "@/types/battle";
 import type {
   BattleSupplyRecord,
-  BattleSupplySettingsRecord,
+  SiteSupplySettingsRecord,
   CardImageRecord,
   DeckCardRecord,
   DeckRecord,
@@ -167,20 +164,14 @@ type SoulDragSelection = {
 };
 
 type PendingBattleActionPopup = {
-  source: BattlePlacementSource;
+  source:
+    | { kind: "card"; instanceId: string; fromZone: BattleZoneId }
+    | { kind: "soul"; parentInstanceId: string; soulInstanceId: string };
   sourceCard: BattleCard;
   toZone: BattleZoneId;
   targetInstanceId: string;
   x: number;
   y: number;
-};
-
-type PendingContextMenu = {
-  items: BattleMenuItem[];
-  title: string;
-  x: number;
-  y: number;
-  sourceCard?: BattleCard;
 };
 
 type PendingDeckCountPopup = {
@@ -203,14 +194,6 @@ type PendingHyakuganPopup = {
   pairCandidates: BattleCard[];
   selectedPairInstanceId: string | null;
 };
-
-const PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
-  "center",
-  "left",
-  "right",
-  "item",
-  "set"
-];
 
 type BattleResetSource = {
   flag: Parameters<typeof createInitialBattleState>[0]["flag"];
@@ -296,14 +279,17 @@ export function BattleController() {
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
-  const [battleSupplySettings, setBattleSupplySettings] =
-    useState<BattleSupplySettingsRecord | null>(null);
+  const [siteSupplySettings, setSiteSupplySettings] =
+    useState<SiteSupplySettingsRecord | null>(null);
   const [battleDeck, setBattleDeck] = useState<DeckRecord | null>(null);
+  const [showRoomDeckSelection, setShowRoomDeckSelection] = useState(false);
+  const [roomDeckOptions, setRoomDeckOptions] = useState<DeckRecord[]>([]);
+  const [roomDeckSelectionId, setRoomDeckSelectionId] = useState("");
+  const [roomDeckSelectionName, setRoomDeckSelectionName] = useState("");
+  const [roomDeckSelectionBusy, setRoomDeckSelectionBusy] = useState(false);
+  const [roomDeckSelectionError, setRoomDeckSelectionError] = useState("");
   const [playerSupplyDecks, setPlayerSupplyDecks] = useState<
     Partial<Record<BattlePlayerId, DeckRecord>>
-  >({});
-  const [playerSupplySettings, setPlayerSupplySettings] = useState<
-    Partial<Record<BattlePlayerId, BattleSupplySettingsRecord | null>>
   >({});
   const [cardAbilityMap, setCardAbilityMap] = useState<BattleCardAbilityMap>(
     () => new Map()
@@ -324,8 +310,6 @@ export function BattleController() {
   );
   const [pendingActionPopup, setPendingActionPopup] =
     useState<PendingBattleActionPopup | null>(null);
-  const [pendingContextMenu, setPendingContextMenu] =
-    useState<PendingContextMenu | null>(null);
   const [selectionMode, setSelectionMode] = useState<BattleSelectionMode>(null);
   const [pendingDeckCountPopup, setPendingDeckCountPopup] =
     useState<PendingDeckCountPopup | null>(null);
@@ -354,6 +338,7 @@ export function BattleController() {
   const [message, setMessage] = useState("");
   const [showDeckChangePopup, setShowDeckChangePopup] = useState(false);
   const [deckChangeLoading, setDeckChangeLoading] = useState(false);
+  const [deckChangeError, setDeckChangeError] = useState("");
   const [changeableDecks, setChangeableDecks] = useState<DeckRecord[]>([]);
   const [deckChangeTargetId, setDeckChangeTargetId] = useState("");
   const [deckChangeSearchText, setDeckChangeSearchText] = useState("");
@@ -398,6 +383,62 @@ export function BattleController() {
 
   const loadBattle = useCallback(async () => {
     if (!deckId) {
+      if (isRealtimeBattle && roomId && selfSeat) {
+        setLoading(true);
+        setMessage("");
+        const profile = await getOrCreateProfile();
+        if (!profile) {
+          window.location.href = "/login";
+          return;
+        }
+        currentUserIdRef.current = profile.id;
+
+        const [roomResult, decksResult] = await Promise.all([
+          loadBattleRoom(roomId),
+          loadDecks()
+        ]);
+        if (roomResult.error || !roomResult.data) {
+          setMessage(roomResult.error ?? "ルームを読み込めませんでした。");
+          setLoading(false);
+          return;
+        }
+
+        const room = roomResult.data;
+        const seatUserId = selfSeat === "player1" ? room.host_user_id : room.guest_user_id;
+        if (room.status === "disbanded" || seatUserId !== profile.id) {
+          setMessage("このルームの席を確認できません。対戦開始画面から入り直してください。");
+          setLoading(false);
+          return;
+        }
+        if (decksResult.error) {
+          setMessage(getErrorMessage(decksResult.error) ?? "デッキ一覧を読み込めませんでした。");
+          setLoading(false);
+          return;
+        }
+
+        const availableDecks = (decksResult.data ?? []).filter(
+          (deck) =>
+            (deck.owner_id === profile.id ||
+              deck.deck_visibility === "public" ||
+              deck.deck_visibility === "default") &&
+            deck.flag_id &&
+            deck.buddy_card_id
+        );
+        const currentRoomDeckId =
+          selfSeat === "player1" ? room.host_deck_id : room.guest_deck_id;
+        setRoomDeckOptions(availableDecks);
+        setRoomDeckSelectionId(
+          availableDecks.some((deck) => deck.id === currentRoomDeckId)
+            ? currentRoomDeckId ?? ""
+            : availableDecks[0]?.id ?? ""
+        );
+        setRoomDeckSelectionName(room.name);
+        setRoomDeckSelectionError("");
+        setShowRoomDeckSelection(true);
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
       setMessage("デッキを選択してからBattleを開始してください。");
       return;
@@ -426,7 +467,7 @@ export function BattleController() {
       shortcutResult,
       abilityMapResult,
       supplyResult,
-      supplySettingsResult,
+      siteSupplySettingsResult,
       roomResult
     ] =
       await Promise.allSettled([
@@ -435,7 +476,7 @@ export function BattleController() {
         loadShortcutSettings(),
         loadBattleCardAbilityMap(),
         loadBattleSupplies(),
-        loadBattleSupplySettings(profile.id),
+        loadSiteSupplySettings(),
         isRealtimeBattle ? loadBattleRoom(roomId) : Promise.resolve({ data: null, error: null })
       ]);
 
@@ -447,8 +488,10 @@ export function BattleController() {
     const abilityMapResponse =
       abilityMapResult.status === "fulfilled" ? abilityMapResult.value : null;
     const supplyResponse = supplyResult.status === "fulfilled" ? supplyResult.value : null;
-    const supplySettingsResponse =
-      supplySettingsResult.status === "fulfilled" ? supplySettingsResult.value : null;
+    const siteSupplySettingsResponse =
+      siteSupplySettingsResult.status === "fulfilled"
+        ? siteSupplySettingsResult.value
+        : null;
     const roomResponse = roomResult.status === "fulfilled" ? roomResult.value : null;
 
     if (
@@ -581,13 +624,13 @@ export function BattleController() {
       } else {
         setBattleSupplies(supplyResponse?.data ?? []);
       }
-      if (supplySettingsResponse?.error) {
+      if (siteSupplySettingsResponse?.error) {
         console.warn(
-          "Battle supply settings are not available yet.",
-          supplySettingsResponse.error
+          "Site supply settings are not available yet.",
+          siteSupplySettingsResponse.error
         );
       } else {
-        setBattleSupplySettings(supplySettingsResponse?.data ?? null);
+        setSiteSupplySettings(siteSupplySettingsResponse?.data ?? null);
       }
       if (roomResponse?.error) {
         console.warn("Battle room supply metadata is not available yet.", roomResponse.error);
@@ -610,25 +653,6 @@ export function BattleController() {
         self: selfSupplyDeck,
         ...(opponentDeck ? { opponent: opponentDeck } : {})
       });
-      const selfSettingsResult = selfSupplyDeck.owner_id
-        ? await loadBattleSupplySettings(selfSupplyDeck.owner_id)
-        : { data: null, error: null };
-      const opponentSettingsResult = opponentDeck?.owner_id
-        ? await loadBattleSupplySettings(opponentDeck.owner_id)
-        : { data: null, error: null };
-      if (selfSettingsResult.error) {
-        console.warn("Self supply settings are not available yet.", selfSettingsResult.error);
-      }
-      if (opponentSettingsResult.error) {
-        console.warn(
-          "Opponent supply settings are not available yet.",
-          opponentSettingsResult.error
-        );
-      }
-      setPlayerSupplySettings({
-        self: selfSettingsResult.data ?? supplySettingsResponse?.data ?? null,
-        opponent: opponentSettingsResult.data ?? null
-      });
       setCardAbilityMap(abilityMapResponse?.error ? new Map() : abilityMapResponse?.data ?? new Map());
       setShortcutSettings(shortcutResponse?.data ?? mergeWithDefaultShortcuts(null));
       setBattleState(initialState);
@@ -643,6 +667,42 @@ export function BattleController() {
 
     setLoading(false);
   }, [deckId, isRealtimeBattle, roomId, selfSeat]);
+
+  async function handleConfirmRoomDeckSelection() {
+    if (!roomId || !selfSeat || !roomDeckSelectionId) return;
+    setRoomDeckSelectionBusy(true);
+    setRoomDeckSelectionError("");
+    const result = await updateBattleRoomDeck({
+      roomId,
+      seat: selfSeat,
+      deckId: roomDeckSelectionId
+    });
+    setRoomDeckSelectionBusy(false);
+    if (result.error || !result.data) {
+      setRoomDeckSelectionError(result.error ?? "デッキを設定できませんでした。");
+      return;
+    }
+
+    window.location.href = buildBattleUrl({
+      deckId: roomDeckSelectionId,
+      roomId,
+      seat: selfSeat,
+      mode: "match"
+    });
+  }
+
+  async function handleCancelRoomDeckSelection() {
+    if (!roomId || !selfSeat) return;
+    setRoomDeckSelectionBusy(true);
+    setRoomDeckSelectionError("");
+    const result = await leaveBattleRoomBeforeDeckSelection(roomId, selfSeat);
+    setRoomDeckSelectionBusy(false);
+    if (result.error) {
+      setRoomDeckSelectionError(result.error);
+      return;
+    }
+    window.location.href = "/battle";
+  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -684,22 +744,6 @@ export function BattleController() {
     setPlayerSupplyDecks((current) => ({
       ...current,
       opponent: opponentDeck
-    }));
-
-    const opponentSettingsResult = await loadBattleSupplySettings(
-      opponentDeck.owner_id
-    );
-    if (opponentSettingsResult.error) {
-      console.warn(
-        "Opponent supply settings refresh failed.",
-        opponentSettingsResult.error
-      );
-      return;
-    }
-
-    setPlayerSupplySettings((current) => ({
-      ...current,
-      opponent: opponentSettingsResult.data ?? null
     }));
   }, [isRealtimeBattle, roomId, selfSeat]);
 
@@ -812,16 +856,13 @@ export function BattleController() {
     supplyType: "sleeve" | "playmat"
   ) => {
     const deck = playerSupplyDecks[playerId] ?? (playerId === "self" ? battleDeck : null);
-    const settings =
-      playerSupplySettings[playerId] ??
-      (playerId === "self" ? battleSupplySettings : null);
     const supplyId =
       supplyType === "sleeve"
-        ? deck?.sleeve_supply_id || settings?.sleeve_supply_id || null
-        : deck?.playmat_supply_id || settings?.playmat_supply_id || null;
+        ? deck?.sleeve_supply_id || siteSupplySettings?.sleeve_supply_id || null
+        : deck?.playmat_supply_id || null;
     const supply = battleSupplies.find((item) => item.id === supplyId);
     return getPublicSupplyImageUrl(supply?.image_path);
-  }, [battleDeck, battleSupplies, battleSupplySettings, playerSupplyDecks, playerSupplySettings]);
+  }, [battleDeck, battleSupplies, playerSupplyDecks, siteSupplySettings]);
 
   const playerSleeveImageUrls = useMemo(
     () => ({
@@ -1113,7 +1154,6 @@ export function BattleController() {
     setSoulDragSelection(null);
     setPendingDeckDrop(null);
     setPendingActionPopup(null);
-    setPendingContextMenu(null);
     setSelectionMode(null);
     setPendingDeckCountPopup(null);
     setPendingBiriKinataPopup(null);
@@ -1153,7 +1193,7 @@ export function BattleController() {
     if (!roomId) return;
     const confirmed = window.confirm(
       isRealtimeBattle
-        ? "部屋から退室します。自分の同期状態だけを削除して対戦開始画面へ戻ります。よろしいですか？"
+        ? "部屋から退室します。対戦状態を整理して対戦開始画面へ戻ります。よろしいですか？"
         : "一人回しから退室します。保存済みの盤面状態も削除します。よろしいですか？"
     );
     if (!confirmed) return;
@@ -1162,8 +1202,11 @@ export function BattleController() {
       isRealtimeBattle && selfSeat
         ? (!opponentPresent
             ? Promise.all([
-                deleteBattleRoom(roomId),
-                deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
+                PREALLOCATED_BATTLE_ROOMS.some((room) => room.roomId === roomId)
+                  ? releaseBattleRoom(roomId)
+                  : deleteBattleRoom(roomId),
+                deleteBattleState(roomId),
+                deleteSyncedPlayerBattleStates(roomId)
               ])
             : Promise.all([
                 disbandBattleRoom(roomId),
@@ -1174,10 +1217,9 @@ export function BattleController() {
             deleteSyncedPlayerBattleStates(roomId)
           ]);
 
-    void deleteTask.then(([battleResult, playerResult]) => {
-      if (battleResult.error || playerResult.error) {
-        console.error(battleResult.error ?? playerResult.error);
-      }
+    void deleteTask.then((results) => {
+      const error = results.find((result) => result.error)?.error;
+      if (error) console.error(error);
 
       void cleanupExpiredBattleRooms();
       window.location.href = "/battle";
@@ -1230,33 +1272,39 @@ export function BattleController() {
   }, [deckChangeTargetId, filteredChangeableDecks]);
 
   async function handleOpenDeckChangePopup() {
+    setDeckChangeError("");
+    setChangeableDecks([]);
+    setShowDeckChangePopup(true);
     setDeckChangeLoading(true);
-    const deckResult = await loadDecks();
-    setDeckChangeLoading(false);
-
-    if (deckResult.error) {
-      setMessage("??????????????????");
-      return;
-    }
-
-    const currentUserId = currentUserIdRef.current ?? "";
-    const visibleDecks = (deckResult.data ?? []).filter(
-      (deck: DeckRecord) =>
-        (deck.owner_id === currentUserId ||
-          deck.deck_visibility === "public" ||
-          deck.deck_visibility === "default") &&
-        canStartBattleDeck(deck)
-    );
-
-    setChangeableDecks(visibleDecks);
     setDeckChangeSearchText("");
     setDeckChangeEraKey("");
-    setDeckChangeTargetId(
-      visibleDecks.find((deck: DeckRecord) => deck.id === battleDeck?.id)?.id ??
-        visibleDecks[0]?.id ??
-        ""
-    );
-    setShowDeckChangePopup(true);
+    try {
+      const deckResult = await loadDecks();
+      if (deckResult.error) {
+        setDeckChangeError(getErrorMessage(deckResult.error) ?? "デッキ一覧を読み込めませんでした。");
+        return;
+      }
+
+      const currentUserId = currentUserIdRef.current ?? "";
+      const visibleDecks = (deckResult.data ?? []).filter(
+        (deck: DeckRecord) =>
+          (deck.owner_id === currentUserId ||
+            deck.deck_visibility === "public" ||
+            deck.deck_visibility === "default") &&
+          canStartBattleDeck(deck)
+      );
+
+      setChangeableDecks(visibleDecks);
+      setDeckChangeTargetId(
+        visibleDecks.find((deck: DeckRecord) => deck.id === battleDeck?.id)?.id ??
+          visibleDecks[0]?.id ??
+          ""
+      );
+    } catch (error) {
+      setDeckChangeError(getErrorMessage(error) ?? "デッキ一覧を読み込めませんでした。");
+    } finally {
+      setDeckChangeLoading(false);
+    }
   }
 
   function handleChangeDeck() {
@@ -1480,7 +1528,6 @@ export function BattleController() {
       if (
         isBattleShortcutBlocked({
           isBattleActionPopupOpen: pendingActionPopup != null,
-          isContextMenuOpen: pendingContextMenu != null,
           isSelectionModeOpen: selectionMode != null,
           isDeckCountPopupOpen: pendingDeckCountPopup != null,
           isDeckBrowserPopupOpen: lookedDeckCards.length > 0 || dropBrowserPlayerId != null,
@@ -1511,7 +1558,6 @@ export function BattleController() {
     dropBrowserPlayerId,
     pendingActionPopup,
     pendingBiriKinataPopup,
-    pendingContextMenu,
     pendingDeckCountPopup,
     pendingDeckDrop,
     pendingFaceDownSoulPopup,
@@ -1736,69 +1782,21 @@ export function BattleController() {
   }
 
   function handleContextMenuSoulCard(
-    parentCard: BattleCard,
-    soulCard: BattleCard,
+    _parentCard: BattleCard,
+    _soulCard: BattleCard,
     event: MouseEvent<HTMLButtonElement>
   ) {
     event.preventDefault();
     event.stopPropagation();
-
-    const selectedCount =
-      soulSelection.parentInstanceId === parentCard.instanceId &&
-      soulSelection.instanceIds.includes(soulCard.instanceId)
-        ? soulSelection.instanceIds.length
-        : 1;
-    const items = buildBattleContextMenu({
-      kind: "soul",
-      parentCard,
-      soulCard,
-      selectedCount,
-      selectedSoulInstanceIds:
-        selectedCount > 1 ? soulSelection.instanceIds : [soulCard.instanceId]
-    });
-    if (items.length === 0) return;
-
-    setPendingContextMenu({
-      items,
-      title: "Soul",
-      x: event.clientX,
-      y: event.clientY
-    });
   }
 
   function handleContextMenuCard(
-    card: BattleCard,
+    _card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent" = "self"
+    _playerId: "self" | "opponent" = "self"
   ) {
     event.preventDefault();
     event.stopPropagation();
-    if (playerId !== "self") return;
-    if (!battleState) return;
-
-    const items = buildBattleContextMenu(
-      card.zoneId === "deck"
-        ? {
-            kind: "deck",
-            topCard: card
-          }
-        : {
-            kind: "card",
-            card,
-            cardRecord: cardMap.get(card.cardId) ?? null,
-            state: battleState,
-            cardAbilityMap
-          }
-    );
-    if (items.length === 0) return;
-
-    setPendingContextMenu({
-      items,
-      title: card.zoneId === "deck" ? "Deck" : card.zoneId,
-      x: event.clientX,
-      y: event.clientY,
-      sourceCard: card
-    });
   }
 
   function handleDropCard(toZone: BattleZoneId, input: BattleDropInput = {}) {
@@ -1832,15 +1830,15 @@ export function BattleController() {
     if (
       battleState &&
       dragSelection.instanceIds.length === 1 &&
-      ["center", "item"].includes(toZone) &&
       isAreaStackZone(toZone) &&
       input.clientX != null &&
       input.clientY != null
     ) {
+      const existingAreaStacks = getAreaStacks(
+        battleState.players.self.zones[toZone].cards
+      );
       const targetInstanceId =
-        input.targetInstanceId ??
-        getAreaStacks(battleState.players.self.zones[toZone].cards)[0]?.topCard
-          .instanceId;
+        input.targetInstanceId ?? existingAreaStacks[0]?.topCard.instanceId;
       if (!targetInstanceId) {
         applyCardDrop(toZone, undefined, dragSelection, input);
         return;
@@ -2022,33 +2020,6 @@ export function BattleController() {
     setPendingActionPopup(null);
   }
 
-  function handleContextCommand(command: BattleCommand) {
-    executeCommand(command);
-
-    if (command.type === "SET_VIEWER_CARD") {
-      setViewer(command.payload.instanceId, { force: true });
-    }
-
-    setPendingContextMenu(null);
-  }
-
-  function handleContextPlacement(source: BattlePlacementSource) {
-    setSelectionMode({
-      type: "zone",
-      title: "配置するゾーンを選択してください",
-      description: "Center / Left / Right / Item / Set から選択します。",
-      allowedZones: PLACEMENT_TARGET_ZONES,
-      playerId: "self",
-      onSelect: (zoneId, input) =>
-        handlePlacementZoneSelect(source, zoneId, {
-          x: input?.x,
-          y: input?.y
-        }),
-      onCancel: () => setSelectionMode(null)
-    });
-    setPendingContextMenu(null);
-  }
-
   function getFaceDownSoulCandidates(sourceInstanceId: string) {
     if (!battleState) return [];
     return [
@@ -2125,64 +2096,6 @@ export function BattleController() {
         setSelectionMode(null);
       }
     });
-  }
-
-  function handleContextUiAction(item: BattleMenuItem) {
-    if (item.uiAction === "showSoul") {
-      const activeInstanceId = selection.instanceIds[0] ?? null;
-      setViewer(activeInstanceId, { force: true });
-    }
-
-    if (item.uiAction === "openDeckLook") {
-      setPendingDeckCountPopup({
-        mode: "look",
-        x: pendingContextMenu?.x ?? window.innerWidth / 2,
-        y: pendingContextMenu?.y ?? window.innerHeight / 2
-      });
-    }
-
-    if (item.uiAction === "openDeckReveal") {
-      setPendingDeckCountPopup({
-        mode: "reveal",
-        x: pendingContextMenu?.x ?? window.innerWidth / 2,
-        y: pendingContextMenu?.y ?? window.innerHeight / 2
-      });
-    }
-
-    if (item.uiAction === "activateBiriKinata" && pendingContextMenu?.sourceCard) {
-      setPendingBiriKinataPopup({
-        sourceInstanceId: pendingContextMenu.sourceCard.instanceId
-      });
-    }
-
-    if (
-      item.uiAction === "activateFaceDownSoul" &&
-      pendingContextMenu?.sourceCard
-    ) {
-      const sourceInstanceId = pendingContextMenu.sourceCard.instanceId;
-      setPendingFaceDownSoulPopup({
-        sourceInstanceId,
-        candidates: getFaceDownSoulCandidates(sourceInstanceId)
-      });
-    }
-
-    if (
-      item.uiAction === "activateHyakuganComposite" &&
-      pendingContextMenu?.sourceCard
-    ) {
-      const pairCandidates = getHyakuganPairCandidates(pendingContextMenu.sourceCard);
-      if (pairCandidates.length === 0) {
-        setMessage("同じゾーンにもう片方の半身がありません。");
-      } else {
-        setPendingHyakuganPopup({
-          sourceInstanceId: pendingContextMenu.sourceCard.instanceId,
-          pairCandidates,
-          selectedPairInstanceId: null
-        });
-      }
-    }
-
-    setPendingContextMenu(null);
   }
 
   function handleFaceDownSoulTargetSelect(targetInstanceId: string) {
@@ -2322,71 +2235,6 @@ export function BattleController() {
     executeCommands(commands);
   }
 
-  function getSourceCard(source: BattlePlacementSource) {
-    return findBattleCardByInstanceId(
-      battleState,
-      source.kind === "card" ? source.instanceId : source.soulInstanceId
-    );
-  }
-
-  function executePlacementToEmptyArea(
-    source: BattlePlacementSource,
-    toZone: BattleZoneId
-  ) {
-    if (source.kind === "card") {
-      executeCommand({
-        type: "PLACE_AREA_SLOT",
-        payload: {
-          instanceId: source.instanceId,
-          fromZone: source.fromZone,
-          toZone
-        }
-      });
-      return;
-    }
-
-    executeCommand({
-      type: "MOVE_SOUL_CARD",
-      payload: {
-        parentInstanceId: source.parentInstanceId,
-        soulInstanceId: source.soulInstanceId,
-        toZone,
-        placeAsNewStack: true
-      }
-    });
-  }
-
-  function handlePlacementZoneSelect(
-    source: BattlePlacementSource,
-    toZone: BattleZoneId,
-    input?: { x?: number; y?: number }
-  ) {
-    if (!battleState || !PLACEMENT_TARGET_ZONES.includes(toZone)) return;
-
-    const sourceCard = getSourceCard(source);
-    if (!sourceCard) {
-      setSelectionMode(null);
-      return;
-    }
-
-    const areaStacks = getAreaStacks(battleState.players.self.zones[toZone].cards);
-    if (areaStacks.length === 0 || (toZone === "set" && areaStacks.length < 5)) {
-      executePlacementToEmptyArea(source, toZone);
-      setSelectionMode(null);
-      return;
-    }
-
-    setPendingActionPopup({
-      source,
-      sourceCard,
-      toZone,
-      targetInstanceId: areaStacks[0].topCard.instanceId,
-      x: input?.x ?? window.innerWidth / 2,
-      y: input?.y ?? window.innerHeight / 2
-    });
-    setSelectionMode(null);
-  }
-
   function handleBattleActionPopupSelect(action: BattleActionPopupAction) {
     if (!pendingActionPopup) return;
 
@@ -2514,6 +2362,53 @@ export function BattleController() {
 
   if (loading) {
     return <main className="bf-battle-loading">Battleを準備しています。</main>;
+  }
+
+  if (showRoomDeckSelection) {
+    return (
+      <main className="bf-battle-loading">
+        <section className="bf-room-deck-selection">
+          <p className="dm-kicker">{roomDeckSelectionName}</p>
+          <h1>使用するデッキを選択</h1>
+          <p>ルームへの入室が完了しました。対戦で使うデッキを選んでください。</p>
+          {roomDeckOptions.length > 0 ? (
+            <select
+              className="dm-input"
+              value={roomDeckSelectionId}
+              onChange={(event) => setRoomDeckSelectionId(event.target.value)}
+              disabled={roomDeckSelectionBusy}
+            >
+              {roomDeckOptions.map((deck) => (
+                <option key={deck.id} value={deck.id}>
+                  {deck.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p role="alert">対戦に使えるデッキがありません。フラッグとバディを設定したデッキを作成してください。</p>
+          )}
+          {roomDeckSelectionError && <p role="alert">{roomDeckSelectionError}</p>}
+          <div className="bf-room-deck-selection-actions">
+            <button
+              type="button"
+              className="dm-button primary"
+              disabled={roomDeckSelectionBusy || !roomDeckSelectionId}
+              onClick={() => void handleConfirmRoomDeckSelection()}
+            >
+              {roomDeckSelectionBusy ? "設定中…" : "このデッキで対戦へ"}
+            </button>
+            <button
+              type="button"
+              className="dm-button secondary"
+              disabled={roomDeckSelectionBusy}
+              onClick={() => void handleCancelRoomDeckSelection()}
+            >
+              ルームを退出
+            </button>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   if (!battleState) {
@@ -2688,7 +2583,11 @@ export function BattleController() {
             </>
           }
         >
-          {changeableDecks.length === 0 ? (
+          {deckChangeLoading ? (
+            <p role="status">デッキ一覧を読み込んでいます…</p>
+          ) : deckChangeError ? (
+            <p role="alert">{deckChangeError}</p>
+          ) : changeableDecks.length === 0 ? (
             <p>対戦開始に使えるデッキがありません。</p>
           ) : (
             <div className="bf-deck-change-popup">
@@ -2795,20 +2694,6 @@ export function BattleController() {
           y={pendingActionPopup.y}
           onSelect={handleBattleActionPopupSelect}
           onCancel={handleBattleActionPopupCancel}
-        />
-      )}
-
-      {pendingContextMenu && (
-        <BattleContextMenu
-          key={`${pendingContextMenu.x}:${pendingContextMenu.y}:${pendingContextMenu.title}`}
-          x={pendingContextMenu.x}
-          y={pendingContextMenu.y}
-          title={pendingContextMenu.title}
-          items={pendingContextMenu.items}
-          onCommand={handleContextCommand}
-          onPlacement={handleContextPlacement}
-          onUiAction={handleContextUiAction}
-          onCancel={() => setPendingContextMenu(null)}
         />
       )}
 

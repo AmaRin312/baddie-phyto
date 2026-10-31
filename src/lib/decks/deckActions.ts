@@ -21,6 +21,10 @@ const DECK_SELECT_COLUMNS = [
   "created_at",
   "updated_at"
 ].join(",");
+const DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE = DECK_SELECT_COLUMNS
+  .split(",")
+  .filter((column) => column !== "selected_buddy_image_id")
+  .join(",");
 
 const DECK_CARD_SELECT_COLUMNS = [
   "id",
@@ -99,11 +103,18 @@ export async function loadDecks() {
 
   const request: Promise<CachedDeckListResponse> = (async () => {
     try {
-      const result = await supabase
+      let result = await supabase
         .from("decks")
         .select(DECK_SELECT_COLUMNS)
         .order("updated_at", { ascending: false })
         .returns<DeckRecord[]>();
+      if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
+        result = await supabase
+          .from("decks")
+          .select(DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE)
+          .order("updated_at", { ascending: false })
+          .returns<DeckRecord[]>();
+      }
       if (!result.error) {
         setTimedCache(decksCache, "all", result);
       }
@@ -125,11 +136,18 @@ export async function loadDeck(deckId: string) {
 
   const request: Promise<CachedDeckResponse> = (async () => {
     try {
-      const result = await supabase
+      let result = await supabase
         .from("decks")
         .select(DECK_SELECT_COLUMNS)
         .eq("id", deckId)
         .maybeSingle<DeckRecord>();
+      if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
+        result = await supabase
+          .from("decks")
+          .select(DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE)
+          .eq("id", deckId)
+          .maybeSingle<DeckRecord>();
+      }
       if (!result.error) {
         setTimedCache(deckCache, deckId, result);
       }
@@ -219,6 +237,7 @@ export async function createDraftDeck(input?: {
   name?: string;
   deckVisibility?: DeckVisibility;
   eraKey?: DeckEraKey | null;
+  sleeveSupplyId?: string | null;
 }) {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
@@ -234,6 +253,7 @@ export async function createDraftDeck(input?: {
     flag_id: null,
     buddy_card_id: null,
     selected_flag_image_id: null,
+    sleeve_supply_id: input?.sleeveSupplyId ?? null,
     deck_visibility: input?.deckVisibility ?? "private"
   };
 

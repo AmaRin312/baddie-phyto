@@ -32,19 +32,19 @@ const OPTIONS: BattleActionPopupOption[] = [
   {
     action: "soulFaceUp",
     keyLabel: "A",
-    label: "表向きソウル",
+    label: "ソウルに入れる",
     className: "is-left"
   },
   {
     action: "place",
     keyLabel: "S",
-    label: "新たなカード",
+    label: "新たに出す",
     className: "is-bottom"
   },
   {
     action: "soulFaceDown",
     keyLabel: "D",
-    label: "裏向きソウル",
+    label: "裏向きでソウルに入れる",
     className: "is-right"
   }
 ];

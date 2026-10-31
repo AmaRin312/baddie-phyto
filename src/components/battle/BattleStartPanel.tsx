@@ -8,7 +8,6 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import {
-  createBattleRoom,
   joinBattleRoom,
   loadActiveBattleRooms,
   type BattleRoomRecord
@@ -59,6 +58,17 @@ function buildBattleUrl(input: {
   return `/battle?${params.toString()}`;
 }
 
+function buildBattleRoomEntryUrl(room: BattleRoomRecord, seat: BattlePlayerSeat) {
+  const params = new URLSearchParams({
+    roomId: room.room_id,
+    seat,
+    mode: "match"
+  });
+  const existingDeckId = seat === "player1" ? room.host_deck_id : room.guest_deck_id;
+  if (existingDeckId) params.set("deckId", existingDeckId);
+  return `/battle?${params.toString()}`;
+}
+
 function getRoomOccupancyLabel(room: BattleRoomRecord) {
   const count =
     Number(Boolean(room.host_user_id)) + Number(Boolean(room.guest_user_id));
@@ -76,7 +86,6 @@ export function BattleStartPanel() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [selectedDeckId, setSelectedDeckId] = useState("");
   const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
-  const [roomName, setRoomName] = useState("");
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -218,59 +227,14 @@ export function BattleStartPanel() {
     );
   }
 
-  async function handleCreateRoom() {
-    if (!selectedDeck) {
-      setMessage("使用するデッキを選択してください。");
-      return;
-    }
-    if (!canStartDeck(selectedDeck)) {
-      setMessage("対戦開始にはフラッグとバディが必要です。");
-      return;
-    }
-
-    const result = await createBattleRoom({
-      deckId: selectedDeck.id,
-      name: roomName.trim() || `${selectedDeck.name} のルーム`
-    });
-    if (result.error || !result.data) {
-      setMessage(result.error ?? "ルーム作成に失敗しました。");
-      return;
-    }
-
-    router.push(
-      buildBattleUrl({
-        deckId: selectedDeck.id,
-        roomId: result.data.room_id,
-        seat: "player1",
-        mode: "match"
-      })
-    );
-  }
-
   async function handleJoinRoom(room: BattleRoomRecord) {
-    if (!selectedDeck) {
-      setMessage("使用するデッキを選択してください。");
-      return;
-    }
-    if (!canStartDeck(selectedDeck)) {
-      setMessage("対戦開始にはフラッグとバディが必要です。");
-      return;
-    }
-
-    const result = await joinBattleRoom({ room, deckId: selectedDeck.id });
+    const result = await joinBattleRoom({ room });
     if (result.error || !result.data) {
       setMessage(result.error ?? "ルーム入室に失敗しました。");
       return;
     }
 
-    router.push(
-      buildBattleUrl({
-        deckId: selectedDeck.id,
-        roomId: result.data.room.room_id,
-        seat: result.data.seat,
-        mode: "match"
-      })
-    );
+    router.push(buildBattleRoomEntryUrl(result.data.room, result.data.seat));
   }
 
   function renderDeckSummary(deck: DeckRecord) {
@@ -416,7 +380,7 @@ export function BattleStartPanel() {
       <div className="dm-app-grid">
         <AppCard
           title="一人回し"
-          description="選んだデッキで一人回しを開始します。Realtime 同期は使いません。"
+          description="一人回し用のデッキを選択します。対人戦ではルーム入室後にデッキを選びます。"
         >
           <label className="dm-form-label" htmlFor="battle-solo-deck">
             使用デッキ
@@ -457,52 +421,13 @@ export function BattleStartPanel() {
           )}
         </AppCard>
 
-        <AppCard
-          title="対人ルーム作成"
-          description="作成したルームは既存ルーム一覧に表示されます。後から他の人が入室できます。"
-        >
-          <label className="dm-form-label" htmlFor="battle-deck">
-            使用デッキ
-          </label>
-          <select
-            id="battle-deck"
-            className="dm-input"
-            value={effectiveSelectedDeckId}
-            onChange={(event) => setSelectedDeckId(event.target.value)}
-          >
-            {visibleDecks.map((deck) => (
-              <option key={deck.id} value={deck.id}>
-                {deck.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="dm-form-label" htmlFor="battle-room-name">
-            ルーム名
-          </label>
-          <input
-            id="battle-room-name"
-            className="dm-input"
-            value={roomName}
-            onChange={(event) => setRoomName(event.target.value)}
-            placeholder="例: フリーバトル"
-          />
-
-          <button
-            type="button"
-            className="dm-button primary"
-            onClick={() => void handleCreateRoom()}
-          >
-            ルームを作成して入室
-          </button>
-        </AppCard>
       </div>
 
       {message && <p className="dm-form-message">{message}</p>}
 
       <AppCard
-        title="既存ルーム"
-        description="既存ルームへ入室できます。現在人数付きで対戦参加の可否を確認できます。"
+        title="対人ルーム"
+        description="用意済みの2ルームを利用します。ルームに入った後で対戦デッキを選択します。"
       >
         {roomsLoading && <p className="dm-muted-text">ルームを読み込み中です。</p>}
         {!roomsLoading && rooms.length === 0 && (
@@ -521,10 +446,18 @@ export function BattleStartPanel() {
                 <button
                   type="button"
                   className="dm-button secondary"
-                  disabled={!selectedDeck || !canStartDeck(selectedDeck)}
+                  disabled={
+                    (Boolean(room.guest_user_id) && room.host_user_id !== currentUserId)
+                  }
                   onClick={() => void handleJoinRoom(room)}
                 >
-                  入室
+                  {room.host_user_id === currentUserId
+                    ? "再入室"
+                    : !room.host_user_id
+                      ? "ルームを使用"
+                      : room.guest_user_id
+                        ? "対戦中"
+                        : "入室"}
                 </button>
               </div>
             </div>

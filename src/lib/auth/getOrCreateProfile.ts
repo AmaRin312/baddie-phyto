@@ -4,6 +4,7 @@ export type Profile = {
   id: string;
   email: string | null;
   nickname: string | null;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +57,7 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     id: user.id,
     email: user.email ?? null,
     nickname: null,
+    is_admin: false,
     created_at: user.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString()
   };

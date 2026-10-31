@@ -27,7 +27,6 @@ function CardViewerComponent({
   className = "",
   variant = "viewer",
   faceDown = false,
-  forcePortrait = false,
   forcePortraitZoomPercent,
   faceDownImageUrl = null,
   preserveOrientation = false
@@ -37,7 +36,9 @@ function CardViewerComponent({
     styles.viewer,
     variant === "compact" ? styles.compact : "",
     variant === "board" ? styles.board : "",
-    variant === "viewer" && card.orientation === "horizontal" ? styles.horizontalViewer : "",
+    variant === "viewer" && card.orientation === "horizontal" && preserveOrientation
+      ? styles.horizontalViewer
+      : "",
     className
   ]
     .filter(Boolean)
@@ -66,8 +67,7 @@ function CardViewerComponent({
   const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
   const shouldForcePortraitImage =
     card.orientation === "horizontal" &&
-    !preserveOrientation &&
-    (forcePortrait || variant !== "viewer");
+    !preserveOrientation;
   const imageClassName = [
     styles.image,
     shouldForcePortraitImage ? styles.forcePortraitImage : ""

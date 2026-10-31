@@ -18,6 +18,11 @@ export type BattleRoomRecord = {
   expires_at: string | null;
 };
 
+export const PREALLOCATED_BATTLE_ROOMS = [
+  { roomId: "bf-room-1", name: "対戦ルーム1" },
+  { roomId: "bf-room-2", name: "対戦ルーム2" }
+] as const;
+
 async function getCurrentUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error) {
@@ -25,13 +30,6 @@ async function getCurrentUserId() {
     return null;
   }
   return data.user?.id ?? null;
-}
-
-function createRoomId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `bf-${crypto.randomUUID().slice(0, 8)}`;
-  }
-  return `bf-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export async function cleanupExpiredBattleRooms() {
@@ -48,8 +46,9 @@ export async function loadActiveBattleRooms() {
   const { data, error } = await supabase
     .from("battle_rooms")
     .select("*")
+    .in("room_id", PREALLOCATED_BATTLE_ROOMS.map((room) => room.roomId))
     .in("status", ["waiting", "playing"])
-    .order("updated_at", { ascending: false })
+    .order("name", { ascending: true })
     .returns<BattleRoomRecord[]>();
 
   if (error) {
@@ -75,39 +74,9 @@ export async function loadBattleRoom(roomId: string) {
   return { data, error: null };
 }
 
-export async function createBattleRoom(input: {
-  deckId: string;
-  name?: string;
-}) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { data: null, error: "ログインが必要です。" };
-  }
-
-  const roomId = createRoomId();
-  const { data, error } = await supabase
-    .from("battle_rooms")
-    .insert({
-      room_id: roomId,
-      name: input.name?.trim() || `Battle Room ${roomId}`,
-      status: "waiting",
-      host_user_id: userId,
-      host_deck_id: input.deckId
-    })
-    .select("*")
-    .single<BattleRoomRecord>();
-
-  if (error) {
-    console.error(error);
-    return { data: null, error: error.message };
-  }
-
-  return { data, error: null };
-}
-
 export async function joinBattleRoom(input: {
   room: BattleRoomRecord;
-  deckId: string;
+  deckId?: string;
 }): Promise<{
   data: { room: BattleRoomRecord; seat: BattlePlayerSeat } | null;
   error: string | null;
@@ -127,17 +96,45 @@ export async function joinBattleRoom(input: {
     };
   }
 
+  if (input.room.host_user_id == null && input.room.guest_user_id == null) {
+    const { data, error } = await supabase
+      .from("battle_rooms")
+      .update({
+        status: "waiting",
+        host_user_id: userId,
+        host_deck_id: input.deckId ?? null,
+        guest_user_id: null,
+        guest_deck_id: null,
+        disbanded_at: null,
+        expires_at: null
+      })
+      .eq("room_id", input.room.room_id)
+      .eq("status", "waiting")
+      .is("host_user_id", null)
+      .is("guest_user_id", null)
+      .select("*")
+      .single<BattleRoomRecord>();
+
+    if (error) {
+      console.error(error);
+      return { data: null, error: "このルームは他の人が確保しました。別のルームを選んでください。" };
+    }
+
+    return { data: { room: data, seat: "player1" }, error: null };
+  }
+
   const { data, error } = await supabase
     .from("battle_rooms")
     .update({
       status: "playing",
       guest_user_id: userId,
-      guest_deck_id: input.deckId,
+      guest_deck_id: input.deckId ?? null,
       disbanded_at: null,
       expires_at: null
     })
     .eq("room_id", input.room.room_id)
-    .neq("status", "disbanded")
+    .eq("status", "waiting")
+    .is("guest_user_id", null)
     .select("*")
     .single<BattleRoomRecord>();
 
@@ -153,6 +150,70 @@ export async function joinBattleRoom(input: {
     },
     error: null
   };
+}
+
+export async function releaseBattleRoom(roomId: string) {
+  const { error } = await supabase
+    .from("battle_rooms")
+    .update({
+      status: "waiting",
+      host_user_id: null,
+      host_deck_id: null,
+      guest_user_id: null,
+      guest_deck_id: null,
+      disbanded_at: null,
+      expires_at: null
+    })
+    .eq("room_id", roomId);
+
+  if (error) {
+    console.error(error);
+    return { error: error.message };
+  }
+
+  return { error: null };
+}
+
+export async function leaveBattleRoomBeforeDeckSelection(
+  roomId: string,
+  seat: BattlePlayerSeat
+) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "ログインが必要です。" };
+
+  if (seat === "player2") {
+    const { error } = await supabase
+      .from("battle_rooms")
+      .update({
+        status: "waiting",
+        guest_user_id: null,
+        guest_deck_id: null
+      })
+      .eq("room_id", roomId)
+      .eq("guest_user_id", userId)
+      .eq("status", "playing");
+
+    if (error) {
+      console.error(error);
+      return { error: error.message };
+    }
+    return { error: null };
+  }
+
+  const { data: room, error: loadError } = await supabase
+    .from("battle_rooms")
+    .select("guest_user_id")
+    .eq("room_id", roomId)
+    .eq("host_user_id", userId)
+    .maybeSingle<{ guest_user_id: string | null }>();
+  if (loadError || !room) {
+    return { error: loadError?.message ?? "ルームの席を確認できませんでした。" };
+  }
+
+  if (room.guest_user_id) {
+    return disbandBattleRoom(roomId);
+  }
+  return releaseBattleRoom(roomId);
 }
 
 export async function disbandBattleRoom(roomId: string) {

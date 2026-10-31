@@ -3331,6 +3331,35 @@ select {
   text-align: center;
 }
 
+.bf-room-deck-selection {
+  width: min(520px, 100%);
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 22px;
+  padding: 28px;
+  display: grid;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.14);
+  text-align: left;
+}
+
+.bf-room-deck-selection h1,
+.bf-room-deck-selection p {
+  margin: 0;
+}
+
+.bf-room-deck-selection h1 {
+  color: #123b7a;
+  font-size: 24px;
+}
+
+.bf-room-deck-selection-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .bf-deck-drop-dialog-backdrop {
   position: fixed;
   z-index: 50;
@@ -3479,22 +3508,6 @@ select {
   top: 50%;
   right: 0;
   transform: translateY(-50%);
-}
-
-.bf-context-menu .bf-action-popup-core {
-  gap: 2px;
-}
-
-.bf-context-menu .bf-action-popup-core span {
-  font-size: 12px;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.bf-context-menu .bf-action-popup-core small {
-  color: #64748b;
-  font-size: 9px;
-  font-weight: 900;
 }
 
 .bf-placement-mode-banner {
@@ -4502,36 +4515,48 @@ select {
 }
 
 .dm-deck-search-card {
-  min-height: 76px;
-  padding: 7px 9px;
-  align-items: center;
+  position: absolute;
+  width: calc(25% - 7px);
+  height: 104px;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(147, 197, 253, 0.65);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  cursor: grab;
   content-visibility: auto;
-  contain-intrinsic-size: 76px;
+  contain-intrinsic-size: 104px;
 }
 
-.dm-deck-search-card .dm-deck-card-cell {
-  min-width: 0;
-  flex: 1 1 auto;
+.dm-deck-search-card:active {
+  cursor: grabbing;
 }
 
-.dm-deck-search-card .dm-deck-card-cell > article {
-  flex: 0 0 46px;
-  width: 46px;
-  height: 64px;
+.dm-deck-search-card > article {
+  width: 64px;
+  height: 90px;
 }
 
-.dm-deck-search-card .dm-deck-card-cell > span {
-  min-width: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  font-size: 13px;
-  line-height: 1.45;
+.dm-deck-search-count {
+  position: absolute;
+  right: 4px;
+  top: 3px;
+  border-radius: 99px;
+  padding: 2px 6px;
+  color: white;
+  background: #2563eb;
+  font-size: 10px;
+  font-weight: 800;
 }
 
-.dm-deck-search-card .dm-deck-row-actions {
-  flex: 0 0 auto;
+@media (max-width: 1280px) {
+  .dm-deck-search-card { width: calc(33.333% - 6px); }
+}
+
+@media (max-width: 760px) {
+  .dm-deck-search-card { width: calc(25% - 5px); height: 82px; }
+  .dm-deck-search-card > article { width: 48px; height: 68px; }
 }
 
 .dm-deck-search-pagination {
@@ -4693,17 +4718,31 @@ select {
 }
 
 .dm-deck-management-images {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  position: relative;
+  width: 68px;
+  height: 72px;
+  margin: 0 auto;
 }
 
 .dm-deck-management-images > div {
-  min-width: 0;
+  position: absolute;
+  width: 38px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.dm-deck-management-images > .is-flag {
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
+.dm-deck-management-images > .is-buddy {
+  left: 25%;
+  top: 25%;
+  z-index: 2;
 }
 
 .dm-deck-management-images article {
@@ -4729,6 +4768,35 @@ select {
 
 .dm-deck-action-modal {
   max-width: 720px;
+}
+
+.dm-deck-supply-summary {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.dm-deck-supply-summary-item {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: var(--dm-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dm-deck-supply-summary-item img {
+  width: 68px;
+  height: 96px;
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.18);
+}
+
+.dm-deck-supply-summary-item.is-playmat img {
+  width: 128px;
+  height: 72px;
 }
 
 .dm-deck-content-list {
@@ -6017,7 +6085,60 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-management-images {
-  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.dm-new-deck-supply-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--dm-blue-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dm-new-deck-supply-field select {
+  width: 100%;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--dm-text);
+  background: rgba(255, 255, 255, 0.86);
+  font: inherit;
+}
+
+.dm-admin-supply-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: var(--dm-blue-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dm-admin-supply-field select {
+  width: 100%;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--dm-text);
+  background: rgba(255, 255, 255, 0.86);
+  font: inherit;
+}
+
+.dm-admin-supply-preview {
+  width: 72px;
+  height: 104px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, 0.16);
+}
+
+.dm-admin-supply-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .bf-battle-app {
@@ -6244,4 +6365,166 @@ body:has(.bf-battle-app) {
 .bf-dice-empty {
   color: #94a3b8;
   font-size: 14px;
+}
+
+/* Battle layout: keep the complete board visible and place the action zones
+   in the lower/upper lanes shown in the updated board reference. */
+.bf-battle-app {
+  --bf-right-panel-width: clamp(360px, 31vw, 620px);
+  grid-template-columns:
+    var(--bf-sidebar-width)
+    minmax(0, 1fr)
+    var(--bf-right-panel-width);
+}
+
+.bf-player-board {
+  grid-template-areas:
+    "gauge left resolution resolution drop"
+    "gauge left center right drop"
+    "set   .    item   buddy deck";
+}
+
+.bf-zone-center,
+.bf-zone-resolution,
+.bf-zone-item,
+.bf-zone-set {
+  position: relative;
+  inset: auto !important;
+  width: auto;
+  height: auto;
+  align-self: center;
+  justify-self: center;
+  transform: none !important;
+}
+
+.bf-zone-center {
+  align-self: start;
+  margin-top: 18px;
+}
+
+.bf-zone-resolution {
+  align-self: start;
+  width: min(100%, 240px);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  margin-top: 8px;
+}
+
+.bf-zone-item,
+.bf-zone-set {
+  min-height: calc(var(--bf-battle-card-h) + 10px);
+}
+
+.bf-zone-item {
+  grid-area: item;
+}
+
+.bf-zone-set {
+  grid-area: set;
+}
+
+.bf-hand-row.is-self .bf-hand-card-button {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 138px;
+  width: 138px;
+  height: 198px;
+  margin-right: -64px;
+}
+
+.bf-hand-card-button.is-selected {
+  z-index: 1;
+  transform: none;
+}
+
+.bf-viewer-grid {
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .bf-battle-app {
+    --bf-right-panel-width: 340px;
+  }
+}
+
+@media (max-width: 980px) {
+  .bf-battle-app {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Keep life and dice on the same vertical lanes, clear of the moved zones. */
+.bf-life-badge,
+.bf-board-half.is-opponent .bf-life-badge {
+  left: 12px;
+  right: auto;
+}
+
+.bf-dice-panel,
+.bf-board-half.is-opponent .bf-dice-panel {
+  left: 12px;
+  right: auto;
+}
+
+/* Move the gauge by half a card toward the bottom of the screen without
+   changing its horizontal position. The opponent board is rotated 180deg. */
+.bf-zone-gauge {
+  top: calc(17% - 1px) !important;
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge {
+  top: calc(17% - 159px) !important;
+}
+
+/* Gauge cards are 116px wide after rotation; 58px offsets make each adjacent
+   card cover exactly half of the previous card. */
+.bf-zone-gauge .bf-card-button.is-gauge-card {
+  top: calc(18px + (var(--bf-gauge-row) * 41px)) !important;
+  transform: translate(calc(var(--bf-gauge-column) * -58px), 0) rotate(-90deg) !important;
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card {
+  top: calc(18px + (var(--bf-gauge-row) * 41px)) !important;
+  transform: translate(calc(var(--bf-gauge-column) * -58px), 0) rotate(90deg) !important;
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  top: calc(18px + (var(--bf-gauge-row) * 41px)) !important;
+  transform: translate(calc(var(--bf-gauge-column) * -58px), 0) rotate(-90deg) scale(1.04) !important;
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
+  top: calc(18px + (var(--bf-gauge-row) * 41px)) !important;
+  transform: translate(calc(var(--bf-gauge-column) * -58px), 0) rotate(90deg) scale(1.04) !important;
+}
+
+/* Keep hand cards at a constant image size; additional cards scroll sideways. */
+.bf-hand-row.is-self .bf-hand-card-button {
+  flex: 0 0 138px;
+  min-width: 138px;
+  max-width: 138px;
+  width: 138px;
+  height: 198px;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-pager > span,
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-summary,
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-order,
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card > strong {
+  display: none;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  gap: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card {
+  width: 95px;
+  max-width: 100%;
 }

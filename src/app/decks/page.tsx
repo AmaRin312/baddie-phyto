@@ -15,6 +15,7 @@ import {
   loadDecks
 } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
+import { getPublicSupplyImageUrl, loadBattleSupplies } from "@/lib/supplies/supplyActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   DECK_ERA_OPTIONS,
@@ -24,13 +25,13 @@ import {
   type DeckCardRecord,
   type DeckEraKey,
   type DeckRecord,
+  type BattleSupplyRecord,
   type FlagRecord
 } from "@/types/baddiePhyto";
 
 type DeckSection = {
   key: string;
   title: string;
-  description: string;
   decks: DeckRecord[];
 };
 
@@ -54,6 +55,7 @@ export default function DecksPage() {
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [supplies, setSupplies] = useState<BattleSupplyRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -90,7 +92,6 @@ export default function DecksPage() {
       {
         key: "own",
         title: "作成したデッキ",
-        description: "自分が作成したデッキです。",
         decks: eraFilteredDecks.filter(
           (deck) => deck.owner_id === currentUserId && deck.deck_visibility !== "default"
         )
@@ -98,7 +99,6 @@ export default function DecksPage() {
       {
         key: "public",
         title: "共有デッキ",
-        description: "他ユーザーに公開されている自作デッキです。",
         decks: eraFilteredDecks.filter(
           (deck) => deck.deck_visibility === "public" && deck.owner_id !== currentUserId
         )
@@ -106,7 +106,6 @@ export default function DecksPage() {
       {
         key: "default",
         title: "サンプルデッキ",
-        description: "基礎デッキとして公開されているデッキです。",
         decks: eraFilteredDecks.filter((deck) => deck.deck_visibility === "default")
       }
     ],
@@ -123,16 +122,18 @@ export default function DecksPage() {
 
       setCurrentUserId(profile.id);
 
-      const [deckResult, deckCardResult, flagResult] = await Promise.allSettled([
+      const [deckResult, deckCardResult, flagResult, supplyResult] = await Promise.allSettled([
         loadDecks(),
         loadAllDeckCards(),
-        loadFlagsLite()
+        loadFlagsLite(),
+        loadBattleSupplies()
       ]);
 
       const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
       const deckCardsResponse =
         deckCardResult.status === "fulfilled" ? deckCardResult.value : null;
       const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
+      const suppliesResponse = supplyResult.status === "fulfilled" ? supplyResult.value : null;
 
       if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
         console.error(decksResponse?.error ?? deckCardsResponse?.error);
@@ -146,6 +147,7 @@ export default function DecksPage() {
         setDecks(nextDecks);
         setDeckCards(nextDeckCards);
         setFlags(nextFlags);
+        setSupplies(suppliesResponse?.error ? [] : suppliesResponse?.data ?? []);
 
         const relatedCardIds = [
           ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
@@ -291,21 +293,21 @@ export default function DecksPage() {
       <div
         key={deck.id}
         className="dm-deck-management-item"
-        onDoubleClick={() => setSelectedDeckForAction(deck)}
       >
         <AppCard title={deck.name}>
           <button
             type="button"
             className="dm-deck-management-card dm-deck-management-click-card"
+            onClick={() => setSelectedDeckForAction(deck)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 setSelectedDeckForAction(deck);
               }
             }}
-            title="ダブルクリックでデッキ内容を表示"
+            title="クリックしてデッキ内容を表示"
           >
             <div className="dm-deck-management-images">
-              <div>
+              <div className="is-flag">
                 {flagCard ? (
                   <CardViewer
                     card={flagCard}
@@ -319,7 +321,7 @@ export default function DecksPage() {
                   <span className="dm-deck-management-empty">未選択</span>
                 )}
               </div>
-              <div>
+              <div className="is-buddy">
                 {buddyCard ? (
                   <CardViewer
                     card={buddyCard}
@@ -378,15 +380,11 @@ export default function DecksPage() {
               <div className="dm-section-heading">
                 <div>
                   <h2>{section.title}</h2>
-                  <p>{section.description}</p>
                 </div>
                 <span>{section.decks.length}件</span>
               </div>
               <div className="dm-app-grid">
                 {section.decks.map(renderDeckCard)}
-                {section.decks.length === 0 && (
-                  <AppCard title="該当なし" description="条件に合うデッキがありません。" />
-                )}
               </div>
             </section>
           ))}
@@ -421,9 +419,24 @@ export default function DecksPage() {
             </header>
 
             <div className="dm-card-detail-modal-body">
-              <AppCard title="デッキ内容一覧">
+              <AppCard title={selectedDeckForAction.name}>
                 {renderDeckContentList(selectedDeckForAction)}
               </AppCard>
+              <div className="dm-deck-supply-summary">
+                {(["sleeve", "playmat"] as const).map((type) => {
+                  const supplyId = type === "sleeve"
+                    ? selectedDeckForAction.sleeve_supply_id
+                    : selectedDeckForAction.playmat_supply_id;
+                  const supply = supplies.find((item) => item.id === supplyId);
+                  const imageUrl = getPublicSupplyImageUrl(supply?.image_path);
+                  return (
+                    <div className={`dm-deck-supply-summary-item is-${type}`} key={type}>
+                      <span>{type === "sleeve" ? "スリーブ" : "プレイマット"}</span>
+                      {imageUrl ? <img src={imageUrl} alt={supply?.name ?? ""} /> : <small>未設定</small>}
+                    </div>
+                  );
+                })}
+              </div>
 
               {selectedDeckForAction.owner_id === currentUserId ? (
                 <div className="dm-dialog-actions">
@@ -439,14 +452,6 @@ export default function DecksPage() {
                   )}
                   <button
                     type="button"
-                    className="dm-button secondary"
-                    onClick={() => setSelectedDeckForAction(null)}
-                    disabled={deletingDeck}
-                  >
-                    戻る
-                  </button>
-                  <button
-                    type="button"
                     className="dm-button primary"
                     onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
                     disabled={deletingDeck}
@@ -456,14 +461,6 @@ export default function DecksPage() {
                 </div>
               ) : (
                 <div className="dm-dialog-actions">
-                  <button
-                    type="button"
-                    className="dm-button secondary"
-                    onClick={() => setSelectedDeckForAction(null)}
-                    disabled={copyingDeck}
-                  >
-                    戻る
-                  </button>
                   <button
                     type="button"
                     className="dm-button primary"

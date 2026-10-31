@@ -14,6 +14,7 @@ import {
   isAreaStackZone
 } from "@/lib/battle/battleActions";
 import { getCompositeGroupCards } from "@/lib/battle/compositeCards";
+import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import type { BattleCard, BattleDropInput, BattleZoneId } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
@@ -68,13 +69,8 @@ function shouldShowFace(card: BattleCard) {
 }
 
 function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
-  return (
-    zoneId === "center" ||
-    zoneId === "left" ||
-    zoneId === "right" ||
-    zoneId === "item" ||
-    zoneId === "set" ||
-    zoneId === "resolution"
+  return ["center", "left", "right", "item", "set", "resolution"].includes(
+    zoneId
   );
 }
 
@@ -268,6 +264,7 @@ export function BattleZone({
                     event.preventDefault();
                     return;
                   }
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", battleCard.instanceId);
                   onDragStartCard(battleCard, playerId);
@@ -292,7 +289,9 @@ export function BattleZone({
                   isPublic={shouldShowFace(battleCard)}
                   variant="board"
                   sleeveImageUrl={sleeveImageUrl}
-                  preserveOrientation={card.orientation === "horizontal"}
+                  preserveOrientation={
+                    preserveBattleOrientation && card.orientation === "horizontal"
+                  }
                 />
               </button>
             );
@@ -343,6 +342,7 @@ export function BattleZone({
                     event.preventDefault();
                     return;
                   }
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", areaTopCard.instanceId);
                   onDragStartCard(areaTopCard, playerId);
@@ -420,6 +420,7 @@ export function BattleZone({
                       event.preventDefault();
                       return;
                     }
+                    setBattleCardDragImage(event.currentTarget, event.dataTransfer);
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", gaugeCard.instanceId);
                     onDragStartCard(gaugeCard, playerId);
@@ -472,6 +473,7 @@ export function BattleZone({
                   event.preventDefault();
                   return;
                 }
+                setBattleCardDragImage(event.currentTarget, event.dataTransfer);
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", topCard.instanceId);
                 onDragStartCard(topCard, playerId);

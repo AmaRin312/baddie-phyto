@@ -88,6 +88,13 @@ export type BattleSupplySettingsRecord = {
   updated_at: string;
 };
 
+export type SiteSupplySettingsRecord = {
+  id: boolean;
+  sleeve_supply_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AbilityRecord = {
   id: string;
   name: string;

@@ -19,7 +19,6 @@ export function AppShell({ children }: AppShellProps) {
           <Link href="/home">ホーム</Link>
           <Link href="/register">登録</Link>
           <Link href="/decks">デッキ</Link>
-          <Link href="/supplies">サプライ</Link>
           <Link href="/battle">対戦</Link>
         </nav>
       </header>

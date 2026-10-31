@@ -2,7 +2,8 @@ import { supabase } from "@/lib/supabase/client";
 import type {
   BattleSupplyRecord,
   BattleSupplySettingsRecord,
-  BattleSupplyType
+  BattleSupplyType,
+  SiteSupplySettingsRecord
 } from "@/types/baddiePhyto";
 
 const SUPPLY_BUCKET_NAME = "battle-supplies";
@@ -142,4 +143,23 @@ export async function saveBattleSupplySettings(input: {
     })
     .select("*")
     .single<BattleSupplySettingsRecord>();
+}
+
+export async function loadSiteSupplySettings() {
+  return await supabase
+    .from("site_supply_settings")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle<SiteSupplySettingsRecord>();
+}
+
+export async function saveSiteDefaultSleeveSupply(sleeveSupplyId: string | null) {
+  return await supabase
+    .from("site_supply_settings")
+    .upsert({
+      id: true,
+      sleeve_supply_id: sleeveSupplyId
+    })
+    .select("*")
+    .single<SiteSupplySettingsRecord>();
 }

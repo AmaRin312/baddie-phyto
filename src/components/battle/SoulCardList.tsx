@@ -1,6 +1,7 @@
 "use client";
 
 import { BoardCard } from "@/components/cards/BoardCard";
+import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import type { MouseEvent } from "react";
 import type { BattleCard } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
@@ -76,6 +77,7 @@ export function SoulCardList({
                 }}
                 onDragStart={(event) => {
                   event.stopPropagation();
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", soulCard.instanceId);
                   onDragStartSoulCard(parentCard, soulCard);
