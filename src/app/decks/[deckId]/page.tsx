@@ -10,7 +10,7 @@ import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadCards } from "@/lib/cards/cardActions";
+import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
   createDraftDeck,
   copyDeck,
@@ -27,10 +27,9 @@ import {
 } from "@/lib/supplies/supplyActions";
 import {
   EMPTY_DECK_CARD_SEARCH_FILTERS,
-  filterDeckCandidateCards,
-  getDeckCardSearchOptions,
-  loadDeckCardPrintingSearchData,
-  type CardPrintingSearchRecord,
+  loadDeckCardSearchOptions,
+  resolveDeckSearchWorlds,
+  searchDeckCards,
   type DeckCardSearchFilters,
   type DeckCardSetOption
 } from "@/lib/decks/deckCardSearch";
@@ -61,16 +60,6 @@ type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
 type DetailImageContext = "deck" | "flag" | "buddy";
 
-const DECK_SEARCH_TYPE_ORDER: Record<CardRecord["card_type"], number> = {
-  monster: 0,
-  spell: 1,
-  item: 2,
-  impact: 3,
-  impact_monster: 4,
-  flag_card: 5,
-  other: 6
-};
-
 function getFlagName(flag?: FlagRecord | null, card?: CardRecord | null) {
   return flag?.name || card?.name || "未選択";
 }
@@ -92,7 +81,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [currentUserId, setCurrentUserId] = useState("");
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
-  const [cardPrintings, setCardPrintings] = useState<CardPrintingSearchRecord[]>([]);
+  const [searchResults, setSearchResults] = useState<CardRecord[]>([]);
+  const [searchTotalCount, setSearchTotalCount] = useState(0);
+  const [searchWorlds, setSearchWorlds] = useState<string[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
@@ -122,15 +115,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckResult,
       deckCardsResult,
       flagResult,
-      cardResult,
-      printingSearchResult,
+      searchOptionsResult,
       supplyResult
     ] = await Promise.all([
       loadDeck(currentDeckId),
       loadDeckCards(currentDeckId),
       loadFlagsLite({ selectableOnly: true, activeOnly: true }),
-      loadCards(),
-      loadDeckCardPrintingSearchData(),
+      loadDeckCardSearchOptions(),
       loadBattleSupplies()
     ]);
 
@@ -138,8 +129,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckResult.error ||
       deckCardsResult.error ||
       flagResult.error ||
-      cardResult.error ||
-      printingSearchResult.error ||
+      searchOptionsResult.error ||
       supplyResult.error ||
       !deckResult.data
     ) {
@@ -147,8 +137,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         deckResult.error ??
           deckCardsResult.error ??
           flagResult.error ??
-          cardResult.error ??
-          printingSearchResult.error ??
+          searchOptionsResult.error ??
           supplyResult.error
       );
       setMessage("デッキ情報の読み込みに失敗しました。");
@@ -157,6 +146,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
 
     const nextDeck = deckResult.data;
+    const nextDeckCards = deckCardsResult.data ?? [];
+    const nextCardIds = [...new Set([
+      ...nextDeckCards.map((deckCard) => deckCard.card_id),
+      ...((flagResult.data ?? []) as FlagRecord[]).map((flag) => flag.card_id).filter(Boolean)
+    ].filter(Boolean))] as string[];
+    const cardResult = await loadCardsByIds(nextCardIds);
+    if (cardResult.error) {
+      console.error(cardResult.error);
+      setMessage("デッキカード情報の読み込みに失敗しました。");
+      setLoading(false);
+      return;
+    }
     const nextCards = (cardResult.data ?? []) as unknown as CardRecord[];
     const nextCardMap = new Map(nextCards.map((card) => [card.id, card]));
     const nextFlags = ((flagResult.data ?? []) as FlagRecord[]).filter(
@@ -170,8 +171,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const imageCardIds = [
       ...new Set(
         [
-          ...(deckCardsResult.data ?? []).map((deckCard: DeckCardRecord) => deckCard.card_id),
-          ...nextFlags.map((flag) => flag.card_id).filter(Boolean)
+          ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
+          nextFlags.find((flag) => flag.id === nextDeck.flag_id)?.card_id
         ].filter(Boolean)
       )
     ] as string[];
@@ -188,15 +189,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedPlaymatSupplyId(nextDeck.playmat_supply_id ?? "");
     setSaveVisibilities([nextDeck.deck_visibility ?? "private"]);
     setDeckEra(nextDeck.era_key ?? "");
-    const nextDeckCards = deckCardsResult.data ?? [];
     setSavedDeckCards(nextDeckCards);
     setDraftDeckCards(createDeckCardDrafts(nextDeckCards));
     setFlags(nextFlags);
     setCards(nextCards);
+    setSearchResults([]);
     setImages(imageResult.error ? [] : imageResult.data ?? []);
     setBattleSupplies(supplyResult.data ?? []);
-    setCardPrintings(printingSearchResult.printings);
-    setCardSets(printingSearchResult.sets);
+    setSearchWorlds(searchOptionsResult.worlds);
+    setCardSets(searchOptionsResult.sets);
     setLoading(false);
   }, []);
 
@@ -212,24 +213,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
       setCurrentUserId(profile.id);
       if (resolvedDeckId === "new") {
-        const [flagResult, cardResult, printingSearchResult, supplyResult] =
+        const [flagResult, searchOptionsResult, supplyResult] =
           await Promise.all([
             loadFlagsLite({ selectableOnly: true, activeOnly: true }),
-            loadCards(),
-            loadDeckCardPrintingSearchData(),
+            loadDeckCardSearchOptions(),
             loadBattleSupplies()
           ]);
 
         if (
           flagResult.error ||
-          cardResult.error ||
-          printingSearchResult.error ||
+          searchOptionsResult.error ||
           supplyResult.error
         ) {
           console.error(
             flagResult.error ??
-              cardResult.error ??
-              printingSearchResult.error ??
+              searchOptionsResult.error ??
               supplyResult.error
           );
           setMessage("デッキ情報の読み込みに失敗しました。");
@@ -237,6 +235,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           return;
         }
 
+        const flagCardIds = [...new Set(
+          ((flagResult.data ?? []) as FlagRecord[])
+            .map((flag) => flag.card_id)
+            .filter(Boolean)
+        )] as string[];
+        const cardResult = await loadCardsByIds(flagCardIds);
+        if (cardResult.error) {
+          console.error(cardResult.error);
+          setMessage("フラッグ情報の読み込みに失敗しました。");
+          setLoading(false);
+          return;
+        }
         const nextCards = (cardResult.data ?? []) as unknown as CardRecord[];
         const nextCardMap = new Map(nextCards.map((card) => [card.id, card]));
           const nextFlags = ((flagResult.data ?? []) as FlagRecord[]).filter(
@@ -247,11 +257,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               nextCardMap.get(flag.card_id ?? "")?.card_type === "flag_card" &&
               nextCardMap.get(flag.card_id ?? "")?.is_active
         );
-        const imageCardIds = [
-          ...new Set(nextFlags.map((flag) => flag.card_id).filter(Boolean))
-        ] as string[];
-        const imageResult = await loadCardImagesByCardIds(imageCardIds);
-
         setDeck(null);
         setIsNewDeckDraft(true);
         setDeckName("");
@@ -267,10 +272,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setDraftDeckCards([]);
         setFlags(nextFlags);
         setCards(nextCards);
-        setImages(imageResult.error ? [] : imageResult.data ?? []);
+        setSearchResults([]);
+        setImages([]);
         setBattleSupplies(supplyResult.data ?? []);
-        setCardPrintings(printingSearchResult.printings);
-        setCardSets(printingSearchResult.sets);
+        setSearchWorlds(searchOptionsResult.worlds);
+        setCardSets(searchOptionsResult.sets);
         setLoading(false);
         return;
       }
@@ -280,8 +286,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }, [params, reload]);
 
   const cardMap = useMemo(
-    () => new Map(cards.map((card) => [card.id, card])),
-    [cards]
+    () => new Map([...cards, ...searchResults].map((card) => [card.id, card])),
+    [cards, searchResults]
   );
 
   const savedDeckCardDrafts = useMemo(
@@ -346,7 +352,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const detailIsSelectedBuddy = Boolean(
     detailCard && effectiveSelectedBuddyCardId === detailCard.id
   );
-  const searchOptions = useMemo(() => getDeckCardSearchOptions(cards), [cards]);
   const preferredWorlds = useMemo(
     () => new Set([...(selectedFlag?.usable_worlds ?? []), ...(selectedFlagCard?.worlds ?? [])]),
     [selectedFlag, selectedFlagCard]
@@ -363,45 +368,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     [cardMap, draftDeckCards]
   );
 
-  const filteredCards = useMemo(() => {
-    if (deferredSearchFilters.worlds.length === 0) return [];
-    return filterDeckCandidateCards({
-      cards,
-      printings: cardPrintings,
-      filters: deferredSearchFilters,
-      selectedBuddyCardId: effectiveSelectedBuddyCardId,
-      selectedFlagCardId: selectedFlag?.card_id,
-      excludeInactive: true,
-      excludeFlagCard: false
-    }).sort((left, right) => {
-      const leftPreferred = left.worlds.some((world) => preferredWorlds.has(world));
-      const rightPreferred = right.worlds.some((world) => preferredWorlds.has(world));
-      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
-      const typeDiff =
-        DECK_SEARCH_TYPE_ORDER[left.card_type] - DECK_SEARCH_TYPE_ORDER[right.card_type];
-      if (typeDiff !== 0) return typeDiff;
-      if (left.card_type === "monster" && right.card_type === "monster") {
-        const sizeDiff = (right.size ?? -1) - (left.size ?? -1);
-        if (sizeDiff !== 0) return sizeDiff;
-      }
-      return left.name.localeCompare(right.name, "ja");
-    });
-  }, [
-    cardPrintings,
-    cards,
-    deferredSearchFilters,
-    effectiveSelectedBuddyCardId,
-    preferredWorlds,
-    selectedFlag?.card_id
-  ]);
-
-  const searchPageCount = Math.max(1, Math.ceil(filteredCards.length / 100));
+  const filteredCards = searchResults;
+  const searchPageCount = Math.max(1, Math.ceil(searchTotalCount / 100));
   const safeSearchPage = Math.min(searchPage, searchPageCount - 1);
-  const visibleFilteredCards = useMemo(
-    () => filteredCards.slice(safeSearchPage * 100, safeSearchPage * 100 + 100),
-    [filteredCards, safeSearchPage]
-  );
-  const SEARCH_ROW_HEIGHT = 112;
+  const visibleFilteredCards = filteredCards;
+  const SEARCH_ROW_HEIGHT = 150;
   const SEARCH_OVERSCAN = 6;
   const SEARCH_VIEWPORT_HEIGHT = 520;
   const searchVisibleRange = useMemo(() => {
@@ -418,6 +389,45 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     () => visibleFilteredCards.slice(searchVisibleRange.startIndex, searchVisibleRange.endIndex),
     [searchVisibleRange.endIndex, searchVisibleRange.startIndex, visibleFilteredCards]
   );
+
+  useEffect(() => {
+    if (deferredSearchFilters.worlds.length === 0) {
+      setSearchResults([]);
+      setSearchTotalCount(0);
+      setSearchLoading(false);
+      setSearchError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchError("");
+      const result = await searchDeckCards({
+        filters: deferredSearchFilters,
+        page: safeSearchPage,
+        pageSize: 100,
+        preferredWorlds: resolveDeckSearchWorlds(searchWorlds, [...preferredWorlds]),
+        excludedCardId: selectedFlag?.card_id
+      });
+
+      if (cancelled) return;
+      setSearchLoading(false);
+      if (result.error || !result.data) {
+        setSearchResults([]);
+        setSearchTotalCount(0);
+        setSearchError(`カード検索に失敗しました。${result.error?.message ?? ""}`);
+        return;
+      }
+      setSearchResults(result.data.items ?? []);
+      setSearchTotalCount(result.data.totalCount ?? 0);
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [deferredSearchFilters, preferredWorlds, safeSearchPage, searchWorlds, selectedFlag?.card_id]);
   const activeDraftDeckCards = useMemo(
     () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
     [cardMap, draftDeckCards]
@@ -427,7 +437,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       ...new Set(
         [
           ...activeDraftDeckCards.map((draft) => draft.cardId),
-          ...visibleFilteredCards.map((card) => card.id),
+          ...virtualizedFilteredCards.map((card) => card.id),
+          ...(flagPickerOpen ? flags.map((flag) => flag.card_id) : []),
           selectedFlagCard?.id,
           selectedBuddyCard?.id,
           detailCard?.id,
@@ -437,7 +448,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     ] as string[];
   }, [
     activeDraftDeckCards,
-    visibleFilteredCards,
+    flagPickerOpen,
+    flags,
+    virtualizedFilteredCards,
     selectedFlagCard?.id,
     selectedBuddyCard?.id,
     detailCard?.id,
@@ -665,6 +678,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setMessage("ゲーム開始フラッグは deck_cards には入れません。");
       return;
     }
+    setCards((current) =>
+      current.some((existingCard) => existingCard.id === card.id)
+        ? current
+        : [...current, card]
+    );
     setMessage("");
     if (quantity <= 0) {
       if (selectedBuddyCardId === card.id) {
@@ -1089,7 +1107,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               <form className="dm-auth-form dm-card-form">
                 <DeckCardSearchPanel
                   filters={searchFilters}
-                  worlds={searchOptions.worlds}
+                  worlds={searchWorlds}
                   initialWorlds={[...new Set([...(selectedFlag?.usable_worlds ?? []), ...(selectedFlagCard?.worlds ?? [])])]}
                   sets={cardSets}
                   onChange={handleSearchFiltersChange}
@@ -1154,10 +1172,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 </div>
                 {searchFilters.worlds.length === 0 ? (
                   <p className="dm-muted-text">詳細検索からワールドを選択してください。</p>
-                ) : filteredCards.length === 0 && (
+                ) : searchError ? (
+                  <p className="dm-form-message">{searchError}</p>
+                ) : searchLoading ? (
+                  <p className="dm-muted-text">カードを検索しています...</p>
+                ) : searchTotalCount === 0 && (
                   <p className="dm-muted-text">条件に合うカードがありません。</p>
                 )}
-                {filteredCards.length > visibleFilteredCards.length && (
+                {searchTotalCount > 100 && (
                   <div className="dm-deck-search-pagination">
                     <Button
                       type="button"

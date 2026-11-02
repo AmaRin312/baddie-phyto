@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 
 export default function RegisterPage() {
@@ -15,6 +16,9 @@ export default function RegisterPage() {
 
   return (
     <AppShell>
+      <div className="dm-page-actions">
+        <BackButton fallbackHref="/" />
+      </div>
       <div className="dm-app-grid">
         <AppCard
           title="カード登録"

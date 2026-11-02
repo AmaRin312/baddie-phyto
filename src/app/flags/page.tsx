@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadFlags, setFlagActive } from "@/lib/flags/flagActions";
 import type { FlagWithCardRecord } from "@/types/baddiePhyto";
@@ -66,6 +67,7 @@ export default function FlagsPage() {
   return (
     <AppShell>
       <div className="dm-page-actions">
+        <BackButton fallbackHref="/register" />
         <Link href="/flags/new" className="dm-button primary">
           フラッグ新規登録
         </Link>

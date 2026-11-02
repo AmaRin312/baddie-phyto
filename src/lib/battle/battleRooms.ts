@@ -86,17 +86,33 @@ export async function joinBattleRoom(input: {
     return { data: null, error: "ログインが必要です。" };
   }
 
-  if (input.room.host_user_id === userId) {
+  // Room cards can be stale after another client joins or leaves. Read the
+  // current row before deciding which seat to claim.
+  const roomResult = await loadBattleRoom(input.room.room_id);
+  if (roomResult.error || !roomResult.data) {
+    return { data: null, error: roomResult.error ?? "ルームが見つかりません。" };
+  }
+  const room = roomResult.data;
+
+  if (room.status === "disbanded") {
+    return { data: null, error: "このルームは終了しました。ルーム一覧を再読み込みしてください。" };
+  }
+
+  if (room.host_user_id === userId) {
     return {
       data: {
-        room: input.room,
+        room,
         seat: "player1"
       },
       error: null
     };
   }
 
-  if (input.room.host_user_id == null && input.room.guest_user_id == null) {
+  if (room.guest_user_id === userId) {
+    return { data: { room, seat: "player2" }, error: null };
+  }
+
+  if (room.host_user_id == null && room.guest_user_id == null) {
     const { data, error } = await supabase
       .from("battle_rooms")
       .update({
@@ -108,7 +124,7 @@ export async function joinBattleRoom(input: {
         disbanded_at: null,
         expires_at: null
       })
-      .eq("room_id", input.room.room_id)
+      .eq("room_id", room.room_id)
       .eq("status", "waiting")
       .is("host_user_id", null)
       .is("guest_user_id", null)
@@ -123,6 +139,10 @@ export async function joinBattleRoom(input: {
     return { data: { room: data, seat: "player1" }, error: null };
   }
 
+  if (room.guest_user_id != null || room.host_user_id == null) {
+    return { data: null, error: "このルームは満員です。別のルームを選んでください。" };
+  }
+
   const { data, error } = await supabase
     .from("battle_rooms")
     .update({
@@ -132,7 +152,7 @@ export async function joinBattleRoom(input: {
       disbanded_at: null,
       expires_at: null
     })
-    .eq("room_id", input.room.room_id)
+    .eq("room_id", room.room_id)
     .eq("status", "waiting")
     .is("guest_user_id", null)
     .select("*")
@@ -182,7 +202,7 @@ export async function leaveBattleRoomBeforeDeckSelection(
   if (!userId) return { error: "ログインが必要です。" };
 
   if (seat === "player2") {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("battle_rooms")
       .update({
         status: "waiting",
@@ -191,11 +211,13 @@ export async function leaveBattleRoomBeforeDeckSelection(
       })
       .eq("room_id", roomId)
       .eq("guest_user_id", userId)
-      .eq("status", "playing");
+      .eq("status", "playing")
+      .select("room_id")
+      .maybeSingle<{ room_id: string }>();
 
-    if (error) {
+    if (error || !data) {
       console.error(error);
-      return { error: error.message };
+      return { error: error?.message ?? "退出する席を確認できませんでした。ルームを再読み込みしてください。" };
     }
     return { error: null };
   }

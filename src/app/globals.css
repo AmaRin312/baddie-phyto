@@ -2993,11 +2993,11 @@ select {
 }
 
 .bf-zone-drop .bf-board-card {
-  transform: scale(0.88);
+  transform: none;
 }
 
 .bf-player-board.is-mirrored .bf-zone-drop .bf-board-card {
-  transform: rotate(180deg) scale(0.88);
+  transform: rotate(180deg);
 }
 
 .bf-zone-buddy .bf-board-card {
@@ -3101,6 +3101,11 @@ select {
 .bf-stack-zone .bf-card-button {
   width: 64px;
   height: 90px;
+}
+
+.bf-zone-drop .bf-card-button {
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
 }
 
 .bf-zone-gauge .bf-stack-zone {
@@ -3266,45 +3271,55 @@ select {
 
 .bf-soul-list {
   max-width: 100%;
+  max-height: 180px;
   margin-top: 8px;
   padding: 8px;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 72px;
-  grid-template-rows: repeat(8, 24px);
-  gap: 5px 8px;
-  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
   border: 1px solid rgba(37, 99, 235, 0.22);
   border-radius: 10px;
   background: rgba(219, 234, 254, 0.42);
 }
 
+.bf-soul-list.is-floating {
+  position: fixed;
+  z-index: 120;
+  width: 240px;
+  max-width: min(240px, calc(100vw - 16px));
+  margin: 0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.28);
+}
+
 .bf-soul-column {
-  display: contents;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .bf-soul-card-button {
-  width: 72px;
-  height: 24px;
+  width: 100%;
+  min-height: 34px;
   border: 1px solid rgba(37, 99, 235, 0.32);
   border-radius: 7px;
-  padding: 0;
+  padding: 4px 8px;
   display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 4px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
   overflow: hidden;
   color: #1e3a8a;
   background: rgba(255, 255, 255, 0.92);
   cursor: grab;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 950;
   text-align: left;
 }
 
 .bf-soul-card-button .bp-board-card {
-  width: 18px;
-  height: 24px;
+  width: 24px;
+  height: 30px;
   border-radius: 3px;
 }
 
@@ -3318,6 +3333,28 @@ select {
   border-color: #facc15;
   background: linear-gradient(90deg, #fef3c7, #fffbeb);
   box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.7);
+}
+
+.bf-soul-visibility-actions {
+  display: grid;
+  gap: 12px;
+  padding: 8px;
+}
+
+.bf-soul-visibility-actions p {
+  margin: 0;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.bf-soul-visibility-actions button {
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  border-radius: 10px;
+  color: #1e3a8a;
+  background: #fff;
+  cursor: pointer;
 }
 
 .bf-battle-loading {
@@ -5178,6 +5215,28 @@ select {
   background: rgba(255, 255, 255, 0.86);
 }
 
+.dm-registered-supply-image {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.9);
+}
+
+.dm-registered-supply-image.is-sleeve {
+  aspect-ratio: 5 / 7;
+}
+
+.dm-registered-supply-image.is-playmat {
+  aspect-ratio: 16 / 9;
+}
+
+.dm-registered-supply-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .dm-supply-card.is-selected {
   outline: 3px solid rgba(37, 99, 235, 0.28);
   border-color: rgba(37, 99, 235, 0.72);
@@ -6141,6 +6200,40 @@ body:has(.bf-battle-app) {
   object-fit: cover;
 }
 
+.dm-admin-product-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(65vh, 720px);
+  overflow: auto;
+}
+
+.dm-admin-product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.dm-admin-product-row > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.dm-admin-product-row small {
+  color: #64748b;
+}
+
+.dm-admin-product-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
 .bf-battle-app {
   --bf-right-panel-width: 900px;
 }
@@ -6527,4 +6620,225 @@ body:has(.bf-battle-app) {
 .bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card {
   width: 95px;
   max-width: 100%;
+}
+
+/* Keep large deck/card collections responsive and reduce offscreen painting. */
+.dm-deck-management-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
+}
+
+.dm-deck-content-list {
+  gap: 4px;
+}
+
+.dm-deck-content-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 145px;
+}
+
+.dm-deck-editor-layout.is-three-column {
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(420px, 480px);
+  gap: 5px;
+}
+
+.dm-deck-editor-column {
+  gap: 5px;
+  padding-right: 2px;
+}
+
+.dm-deck-editor-settings .dm-app-card,
+.dm-deck-editor-deck .dm-app-card,
+.dm-deck-editor-search .dm-app-card {
+  padding: 14px;
+}
+
+.dm-deck-search-results {
+  padding-right: 2px;
+}
+
+.dm-deck-search-card {
+  width: calc(25% - 2px);
+  height: 148px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.dm-deck-search-card > article {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    grid-template-columns: minmax(180px, 210px) minmax(0, 1fr) minmax(360px, 410px);
+  }
+}
+
+@media (max-width: 760px) {
+  .dm-deck-search-card {
+    height: 118px;
+  }
+}
+
+/* Stable battle-board grid: zones never push the flag/buddy row when cards are added. */
+.bf-player-board {
+  position: relative;
+  display: grid !important;
+  width: 100%;
+  height: 100%;
+  grid-template-columns:
+    minmax(76px, 0.56fr)
+    repeat(3, minmax(0, 1fr))
+    minmax(76px, 0.56fr);
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "gauge .     .     resolution resolution"
+    "gauge left  center right      drop"
+    ".     set   flag  buddy       deck";
+  align-content: stretch;
+  justify-content: stretch;
+  gap: 0;
+}
+
+.bf-player-board > .bf-zone {
+  position: relative !important;
+  inset: auto !important;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  transform: none !important;
+  overflow: visible;
+}
+
+.bf-player-board > .bf-zone-gauge {
+  grid-area: gauge;
+  transform: translateX(-48px) !important;
+}
+
+.bf-player-board > .bf-zone-left { grid-area: left; }
+.bf-player-board > .bf-zone-center { grid-area: center; }
+.bf-player-board > .bf-zone-right { grid-area: right; }
+.bf-player-board > .bf-zone-resolution { grid-area: resolution; }
+.bf-player-board > .bf-zone-drop { grid-area: drop; }
+.bf-player-board > .bf-zone-set { grid-area: set; }
+.bf-player-board > .bf-zone-flag { grid-area: flag; z-index: 1; }
+.bf-player-board > .bf-zone-buddy { grid-area: buddy; }
+.bf-player-board > .bf-zone-deck { grid-area: deck; }
+
+.bf-player-board > .bf-zone-item,
+.bf-player-board.is-mirrored > .bf-zone-item {
+  position: absolute !important;
+  grid-area: flag;
+  left: calc(50% + 28px) !important;
+  top: calc(50% - 119px) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
+  z-index: 4;
+  transform: none !important;
+}
+
+.bf-player-board > .bf-zone-resolution {
+  grid-column: 4 / 6;
+  grid-row: 1;
+}
+
+.bf-board-half .bf-dice-panel {
+  left: calc(50% + 148px);
+  right: auto;
+  top: calc(83.333% - 18px);
+  bottom: auto;
+}
+
+.bf-board-half.is-opponent .bf-dice-panel {
+  top: calc(16.667% + 70px);
+  bottom: auto;
+}
+
+/* Zone and hand scale/position refinements requested after the grid pass. */
+.bf-battle-app {
+  --bf-battle-card-w: 125px;
+  --bf-battle-card-h: 177px;
+}
+
+.bf-player-board > .bf-zone-set,
+.bf-player-board > .bf-zone-buddy {
+  transform: translateY(-53px) !important;
+}
+
+.bf-player-board > .bf-zone-flag {
+  transform: translateY(-88px) !important;
+}
+
+.bf-player-board > .bf-zone-item,
+.bf-player-board.is-mirrored > .bf-zone-item {
+  top: calc(50% - 207px) !important;
+}
+
+.bf-board-half .bf-dice-panel {
+  top: calc(83.333% - 106px);
+}
+
+.bf-zone-gauge .bf-card-button.is-gauge-card {
+  width: var(--bf-battle-card-w);
+  height: var(--bf-battle-card-h);
+}
+
+.bf-hand-row.is-self .bf-hand-card-button {
+  flex: 0 0 207px;
+  min-width: 207px;
+  max-width: 207px;
+  width: 207px;
+  height: 297px;
+  margin-right: -96px;
+}
+
+/* Battle dialogs occupy the opponent half, leaving the self board exposed. */
+.bf-battle-app > .bf-battle-popup-backdrop {
+  inset: 0 var(--bf-right-panel-width) 50% var(--bf-sidebar-width);
+  place-items: stretch;
+  transform: translateX(2%);
+}
+
+.bf-battle-app > .bf-board-stage {
+  transform: translateX(2%);
+}
+
+.bf-battle-app > .bf-battle-popup-backdrop .bf-battle-popup-fullscreen {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  border-radius: 0 0 14px 14px;
+  padding: 10px;
+  gap: 8px;
+}
+
+.bf-battle-popup-backdrop.is-card-dragging {
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .bf-battle-app > .bf-battle-popup-backdrop {
+    inset: 0;
+    transform: none;
+  }
+
+  .bf-battle-app > .bf-board-stage {
+    transform: none;
+  }
+
+  .bf-battle-app > .bf-battle-popup-backdrop .bf-battle-popup-fullscreen {
+    width: calc(100vw - 20px);
+    height: calc(100dvh - 20px);
+    border-radius: 16px;
+    padding: 12px;
+    gap: 10px;
+  }
 }

@@ -189,6 +189,13 @@ type PendingFaceDownSoulPopup = {
   candidates: BattleCard[];
 };
 
+type PendingSoulVisibilityPopup = {
+  parentInstanceId: string;
+  soulInstanceId: string;
+  cardName: string;
+  mode: "choose" | "name";
+};
+
 type PendingHyakuganPopup = {
   sourceInstanceId: string;
   pairCandidates: BattleCard[];
@@ -317,6 +324,8 @@ export function BattleController() {
     useState<PendingBiriKinataPopup | null>(null);
   const [pendingFaceDownSoulPopup, setPendingFaceDownSoulPopup] =
     useState<PendingFaceDownSoulPopup | null>(null);
+  const [pendingSoulVisibilityPopup, setPendingSoulVisibilityPopup] =
+    useState<PendingSoulVisibilityPopup | null>(null);
   const [pendingHyakuganPopup, setPendingHyakuganPopup] =
     useState<PendingHyakuganPopup | null>(null);
   const [dropBrowserPlayerId, setDropBrowserPlayerId] =
@@ -329,6 +338,7 @@ export function BattleController() {
   const [showAbilityNotificationList, setShowAbilityNotificationList] =
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
+  const [soulListPosition, setSoulListPosition] = useState<{ left: number; top: number } | null>(null);
   const [viewerInstanceIds, setViewerInstanceIds] = useState<string[]>([]);
   const nextViewerSlotRef = useRef<0 | 1>(0);
   const [shortcutSettings, setShortcutSettings] = useState<
@@ -958,6 +968,7 @@ export function BattleController() {
   }
 
   function handleBattleBackgroundClick() {
+    setSoulListPosition(null);
     if (selectionMode) {
       selectionMode.onCancel();
       return;
@@ -1617,10 +1628,19 @@ export function BattleController() {
 
   function handleSelectCard(
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent"; anchor?: { right: number; bottom: number } }
   ) {
     const shiftKey = input?.shiftKey ?? false;
     const playerId = input?.playerId ?? "self";
+
+    if (input?.anchor && card.soul.length > 0 && canDisplayInViewer(card, playerId)) {
+      setSoulListPosition({
+        left: Math.max(8, Math.min(input.anchor.right + 8, window.innerWidth - 248)),
+        top: Math.max(8, Math.min(input.anchor.bottom + 8, window.innerHeight - 204))
+      });
+    } else if (input?.anchor) {
+      setSoulListPosition(null);
+    }
 
     if (canDisplayInViewer(card, playerId)) {
       setViewer(card.instanceId);
@@ -1723,6 +1743,10 @@ export function BattleController() {
     });
   }
 
+  function handlePopupDragStartCard(card: BattleCard) {
+    setDragSelection({ sourceCard: card, instanceIds: [card.instanceId] });
+  }
+
   function handleDragEndCard() {
     setDragSelection(null);
   }
@@ -1734,7 +1758,9 @@ export function BattleController() {
   ) {
     const shiftKey = input?.shiftKey ?? false;
 
-    setViewer(soulCard.instanceId);
+    if (soulCard.visibility !== "face_down") {
+      setViewer(soulCard.instanceId);
+    }
 
     setSoulSelection((current) => {
       if (!shiftKey || current.parentInstanceId !== parentCard.instanceId) {
@@ -1761,6 +1787,37 @@ export function BattleController() {
         instanceIds: [...current.instanceIds, soulCard.instanceId]
       };
     });
+  }
+
+  function handleDoubleClickFaceDownSoul(
+    parentCard: BattleCard,
+    soulCard: BattleCard
+  ) {
+    if (!battleState || soulCard.visibility !== "face_down") return;
+    const isOwnParentCard = Object.values(battleState.players.self.zones).some(
+      (zone) => zone.cards.some((card) => card.instanceId === parentCard.instanceId)
+    );
+    if (!isOwnParentCard) return;
+
+    setPendingSoulVisibilityPopup({
+      parentInstanceId: parentCard.instanceId,
+      soulInstanceId: soulCard.instanceId,
+      cardName: cardMap.get(soulCard.cardId)?.name ?? "カード名不明",
+      mode: "choose"
+    });
+  }
+
+  function handleRevealSoulCard() {
+    if (!pendingSoulVisibilityPopup) return;
+    executeCommand({
+      type: "REVEAL_SOUL_CARD",
+      payload: {
+        parentInstanceId: pendingSoulVisibilityPopup.parentInstanceId,
+        soulInstanceId: pendingSoulVisibilityPopup.soulInstanceId
+      },
+      source: "popup"
+    });
+    setPendingSoulVisibilityPopup(null);
   }
 
   function handleDragStartSoulCard(parentCard: BattleCard, soulCard: BattleCard) {
@@ -2510,6 +2567,7 @@ export function BattleController() {
       <BattleSidebar
         battleState={battleState}
         activeCard={activeCard}
+        soulListPosition={soulListPosition}
         viewerCards={viewerCards}
         cardMap={cardMap}
         imagesByCard={imagesByCard}
@@ -2521,6 +2579,7 @@ export function BattleController() {
         selectedInstanceIds={selectedInstanceIds}
         selectedSoulInstanceIds={selectedSoulInstanceIds}
         viewerPinned={viewerPinned}
+        onCloseViewer={() => setViewer(null, { force: true })}
         onSelectCard={handleSelectCard}
         onToggleViewerPin={() => setViewerPinned((current) => !current)}
         onContextMenuCard={handleContextMenuCard}
@@ -2530,6 +2589,7 @@ export function BattleController() {
         onDragStartSoulCard={handleDragStartSoulCard}
         onDragEndSoulCard={handleDragEndSoulCard}
         onContextMenuSoulCard={handleContextMenuSoulCard}
+        onDoubleClickFaceDownSoul={handleDoubleClickFaceDownSoul}
         onDropCard={handleDropCard}
       />
 
@@ -2697,6 +2757,41 @@ export function BattleController() {
         />
       )}
 
+      {pendingSoulVisibilityPopup && (
+        <BattlePopup
+          title="裏向きソウル"
+          size="small"
+          onClose={() => setPendingSoulVisibilityPopup(null)}
+          ariaLabel="裏向きソウルの操作"
+        >
+          {pendingSoulVisibilityPopup.mode === "name" ? (
+            <div className="bf-soul-visibility-actions">
+              <p>カード名：{pendingSoulVisibilityPopup.cardName}</p>
+              <button type="button" onClick={() => setPendingSoulVisibilityPopup(null)}>
+                閉じる
+              </button>
+            </div>
+          ) : (
+            <div className="bf-soul-visibility-actions">
+              <p>この裏向きカードの操作を選択してください。</p>
+              <button
+                type="button"
+                onClick={() =>
+                  setPendingSoulVisibilityPopup((current) =>
+                    current ? { ...current, mode: "name" } : current
+                  )
+                }
+              >
+                カード名を確認する
+              </button>
+              <button type="button" onClick={handleRevealSoulCard}>
+                表向きにする
+              </button>
+            </div>
+          )}
+        </BattlePopup>
+      )}
+
       {pendingDeckCountPopup && (
         <DeckCountPopup
           title={pendingDeckCountPopup.mode === "look" ? "上を見る" : "公開する"}
@@ -2721,6 +2816,9 @@ export function BattleController() {
           }
           description="カードを選択し、移動先を設定してください。未指定カードは移動しません。"
           mode="move"
+          canDragCards
+          onDragStartCard={handlePopupDragStartCard}
+          onDragEndCard={handleDragEndCard}
           onExecute={handleDeckBrowserExecute}
           onClose={handleCancelDeckLook}
         />
@@ -2735,6 +2833,9 @@ export function BattleController() {
           title="ドロップゾーン"
           description="ドロップゾーンのカード一覧です。"
           mode="browse"
+          canDragCards={dropBrowserPlayerId === "self"}
+          onDragStartCard={handlePopupDragStartCard}
+          onDragEndCard={handleDragEndCard}
           onExecute={() => undefined}
           onClose={() => setDropBrowserPlayerId(null)}
         />

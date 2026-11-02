@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import {
   deleteBattleSupply,
+  getPublicSupplyImageUrl,
   loadBattleSupplies,
   uploadBattleSupply
 } from "@/lib/supplies/supplyActions";
@@ -188,8 +190,49 @@ export default function SuppliesPage() {
     );
   }
 
+  function renderRegisteredSupplies(type: BattleSupplyType) {
+    const registeredSupplies = supplies.filter(
+      (supply) => supply.owner_id === currentUserId && supply.supply_type === type
+    );
+
+    return (
+      <AppCard title={`登録済み${SUPPLY_TYPE_LABELS[type]}`}>
+        {registeredSupplies.length === 0 ? (
+          <p className="dm-muted-text">登録済みの{SUPPLY_TYPE_LABELS[type]}はありません。</p>
+        ) : (
+          <div className="dm-supply-grid">
+            {registeredSupplies.map((supply) => {
+              const imageUrl = getPublicSupplyImageUrl(supply.image_path);
+              return (
+                <article className="dm-supply-card" key={supply.id}>
+                  {imageUrl && (
+                    <div className={`dm-registered-supply-image is-${type}`}>
+                      <img src={imageUrl} alt={supply.name} />
+                    </div>
+                  )}
+                  <strong>{supply.name}</strong>
+                  <button
+                    type="button"
+                    className="dm-supply-delete"
+                    disabled={saving}
+                    onClick={() => void handleDeleteSupply(supply)}
+                  >
+                    削除
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </AppCard>
+    );
+  }
+
   return (
     <AppShell>
+      <div className="dm-page-actions">
+        <BackButton fallbackHref="/register" />
+      </div>
       {loading ? (
         <AppCard title="読み込み中" description="サプライ情報を取得しています。" />
       ) : (
@@ -199,6 +242,8 @@ export default function SuppliesPage() {
           <div className="dm-app-grid">
             {renderUploadCard("sleeve")}
             {renderUploadCard("playmat")}
+            {renderRegisteredSupplies("sleeve")}
+            {renderRegisteredSupplies("playmat")}
           </div>
         </>
       )}

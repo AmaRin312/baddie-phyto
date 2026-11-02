@@ -13,6 +13,7 @@ import {
   moveRevealedCard,
   moveSoulToSoulFaceDown,
   moveSoulToSoulFaceUp,
+  revealSoulCard,
   moveSoulCard,
   moveSoulCards,
   moveTopDeckCard,
@@ -97,6 +98,8 @@ export function executeBattleCommand(
       return moveSoulToSoulFaceUp(state, command.payload);
     case "MOVE_SOUL_TO_SOUL_FACE_DOWN":
       return moveSoulToSoulFaceDown(state, command.payload);
+    case "REVEAL_SOUL_CARD":
+      return revealSoulCard(state, command.payload);
     case "SWAP_AREA_STACKS":
       return swapAreaStacks(state, command.payload);
     case "MOVE_AREA_STACK_TO_SLOT":

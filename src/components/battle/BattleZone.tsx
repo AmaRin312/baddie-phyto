@@ -36,7 +36,7 @@ type BattleZoneProps = {
   selectedInstanceIds: ReadonlySet<string>;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent"; anchor?: { right: number; bottom: number } }
   ) => void;
   onDoubleClickCard: (
     card: BattleCard,
@@ -272,7 +272,12 @@ export function BattleZone({
                 onDragEnd={onDragEndCard}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelectCard(battleCard, { shiftKey: event.shiftKey, playerId });
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  onSelectCard(battleCard, {
+                    shiftKey: event.shiftKey,
+                    playerId,
+                    anchor: { right: rect.right, bottom: rect.bottom }
+                  });
                 }}
                 onDoubleClick={(event) => {
                   event.stopPropagation();
@@ -354,7 +359,12 @@ export function BattleZone({
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelectCard(areaTopCard, { shiftKey: event.shiftKey, playerId });
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  onSelectCard(areaTopCard, {
+                    shiftKey: event.shiftKey,
+                    playerId,
+                    anchor: { right: rect.right, bottom: rect.bottom }
+                  });
                 }}
                 onDoubleClick={(event) => {
                   event.stopPropagation();
@@ -428,7 +438,12 @@ export function BattleZone({
                   onDragEnd={onDragEndCard}
                   onClick={(event) => {
                     event.stopPropagation();
-                    onSelectCard(gaugeCard, { shiftKey: event.shiftKey, playerId });
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    onSelectCard(gaugeCard, {
+                      shiftKey: event.shiftKey,
+                      playerId,
+                      anchor: { right: rect.right, bottom: rect.bottom }
+                    });
                   }}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
@@ -481,7 +496,12 @@ export function BattleZone({
               onDragEnd={onDragEndCard}
               onClick={(event) => {
                 event.stopPropagation();
-                onSelectCard(topCard, { shiftKey: event.shiftKey, playerId });
+                const rect = event.currentTarget.getBoundingClientRect();
+                onSelectCard(topCard, {
+                  shiftKey: event.shiftKey,
+                  playerId,
+                  anchor: { right: rect.right, bottom: rect.bottom }
+                });
               }}
               onDoubleClick={(event) => {
                 event.stopPropagation();

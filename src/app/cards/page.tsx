@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppCard } from "@/components/common/card/AppCard";
 import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { isBattleAbilityId } from "@/lib/battle/abilities/abilityTypes";
 import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
@@ -111,6 +112,7 @@ export default function CardsPage() {
   return (
     <AppShell>
       <div className="dm-page-actions">
+        <BackButton fallbackHref="/register" />
         <Link href="/cards/new" className="dm-button primary">
           カード新規登録
         </Link>

@@ -25,7 +25,7 @@ type BattlePlayerProps = {
   selectedInstanceIds: ReadonlySet<string>;
   onSelectCard: (
     card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
+    input?: { shiftKey?: boolean; playerId?: "self" | "opponent"; anchor?: { right: number; bottom: number } }
   ) => void;
   onDoubleClickCard: (
     card: BattleCard,

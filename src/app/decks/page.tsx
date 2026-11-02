@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
+import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
@@ -64,6 +65,7 @@ export default function DecksPage() {
     useState<DeckRecord | null>(null);
   const [copyingDeck, setCopyingDeck] = useState(false);
   const [deletingDeck, setDeletingDeck] = useState(false);
+  const requestedImageCardIds = useRef(new Set<string>());
 
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
@@ -154,9 +156,18 @@ export default function DecksPage() {
           ...nextFlags.map((flag: FlagRecord) => flag.card_id).filter(Boolean)
         ] as string[];
 
+        const previewImageCardIds = [
+          ...nextDecks.map((deck) => {
+            const selectedFlag = nextFlags.find((flag) => flag.id === deck.flag_id);
+            return selectedFlag?.card_id ?? null;
+          }),
+          ...nextDecks.map((deck) => deck.buddy_card_id)
+        ].filter(Boolean) as string[];
+        previewImageCardIds.forEach((cardId) => requestedImageCardIds.current.add(cardId));
+
         const [cardsResponse, imagesResponse] = await Promise.allSettled([
           loadCardsByIds(relatedCardIds),
-          loadCardImagesByCardIds(relatedCardIds)
+          loadCardImagesByCardIds([...new Set(previewImageCardIds)])
         ]);
 
         const nextCardsResponse =
@@ -182,6 +193,38 @@ export default function DecksPage() {
 
     void loadPage();
   }, []);
+
+  useEffect(() => {
+    if (!selectedDeckForAction) return;
+
+    const deckCardIds = (deckCardMap.get(selectedDeckForAction.id) ?? []).map(
+      (deckCard) => deckCard.card_id
+    );
+    const selectedFlag = flags.find((flag) => flag.id === selectedDeckForAction.flag_id);
+    const cardIdsToLoad = [...new Set([
+      ...deckCardIds,
+      selectedFlag?.card_id,
+      selectedDeckForAction.buddy_card_id
+    ].filter((cardId): cardId is string => Boolean(cardId)))].filter(
+      (cardId) => !requestedImageCardIds.current.has(cardId)
+    );
+
+    if (cardIdsToLoad.length === 0) return;
+    cardIdsToLoad.forEach((cardId) => requestedImageCardIds.current.add(cardId));
+
+    void loadCardImagesByCardIds(cardIdsToLoad).then((result) => {
+      if (result.error) {
+        cardIdsToLoad.forEach((cardId) => requestedImageCardIds.current.delete(cardId));
+        return;
+      }
+      if (result.data?.length) {
+        setImages((current) => {
+          const knownIds = new Set(current.map((image) => image.id));
+          return [...current, ...result.data!.filter((image) => !knownIds.has(image.id))];
+        });
+      }
+    });
+  }, [deckCardMap, flags, selectedDeckForAction]);
 
   async function handleCopySelectedDeck() {
     if (!selectedDeckForAction) return;
@@ -346,6 +389,7 @@ export default function DecksPage() {
   return (
     <AppShell>
       <div className="dm-page-actions">
+        <BackButton fallbackHref="/" />
         <Link href="/decks/new" className="dm-button primary">
           デッキ作成
         </Link>

@@ -24,7 +24,7 @@ export function BattlePopup({
   description,
   size = "medium",
   closeOnEscape = true,
-  closeOnBackdrop = true,
+  closeOnBackdrop = false,
   onClose,
   children,
   footer,
@@ -43,6 +43,12 @@ export function BattlePopup({
     <div
       className={`bf-battle-popup-backdrop${lightBackdrop ? " is-light" : ""}`}
       role="presentation"
+      onDragStartCapture={(event) => {
+        event.currentTarget.classList.add("is-card-dragging");
+      }}
+      onDragEndCapture={(event) => {
+        event.currentTarget.classList.remove("is-card-dragging");
+      }}
       onClick={() => {
         if (closeOnBackdrop) {
           onClose();

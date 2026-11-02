@@ -238,6 +238,14 @@ export type MoveSoulToSoulFaceDownCommand = {
   };
 };
 
+export type RevealSoulCardCommand = {
+  type: "REVEAL_SOUL_CARD";
+  payload: {
+    parentInstanceId: string;
+    soulInstanceId: string;
+  };
+};
+
 export type SwapAreaStacksCommand = {
   type: "SWAP_AREA_STACKS";
   payload: SwapAreaStacksInput;
@@ -279,6 +287,7 @@ export type BattleCommand =
     | AddSoulFaceDownCommand
     | MoveSoulToSoulFaceUpCommand
     | MoveSoulToSoulFaceDownCommand
+    | RevealSoulCardCommand
     | SwapAreaStacksCommand
     | MoveAreaStackToSlotCommand
   ) & {

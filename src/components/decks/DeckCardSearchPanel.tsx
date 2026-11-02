@@ -6,6 +6,7 @@ import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
   DECK_CARD_ERA_OPTIONS,
   EMPTY_DECK_CARD_SEARCH_FILTERS,
+  resolveDeckSearchWorlds,
   type DeckCardAttributeKey,
   type DeckCardEraKey,
   type DeckCardSearchFilters,
@@ -74,10 +75,11 @@ function DeckCardSearchPanelComponent({
   });
 
   useEffect(() => {
-    if (filters.worlds.length === 0 && initialWorlds.length > 0) {
-      onChange({ ...filters, worlds: initialWorlds });
+    const resolvedInitialWorlds = resolveDeckSearchWorlds(worlds, initialWorlds);
+    if (filters.worlds.length === 0 && resolvedInitialWorlds.length > 0) {
+      onChange({ ...filters, worlds: resolvedInitialWorlds });
     }
-  }, [filters, initialWorlds, onChange]);
+  }, [filters, initialWorlds, onChange, worlds]);
 
   const setsByEra = useMemo(() => {
     const map = new Map<DeckCardEraKey, DeckCardSetOption[]>();

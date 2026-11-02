@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
@@ -131,7 +131,7 @@ export function BattleStartPanel() {
     [effectiveSelectedDeckId, visibleDecks]
   );
 
-  async function refreshRooms() {
+  const refreshRooms = useCallback(async () => {
     setRoomsLoading(true);
     const result = await loadActiveBattleRooms();
     if (result.error) {
@@ -142,7 +142,13 @@ export function BattleStartPanel() {
       setRooms(result.data);
     }
     setRoomsLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    const refreshOnFocus = () => void refreshRooms();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
+  }, [refreshRooms]);
 
   useEffect(() => {
     async function loadPage() {
@@ -231,6 +237,7 @@ export function BattleStartPanel() {
     const result = await joinBattleRoom({ room });
     if (result.error || !result.data) {
       setMessage(result.error ?? "ルーム入室に失敗しました。");
+      await refreshRooms();
       return;
     }
 

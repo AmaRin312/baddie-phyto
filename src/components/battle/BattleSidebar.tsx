@@ -25,6 +25,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 type BattleSidebarProps = {
   battleState: BattleState;
   activeCard: BattleCard | null;
+  soulListPosition?: { left: number; top: number } | null;
   viewerCards: BattleCard[];
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
@@ -36,6 +37,7 @@ type BattleSidebarProps = {
   selectedInstanceIds: ReadonlySet<string>;
   selectedSoulInstanceIds: ReadonlySet<string>;
   viewerPinned: boolean;
+  onCloseViewer: () => void;
   onSelectCard: (
     card: BattleCard,
     input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
@@ -60,6 +62,7 @@ type BattleSidebarProps = {
     soulCard: BattleCard,
     event: MouseEvent<HTMLButtonElement>
   ) => void;
+  onDoubleClickFaceDownSoul: (parentCard: BattleCard, soulCard: BattleCard) => void;
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
 };
 
@@ -221,6 +224,7 @@ function HandCards({
 export function BattleSidebar({
   battleState,
   activeCard,
+  soulListPosition,
   viewerCards,
   cardMap,
   imagesByCard,
@@ -232,6 +236,7 @@ export function BattleSidebar({
   selectedInstanceIds,
   selectedSoulInstanceIds,
   viewerPinned,
+  onCloseViewer,
   onSelectCard,
   onToggleViewerPin,
   onContextMenuCard,
@@ -241,6 +246,7 @@ export function BattleSidebar({
   onDragStartSoulCard,
   onDragEndSoulCard,
   onContextMenuSoulCard,
+  onDoubleClickFaceDownSoul,
   onDropCard
 }: BattleSidebarProps) {
   const normalizedViewerCards =
@@ -297,6 +303,10 @@ export function BattleSidebar({
                 <div
                   className="bf-single-viewer"
                   key={`${viewerCard.instanceId}-${viewerIndex}`}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    onCloseViewer();
+                  }}
                 >
                   {compositeCards.length > 1 ? (
                     <BattleCompositeCardView
@@ -326,6 +336,7 @@ export function BattleSidebar({
         </div>
         <SoulCardList
           parentCard={activeCard}
+          position={soulListPosition}
           cardMap={cardMap}
           imagesByCard={imagesByCard}
           selectedSoulInstanceIds={selectedSoulInstanceIds}
@@ -333,6 +344,7 @@ export function BattleSidebar({
           onDragStartSoulCard={onDragStartSoulCard}
           onDragEndSoulCard={onDragEndSoulCard}
           onContextMenuSoulCard={onContextMenuSoulCard}
+          onDoubleClickFaceDownSoul={onDoubleClickFaceDownSoul}
         />
       </section>
 

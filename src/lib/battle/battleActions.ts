@@ -255,6 +255,7 @@ function getVisibilityForZone(zoneId: BattleZoneId): BattleCard["visibility"] {
 
 function getVisibilityForSoulMove(zoneId: BattleZoneId): BattleCard["visibility"] {
   if (zoneId === "deck") return "face_down";
+  if (zoneId === "hand") return "private";
   return "public";
 }
 
@@ -1133,6 +1134,27 @@ export function moveSoulToSoulFaceDown(
     ...input,
     visibility: "face_down"
   });
+}
+
+export function revealSoulCard(
+  state: BattleState,
+  input: { parentInstanceId: string; soulInstanceId: string }
+): BattleState {
+  const located = findSoulCard(state, input);
+  if (!located || located.soulCard.visibility !== "face_down") return state;
+
+  const nextState = cloneBattleState(state);
+  const zoneCards = nextState.players[located.playerId].zones[located.parentZoneId].cards;
+  const parentCard = zoneCards[located.parentIndex];
+  zoneCards[located.parentIndex] = {
+    ...parentCard,
+    soul: parentCard.soul.map((soulCard) =>
+      soulCard.instanceId === input.soulInstanceId
+        ? { ...soulCard, visibility: "public" }
+        : soulCard
+    )
+  };
+  return nextState;
 }
 
 function getAreaPlacementForSoulCard(

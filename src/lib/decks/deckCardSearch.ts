@@ -43,14 +43,6 @@ export type DeckCardSetOption = {
   eraKey: DeckCardEraKey;
 };
 
-export type CardPrintingSearchRecord = {
-  cardId: string;
-  setId: string;
-  setCode: string;
-  setName: string | null;
-  eraKey: DeckCardEraKey;
-};
-
 export type DeckCardSearchFilters = {
   name: string;
   cardText: string;
@@ -75,196 +67,134 @@ export const EMPTY_DECK_CARD_SEARCH_FILTERS: DeckCardSearchFilters = {
   attributes: []
 };
 
-type CardPrintingQueryRow = {
-  card_id: string;
-  card_sets: {
-    id: string;
-    set_code: string;
-    name: string | null;
-    era_key: DeckCardEraKey | null;
-  } | null;
+export type DeckCardSearchResponse = {
+  items: CardRecord[];
+  totalCount: number;
 };
 
-const DECK_CARD_PRINTING_CACHE_TTL_MS = 300_000;
-let deckCardPrintingCache:
-  | {
-      expiresAt: number;
-      value: {
-        printings: CardPrintingSearchRecord[];
-        sets: DeckCardSetOption[];
-        error: string | null;
-      };
-    }
-  | null = null;
-let deckCardPrintingInFlight: Promise<{
-  printings: CardPrintingSearchRecord[];
+type CardSetQueryRow = {
+  id: string;
+  set_code: string;
+  name: string | null;
+  era_key: DeckCardEraKey | null;
+  is_visible: boolean;
+};
+
+export type ManagedCardSet = CardSetQueryRow;
+
+let optionsCache: {
+  expiresAt: number;
+  value: { worlds: string[]; sets: DeckCardSetOption[]; error: string | null };
+} | null = null;
+let optionsInFlight: Promise<{
+  worlds: string[];
   sets: DeckCardSetOption[];
   error: string | null;
 }> | null = null;
 
-export async function loadDeckCardPrintingSearchData(): Promise<{
-  printings: CardPrintingSearchRecord[];
-  sets: DeckCardSetOption[];
-  error: string | null;
-}> {
-  if (deckCardPrintingCache && deckCardPrintingCache.expiresAt > Date.now()) {
-    return deckCardPrintingCache.value;
-  }
-  if (deckCardPrintingInFlight) {
-    return deckCardPrintingInFlight;
-  }
+export async function loadDeckCardSearchOptions() {
+  if (optionsCache && optionsCache.expiresAt > Date.now()) return optionsCache.value;
+  if (optionsInFlight) return optionsInFlight;
 
-  deckCardPrintingInFlight = (async () => {
+  optionsInFlight = (async () => {
     try {
-      const { data, error } = await supabase
-        .from("card_printings")
-        .select("card_id,card_sets(id,set_code,name,era_key)")
-        .returns<CardPrintingQueryRow[]>();
-      if (error) {
-        return { printings: [], sets: [], error: error.message };
-      }
+      const [worldResult, setResult] = await Promise.all([
+        supabase.rpc("list_deck_card_search_worlds"),
+        supabase
+          .from("card_sets")
+          .select("id,set_code,name,era_key,is_visible")
+          .eq("is_visible", true)
+          .order("set_code")
+          .returns<CardSetQueryRow[]>()
+      ]);
+      const error = worldResult.error ?? setResult.error;
+      if (error) return { worlds: [], sets: [], error: error.message };
 
-      const setMap = new Map<string, DeckCardSetOption>();
-      const printings: CardPrintingSearchRecord[] = [];
-
-      (data ?? []).forEach((row) => {
-        const set = row.card_sets;
-        if (!set) return;
-        const eraKey = set.era_key ?? "first";
-        setMap.set(set.id, {
+      const worlds = (worldResult.data as unknown as string[] | null) ?? [];
+      const value = {
+        worlds: [...new Set(worlds)].sort((left, right) =>
+          left.localeCompare(right, "ja")
+        ),
+        sets: (setResult.data ?? []).map((set) => ({
           id: set.id,
           setCode: set.set_code,
           name: set.name,
-          eraKey
-        });
-        printings.push({
-          cardId: row.card_id,
-          setId: set.id,
-          setCode: set.set_code,
-          setName: set.name,
-          eraKey
-        });
-      });
-
-      const result = {
-        printings,
-        sets: Array.from(setMap.values()).sort((left, right) =>
-          (left.name ?? left.setCode).localeCompare(right.name ?? right.setCode, "ja")
-        ),
+          eraKey: set.era_key ?? "first"
+        })),
         error: null
       };
-
-      deckCardPrintingCache = {
-        expiresAt: Date.now() + DECK_CARD_PRINTING_CACHE_TTL_MS,
-        value: result
-      };
-
-      return result;
+      optionsCache = { expiresAt: Date.now() + 300_000, value };
+      return value;
     } finally {
-      deckCardPrintingInFlight = null;
+      optionsInFlight = null;
     }
   })();
 
-  return deckCardPrintingInFlight;
+  return optionsInFlight;
 }
 
-export function getDeckCardSearchOptions(cards: CardRecord[]) {
-  const worlds = new Set<string>();
+export async function loadManagedCardSets() {
+  return await supabase
+    .from("card_sets")
+    .select("id,set_code,name,era_key,is_visible")
+    .order("set_code")
+    .returns<ManagedCardSet[]>();
+}
 
-  cards.forEach((card) => {
-    card.worlds.forEach((world) => worlds.add(world));
-  });
+export async function setCardSetVisibility(id: string, isVisible: boolean) {
+  const result = await supabase
+    .from("card_sets")
+    .update({ is_visible: isVisible })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (!result.error && result.data) optionsCache = null;
+  return result;
+}
 
+export async function searchDeckCards(input: {
+  filters: DeckCardSearchFilters;
+  page: number;
+  pageSize?: number;
+  preferredWorlds: string[];
+  excludedCardId?: string | null;
+}) {
+  const pageSize = Math.min(Math.max(input.pageSize ?? 100, 1), 100);
+  const result = await supabase.rpc("search_deck_cards", {
+      p_name: input.filters.name.trim() || null,
+      p_card_text: input.filters.cardText.trim() || null,
+      p_worlds: input.filters.worlds,
+      p_card_types: input.filters.cardTypes,
+      p_race_keyword: input.filters.races[0]?.trim() || null,
+      p_eras: input.filters.eras,
+      p_set_ids: input.filters.setIds,
+      p_original_mode: input.filters.originalMode,
+      p_attributes: input.filters.attributes,
+      p_preferred_worlds: input.preferredWorlds,
+      p_excluded_card_id: input.excludedCardId || null,
+      p_page_size: pageSize,
+      p_page_offset: Math.max(0, input.page) * pageSize
+    });
+
+  if (result.error) {
+    return { data: null, error: result.error };
+  }
   return {
-    worlds: Array.from(worlds).sort((left, right) => left.localeCompare(right, "ja"))
+    data: result.data as unknown as DeckCardSearchResponse,
+    error: null
   };
 }
 
-function hasAny<T>(source: readonly T[], selected: readonly T[]) {
-  return selected.length === 0 || selected.some((value) => source.includes(value));
-}
+export function resolveDeckSearchWorlds(availableWorlds: string[], preferredWorlds: string[]) {
+  function normalize(world: string) {
+    const value = world.trim().normalize("NFC");
+    const lowerCaseW = value.endsWith("w") ? `${value.slice(0, -1)}W` : value;
+    const shortName = lowerCaseW.endsWith("ワールド")
+      ? `${lowerCaseW.slice(0, -4)}W`
+      : lowerCaseW;
+    return shortName;
+  }
 
-function hasRaceText(source: readonly string[], selected: readonly string[]) {
-  const keyword = selected[0]?.trim().toLowerCase() ?? "";
-  return !keyword || source.some((race) => race.toLowerCase().includes(keyword));
-}
-
-function hasAllAttributes(card: CardRecord, attributes: DeckCardAttributeKey[]) {
-  return attributes.every((attribute) => {
-    switch (attribute) {
-      case "dragon":
-        return card.is_dragon;
-      case "hyakki":
-        return card.is_hyakki;
-      case "cornerKing":
-        return card.is_corner_king;
-      case "chaos":
-        return card.is_chaos;
-      case "generic":
-        return card.is_generic;
-      case "heaven":
-        return card.is_heaven;
-      case "hell":
-        return card.is_hell;
-    }
-  });
-}
-
-export function filterDeckCandidateCards(input: {
-  cards: CardRecord[];
-  printings: CardPrintingSearchRecord[];
-  filters: DeckCardSearchFilters;
-  selectedBuddyCardId: string;
-  selectedFlagCardId?: string | null;
-  excludeInactive: boolean;
-  excludeFlagCard: boolean;
-}) {
-  const printingsByCard = new Map<string, CardPrintingSearchRecord[]>();
-  input.printings.forEach((printing) => {
-    printingsByCard.set(printing.cardId, [
-      ...(printingsByCard.get(printing.cardId) ?? []),
-      printing
-    ]);
-  });
-
-  const keyword = input.filters.name.trim().toLowerCase();
-  const textKeyword = input.filters.cardText.trim().toLowerCase();
-
-  return input.cards
-    .filter((card) => card.id !== input.selectedFlagCardId)
-    .filter((card) => !input.excludeInactive || card.is_active)
-    .filter((card) => !input.excludeFlagCard || card.card_type !== "flag_card")
-    .filter((card) => !keyword || card.name.toLowerCase().includes(keyword))
-    .filter(
-      (card) =>
-        !textKeyword ||
-        (card.card_text ?? "").toLowerCase().includes(textKeyword)
-    )
-    .filter((card) => hasAny(card.worlds, input.filters.worlds))
-    .filter(
-      (card) =>
-        input.filters.cardTypes.length === 0 ||
-        input.filters.cardTypes.includes(card.card_type)
-    )
-    .filter((card) => hasRaceText(card.races, input.filters.races))
-    .filter((card) => {
-      if (input.filters.originalMode === "original") return card.is_original;
-      if (input.filters.originalMode === "official") return !card.is_original;
-      return true;
-    })
-    .filter((card) => hasAllAttributes(card, input.filters.attributes))
-    .filter((card) => {
-      const cardPrintings = printingsByCard.get(card.id) ?? [];
-      if (input.filters.eras.length > 0) {
-        if (!cardPrintings.some((printing) => input.filters.eras.includes(printing.eraKey))) {
-          return false;
-        }
-      }
-      if (input.filters.setIds.length > 0) {
-        if (!cardPrintings.some((printing) => input.filters.setIds.includes(printing.setId))) {
-          return false;
-        }
-      }
-      return true;
-    });
+  const preferredKeys = new Set(preferredWorlds.map(normalize));
+  return availableWorlds.filter((world) => preferredKeys.has(normalize(world)));
 }

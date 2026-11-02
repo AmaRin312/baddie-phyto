@@ -32,6 +32,7 @@ const CARD_SELECT_COLUMNS = [
 ].join(",");
 
 const CARD_CACHE_TTL_MS = 60_000;
+const CARD_LIST_PAGE_SIZE = 1000;
 
 type CachedCardResponse = {
   data: CardRecord[] | null;
@@ -121,15 +122,28 @@ export async function loadCards(options?: { activeOnly?: boolean }) {
   const inFlight = cardListInFlight.get(cacheKey);
   if (inFlight) return inFlight;
 
-  let query = supabase.from("cards").select(CARD_SELECT_COLUMNS).order("name");
-
-  if (options?.activeOnly) query = query.eq("is_active", true);
   const request: Promise<CachedCardResponse> = (async () => {
     try {
-      const result = await query.returns<CardRecord[]>();
-      if (!result.error) {
-        setCachedCardResponse(cacheKey, result);
+      const cards: CardRecord[] = [];
+      for (let offset = 0; ; offset += CARD_LIST_PAGE_SIZE) {
+        let query = supabase
+          .from("cards")
+          .select(CARD_SELECT_COLUMNS)
+          .order("name")
+          .order("id")
+          .range(offset, offset + CARD_LIST_PAGE_SIZE - 1);
+
+        if (options?.activeOnly) query = query.eq("is_active", true);
+
+        const result = await query.returns<CardRecord[]>();
+        if (result.error) return { data: null, error: result.error };
+
+        cards.push(...(result.data ?? []));
+        if ((result.data?.length ?? 0) < CARD_LIST_PAGE_SIZE) break;
       }
+
+      const result = { data: cards, error: null };
+      setCachedCardResponse(cacheKey, result);
       return result;
     } finally {
       cardListInFlight.delete(cacheKey);

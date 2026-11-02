@@ -5,6 +5,11 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import {
+  loadManagedCardSets,
+  setCardSetVisibility,
+  type ManagedCardSet
+} from "@/lib/decks/deckCardSearch";
+import {
   getPublicSupplyImageUrl,
   loadBattleSupplies,
   loadSiteSupplySettings,
@@ -16,6 +21,8 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [supplies, setSupplies] = useState<BattleSupplyRecord[]>([]);
   const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
+  const [cardSets, setCardSets] = useState<ManagedCardSet[]>([]);
+  const [updatingSetId, setUpdatingSetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -35,17 +42,19 @@ export default function AdminPage() {
       }
 
       setIsAdmin(true);
-      const [supplyResult, settingsResult] = await Promise.all([
+      const [supplyResult, settingsResult, cardSetsResult] = await Promise.all([
         loadBattleSupplies("sleeve"),
-        loadSiteSupplySettings()
+        loadSiteSupplySettings(),
+        loadManagedCardSets()
       ]);
 
-      if (supplyResult.error || settingsResult.error) {
-        console.error(supplyResult.error ?? settingsResult.error);
+      if (supplyResult.error || settingsResult.error || cardSetsResult.error) {
+        console.error(supplyResult.error ?? settingsResult.error ?? cardSetsResult.error);
         setMessage("管理者設定の読み込みに失敗しました。SQLの適用状況を確認してください。");
       } else {
         setSupplies(supplyResult.data ?? []);
         setSelectedSleeveSupplyId(settingsResult.data?.sleeve_supply_id ?? "");
+        setCardSets(cardSetsResult.data ?? []);
       }
       setLoading(false);
     }
@@ -66,6 +75,21 @@ export default function AdminPage() {
     }
 
     setMessage("サイト全体のデフォルトスリーブを保存しました。");
+  }
+
+  async function handleSetVisibility(cardSet: ManagedCardSet) {
+    setUpdatingSetId(cardSet.id);
+    setMessage("");
+    const result = await setCardSetVisibility(cardSet.id, !cardSet.is_visible);
+    setUpdatingSetId(null);
+    if (result.error || !result.data) {
+      console.error(result.error);
+      setMessage(`「${cardSet.name ?? cardSet.set_code}」の表示状態を更新できませんでした。SQLの適用状況を確認してください。`);
+      return;
+    }
+    setCardSets((current) => current.map((item) =>
+      item.id === cardSet.id ? { ...item, is_visible: !item.is_visible } : item
+    ));
   }
 
   const selectedSupply = supplies.find((supply) => supply.id === selectedSleeveSupplyId);
@@ -113,6 +137,36 @@ export default function AdminPage() {
             >
               {saving ? "保存中..." : "設定を保存"}
             </button>
+          </AppCard>
+          <AppCard
+            title="カード商品ごとの表示設定"
+            description="非表示にした商品は、デッキ編集のカード検索と収録商品選択肢から除外されます。変更は管理者のみ行えます。"
+          >
+            {cardSets.length > 0 ? (
+              <div className="dm-admin-product-list">
+                {cardSets.map((cardSet) => (
+                  <label className="dm-admin-product-row" key={cardSet.id}>
+                    <span>
+                      <strong>{cardSet.name ?? cardSet.set_code}</strong>
+                      <small>{cardSet.set_code}</small>
+                    </span>
+                    <span className="dm-admin-product-toggle">
+                      <input
+                        type="checkbox"
+                        checked={cardSet.is_visible}
+                        disabled={updatingSetId != null}
+                        onChange={() => void handleSetVisibility(cardSet)}
+                      />
+                      {updatingSetId === cardSet.id
+                        ? "更新中…"
+                        : cardSet.is_visible ? "表示" : "非表示"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="dm-muted-text">登録されている商品はありません。</p>
+            )}
           </AppCard>
         </>
       )}

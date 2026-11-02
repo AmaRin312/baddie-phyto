@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { BattlePopup } from "@/components/battle/BattlePopup";
 import { BoardCard } from "@/components/cards/BoardCard";
+import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import {
   DEFAULT_DECK_BROWSER_DESTINATIONS,
   getBattleDestinationDefinitions
@@ -33,6 +34,9 @@ type DeckBrowserPopupProps = {
   allowedDestinations?: ReadonlyArray<BattleDestination>;
   onExecute: (requests: DeckBrowserRequest[]) => void;
   onClose: () => void;
+  canDragCards?: boolean;
+  onDragStartCard?: (card: BattleCard) => void;
+  onDragEndCard?: () => void;
 };
 
 export const DECK_BROWSER_PAGE_SIZE = 12;
@@ -51,7 +55,10 @@ export function DeckBrowserPopup({
   mode = "move",
   allowedDestinations = DEFAULT_DECK_BROWSER_DESTINATIONS,
   onExecute,
-  onClose
+  onClose,
+  canDragCards = false,
+  onDragStartCard,
+  onDragEndCard
 }: DeckBrowserPopupProps) {
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -176,6 +183,7 @@ export function DeckBrowserPopup({
       size="fullscreen"
       onClose={onClose}
       lightBackdrop
+      closeOnBackdrop={false}
       className={`bf-deck-browser-popup${mode === "browse" ? " is-browse-mode" : ""}`}
       contentClassName="bf-deck-browser-content"
       footer={
@@ -237,6 +245,19 @@ export function DeckBrowserPopup({
                 type="button"
                 className={`bf-deck-browser-card${isSelected ? " is-selected" : ""}${!canSelectCards ? " is-readonly" : ""}`}
                 key={battleCard.instanceId}
+                draggable={canDragCards && Boolean(onDragStartCard)}
+                onDragStart={(event) => {
+                  if (!canDragCards || !onDragStartCard) {
+                    event.preventDefault();
+                    return;
+                  }
+                  event.stopPropagation();
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", battleCard.instanceId);
+                  onDragStartCard(battleCard);
+                }}
+                onDragEnd={onDragEndCard}
                 onClick={() => toggleCard(battleCard.instanceId)}
               >
                 <span className="bf-deck-browser-order">
