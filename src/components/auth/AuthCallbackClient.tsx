@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 async function wait(ms: number) {
@@ -27,10 +27,12 @@ async function waitForSessionReady() {
 export function AuthCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackStarted = useRef(false);
   const [message, setMessage] = useState("Discordログインを確認しています...");
 
   useEffect(() => {
-    let cancelled = false;
+    if (callbackStarted.current) return;
+    callbackStarted.current = true;
 
     async function handleCallback() {
       const nextPath = searchParams.get("next") || "/home";
@@ -62,10 +64,6 @@ export function AuthCallbackClient() {
 
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-      if (cancelled) {
-        return;
-      }
-
       if (error) {
         router.replace(`/login?message=${encodeURIComponent(error.message)}`);
         return;
@@ -84,10 +82,6 @@ export function AuthCallbackClient() {
     }
 
     void handleCallback();
-
-    return () => {
-      cancelled = true;
-    };
   }, [router, searchParams]);
 
   return (

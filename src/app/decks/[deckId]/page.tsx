@@ -107,7 +107,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
-  const [searchScrollTop, setSearchScrollTop] = useState(0);
   const searchResultsRef = useRef<HTMLDivElement | null>(null);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
@@ -373,36 +372,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const searchPageCount = Math.max(1, Math.ceil(searchTotalCount / 100));
   const safeSearchPage = Math.min(searchPage, searchPageCount - 1);
   const visibleFilteredCards = filteredCards;
-  const SEARCH_COLUMN_COUNT = 4;
-  const SEARCH_ROW_HEIGHT = 150;
-  const SEARCH_OVERSCAN_ROWS = 2;
-  const SEARCH_VIEWPORT_HEIGHT = 520;
-  const searchVisibleRange = useMemo(() => {
-    const totalRows = Math.ceil(visibleFilteredCards.length / SEARCH_COLUMN_COUNT);
-    const startRow = Math.max(
-      0,
-      Math.floor(searchScrollTop / SEARCH_ROW_HEIGHT) - SEARCH_OVERSCAN_ROWS
-    );
-    const endRow = Math.min(
-      totalRows,
-      Math.ceil((searchScrollTop + SEARCH_VIEWPORT_HEIGHT) / SEARCH_ROW_HEIGHT) +
-        SEARCH_OVERSCAN_ROWS
-    );
-    const startIndex = startRow * SEARCH_COLUMN_COUNT;
-    const endIndex = Math.min(visibleFilteredCards.length, endRow * SEARCH_COLUMN_COUNT);
-    return { startIndex, endIndex };
-  }, [searchScrollTop, visibleFilteredCards.length]);
-  const virtualizedFilteredCards = useMemo(
-    () => visibleFilteredCards.slice(searchVisibleRange.startIndex, searchVisibleRange.endIndex),
-    [searchVisibleRange.endIndex, searchVisibleRange.startIndex, visibleFilteredCards]
-  );
 
   useEffect(() => {
     const resultsElement = searchResultsRef.current;
     if (resultsElement && resultsElement.scrollTop !== 0) {
       resultsElement.scrollTop = 0;
     }
-    setSearchScrollTop(0);
   }, [deferredSearchFilters, safeSearchPage]);
 
   useEffect(() => {
@@ -452,7 +427,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       ...new Set(
         [
           ...activeDraftDeckCards.map((draft) => draft.cardId),
-          ...virtualizedFilteredCards.map((card) => card.id),
+          ...visibleFilteredCards.map((card) => card.id),
           ...(flagPickerOpen ? flags.map((flag) => flag.card_id) : []),
           selectedFlagCard?.id,
           selectedBuddyCard?.id,
@@ -465,7 +440,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     activeDraftDeckCards,
     flagPickerOpen,
     flags,
-    virtualizedFilteredCards,
+    visibleFilteredCards,
     selectedFlagCard?.id,
     selectedBuddyCard?.id,
     detailCard?.id,
@@ -760,7 +735,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   function handleSearchFiltersChange(nextFilters: DeckCardSearchFilters) {
     setSearchPage(0);
-    setSearchScrollTop(0);
     setSearchFilters(nextFilters);
   }
 
@@ -1123,7 +1097,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <DeckCardSearchPanel
                   filters={searchFilters}
                   worlds={searchWorlds}
-                  initialWorlds={[...new Set([...(selectedFlag?.usable_worlds ?? []), ...(selectedFlagCard?.worlds ?? [])])]}
+                  initialWorlds={
+                    selectedFlagCard?.worlds?.length
+                      ? selectedFlagCard.worlds
+                      : selectedFlag?.usable_worlds ?? []
+                  }
                   sets={cardSets}
                   onChange={handleSearchFiltersChange}
                 />
@@ -1132,58 +1110,54 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <div
                   className="dm-deck-list dm-deck-search-results"
                   ref={searchResultsRef}
-                onScroll={(event) => {
-                  setSearchScrollTop(event.currentTarget.scrollTop);
-                }}
-              >
+                >
                 <div
                   style={{
                     position: "relative",
-                    height: `${Math.ceil(visibleFilteredCards.length / 4) * SEARCH_ROW_HEIGHT}px`
+                    height: `${Math.ceil(visibleFilteredCards.length / 4) * 150}px`
                   }}
                 >
-                  {virtualizedFilteredCards.map((card, virtualIndex) => {
-                  const actualIndex = searchVisibleRange.startIndex + virtualIndex;
-                  const existing = draftDeckCardMap.get(card.id);
-                  return (
-                    <button
-                      key={card.id}
-                      type="button"
-                      className={`dm-deck-search-card${
-                        draggedSearchCardId === card.id ? " is-dragging" : ""
-                      }`}
-                      style={{
-                        position: "absolute",
-                        top: `${Math.floor(actualIndex / 4) * SEARCH_ROW_HEIGHT}px`,
-                        left: `${(actualIndex % 4) * 25}%`
-                      }}
-                      draggable={canEditDeck}
-                      onClick={() => setPreviewCardId(card.id)}
-                      onKeyDown={(event) => {
-                        if ((event.key === "Enter" || event.key === " ") && canEditDeck) {
-                          event.preventDefault();
-                          setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
-                        }
-                      }}
-                      onDragStart={(event) => {
-                        if (!canEditDeck) {
-                          event.preventDefault();
-                          return;
-                        }
-                        setDraggedSearchCardId(card.id);
-                        event.dataTransfer.effectAllowed = "copy";
-                        event.dataTransfer.setData("text/plain", card.id);
-                      }}
-                      onDragEnd={() => setDraggedSearchCardId(null)}
-                    >
+                  {visibleFilteredCards.map((card, actualIndex) => {
+                    const existing = draftDeckCardMap.get(card.id);
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        className={`dm-deck-search-card${
+                          draggedSearchCardId === card.id ? " is-dragging" : ""
+                        }`}
+                        style={{
+                          position: "absolute",
+                          top: `${Math.floor(actualIndex / 4) * 150}px`,
+                          left: `${(actualIndex % 4) * 25}%`
+                        }}
+                        draggable={canEditDeck}
+                        onClick={() => setPreviewCardId(card.id)}
+                        onKeyDown={(event) => {
+                          if ((event.key === "Enter" || event.key === " ") && canEditDeck) {
+                            event.preventDefault();
+                            setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+                          }
+                        }}
+                        onDragStart={(event) => {
+                          if (!canEditDeck) {
+                            event.preventDefault();
+                            return;
+                          }
+                          setDraggedSearchCardId(card.id);
+                          event.dataTransfer.effectAllowed = "copy";
+                          event.dataTransfer.setData("text/plain", card.id);
+                        }}
+                        onDragEnd={() => setDraggedSearchCardId(null)}
+                      >
                         <CardViewer
                           card={card}
                           images={imagesByCard.get(card.id) ?? []}
                           variant="compact"
                         />
                         {existing && <span className="dm-deck-search-count">×{existing.quantity}</span>}
-                    </button>
-                  );
+                      </button>
+                    );
                   })}
                 </div>
                 {searchFilters.worlds.length === 0 ? (
@@ -1288,6 +1262,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     onClick={() => {
                       setSelectedFlagId(flag.id);
                       setSelectedFlagImageId("");
+                      const flagWorlds = flagCard?.worlds?.length
+                        ? flagCard.worlds
+                        : flag.usable_worlds ?? [];
+                      setSearchFilters((current) => ({
+                        ...current,
+                        worlds: resolveDeckSearchWorlds(searchWorlds, flagWorlds)
+                      }));
                       setSearchPage(0);
                       setFlagPickerOpen(false);
                     }}

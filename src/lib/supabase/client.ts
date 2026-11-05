@@ -7,4 +7,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase environment variables are missing.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // The callback page exchanges the PKCE code explicitly. Disable the SDK's
+    // URL auto-detection so the same one-time code cannot be exchanged twice.
+    detectSessionInUrl: false
+  }
+});
