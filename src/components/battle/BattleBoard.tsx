@@ -45,6 +45,7 @@ type BattleBoardProps = {
   placementTargetPlayerId?: "self" | "opponent";
   sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
   playmatImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
+  activePersistentEffects?: string[];
   onPlacementZoneClick?: (
     zoneId: BattleZoneId,
     event: MouseEvent<HTMLDivElement>,
@@ -75,6 +76,7 @@ function BattleBoardComponent({
   placementTargetPlayerId,
   sleeveImageUrls,
   playmatImageUrls,
+  activePersistentEffects = [],
   onPlacementZoneClick,
   onChangeLife,
   onRollDice,
@@ -99,6 +101,7 @@ function BattleBoardComponent({
         imagesByCard={imagesByCard}
         sleeveImageUrl={sleeveImageUrls?.opponent ?? null}
         playmatImageUrl={playmatImageUrls?.opponent ?? null}
+        activePersistentEffects={[]}
         draggedCard={draggedCard}
         draggedInstanceCount={draggedInstanceCount}
         draggedSoulCard={draggedSoulCard}
@@ -122,6 +125,7 @@ function BattleBoardComponent({
         imagesByCard={imagesByCard}
         sleeveImageUrl={sleeveImageUrls?.self ?? null}
         playmatImageUrl={playmatImageUrls?.self ?? null}
+        activePersistentEffects={activePersistentEffects}
         draggedCard={draggedCard}
         draggedInstanceCount={draggedInstanceCount}
         draggedSoulCard={draggedSoulCard}

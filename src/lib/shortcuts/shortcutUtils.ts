@@ -37,10 +37,13 @@ export function getDefaultShortcutSettings(): Required<ShortcutSettings> {
 export function mergeWithDefaultShortcuts(
   settings: ShortcutSettings | null | undefined
 ): Required<ShortcutSettings> {
-  return {
-    ...getDefaultShortcutSettings(),
-    ...(settings ?? {})
-  };
+  const merged = getDefaultShortcutSettings();
+  for (const actionId of SHORTCUT_ACTION_IDS) {
+    if (settings && Object.prototype.hasOwnProperty.call(settings, actionId)) {
+      merged[actionId] = settings[actionId] ?? null;
+    }
+  }
+  return merged;
 }
 
 export function findActionByBinding(

@@ -17,7 +17,9 @@ export const MOVABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "center",
   "left",
   "right",
-  "resolution"
+  "resolution",
+  "buddy",
+  "flag"
 ]);
 
 export const DRAGGABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
@@ -42,7 +44,8 @@ export const DROPPABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "center",
   "left",
   "right",
-  "resolution"
+  "resolution",
+  "flag"
 ]);
 
 export const AREA_STACK_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
@@ -94,6 +97,7 @@ export type MoveCardInput = {
   toZone: BattleZoneId;
   index?: number;
   deckPosition?: DeckPosition;
+  visibility?: BattleCard["visibility"];
 };
 
 export type MoveCardsInput = {
@@ -211,6 +215,19 @@ export type PlaceAsFlagInput = {
 export type ApplyRuleChangeInput = {
   effectId: string;
   itemLimit?: number | null;
+};
+
+export type SetLaevateinnEffectInput = {
+  active: boolean;
+};
+
+export type SetHandOpenEffectInput = {
+  active: boolean;
+};
+
+export type PlaceQuenatarCardInput = {
+  instanceId: string;
+  fromZone?: BattleZoneId;
 };
 
 export type ResolveBiriKinataNotificationInput = {
@@ -337,6 +354,7 @@ function clonePlayer(player: PlayerState): PlayerState {
     ...player,
     life: { ...player.life },
     dice: player.dice ? { ...player.dice } : null,
+    activeEffectIds: [...(player.activeEffectIds ?? [])],
     zones: Object.fromEntries(
       Object.entries(player.zones).map(([zoneId, zone]) => [
         zoneId,
@@ -357,6 +375,7 @@ function cloneBattleState(state: BattleState): BattleState {
       opponent: clonePlayer(state.players.opponent)
     },
     ruleState: {
+      ...state.ruleState,
       itemLimit: state.ruleState.itemLimit,
       appliedRuleEffectIds: [...state.ruleState.appliedRuleEffectIds]
     },
@@ -485,6 +504,10 @@ function getMoveInsertIndex(
     return 0;
   }
 
+  if (input.toZone === "flag") {
+    return 0;
+  }
+
   return toCardsLength;
 }
 
@@ -529,18 +552,33 @@ export function canMoveToZone(zoneId: BattleZoneId) {
   return DROPPABLE_ZONE_IDS.has(zoneId);
 }
 
-function getAreaStackLimit(state: BattleState, zoneId: BattleZoneId) {
+function getAreaStackLimit(
+  state: BattleState,
+  zoneId: BattleZoneId,
+  playerId: BattlePlayerId = "self"
+) {
   if (zoneId === "set") return 5;
-  if (zoneId === "item" && state.ruleState.itemLimit == null) return Infinity;
+  const laevateinnActive = state.ruleState.appliedRuleEffectIds.includes(
+    "text-command:laevateinn"
+  );
+  if (zoneId === "item" && laevateinnActive && playerId === "self") {
+    return Infinity;
+  }
+  const itemLimit =
+    zoneId === "item" && laevateinnActive
+      ? state.ruleState.itemLimitBeforeLaevateinn ?? null
+      : state.ruleState.itemLimit;
+  if (zoneId === "item" && itemLimit == null) return Infinity;
   return 2;
 }
 
 function getNextAreaSlot(
   state: BattleState,
   zoneId: BattleZoneId,
-  areaStacks: BattleAreaStack[]
+  areaStacks: BattleAreaStack[],
+  playerId: BattlePlayerId = "self"
 ): BattleAreaSlot | null {
-  const limit = getAreaStackLimit(state, zoneId);
+  const limit = getAreaStackLimit(state, zoneId, playerId);
   if (areaStacks.length >= limit) return null;
 
   const usedSlots = new Set(areaStacks.map((areaStack) => areaStack.areaSlot));
@@ -657,6 +695,18 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
 
   const compositeId = getCompositeId(located.card);
+  const handOpenActive =
+    input.toZone === "hand" &&
+    state.players[located.playerId].activeEffectIds?.includes("text-command:hand_open");
+  const visibility =
+    input.visibility ??
+    (handOpenActive ? "public" : getVisibilityForZone(input.toZone));
+  const movedMeta = (card: BattleCard) => {
+    const meta = { ...card.meta };
+    delete meta.handOpenExposed;
+    if (handOpenActive) meta.handOpenExposed = true;
+    return meta;
+  };
   if (compositeId && isAreaStackZone(located.zoneId)) {
     const sourceCards = state.players[located.playerId].zones[located.zoneId].cards;
     const compositeCards = getCompositeSortedCards(
@@ -677,12 +727,12 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
         ? (() => {
             const areaStacks = getAreaStacks(toCards);
             if (
-              areaStacks.length >= getAreaStackLimit(state, input.toZone) &&
+              areaStacks.length >= getAreaStackLimit(state, input.toZone, located.playerId) &&
               located.zoneId !== input.toZone
             ) {
               return null;
             }
-            const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+            const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks, located.playerId);
             if (areaSlot == null) return null;
             const stackId = `area-stack:${input.toZone}:${compositeId}`;
             return [...compositeCards]
@@ -698,9 +748,9 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                   withoutDeckRevealData({
                     ...resetMovedCard(card),
                     zoneId: input.toZone,
-                    visibility: getVisibilityForZone(input.toZone),
+                    visibility,
                     meta: {
-                      ...card.meta,
+                      ...movedMeta(card),
                       isRested: false
                     }
                   }),
@@ -715,9 +765,9 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                 withoutDeckRevealData({
                   ...resetMovedCard(card),
                   zoneId: input.toZone,
-                  visibility: getVisibilityForZone(input.toZone),
+                  visibility,
                   meta: {
-                    ...card.meta,
+                    ...movedMeta(card),
                     isRested: false
                   }
                 })
@@ -745,9 +795,9 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   const movedCard: BattleCard = {
     ...resetMovedCard(removedCard),
     zoneId: input.toZone,
-    visibility: getVisibilityForZone(input.toZone),
+    visibility,
     meta: {
-      ...removedCard.meta,
+      ...movedMeta(removedCard),
       isRested: false
     }
   };
@@ -758,7 +808,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     ? getAreaStacks(toCards)
     : [];
   const nextAreaSlot = isAreaStackZone(input.toZone)
-    ? getNextAreaSlot(state, input.toZone, targetAreaStacks)
+    ? getNextAreaSlot(state, input.toZone, targetAreaStacks, located.playerId)
     : null;
   if (isAreaStackZone(input.toZone) && nextAreaSlot == null) return state;
   const normalizedMovedCard = isAreaStackZone(input.toZone)
@@ -790,6 +840,51 @@ export function stackCardOnAreaCard(
   if (input.fromZone && located.zoneId !== input.fromZone) return state;
   if (target.zoneId !== input.toZone) return state;
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
+
+  const compositeId = getCompositeId(located.card);
+  if (compositeId && isAreaStackZone(located.zoneId)) {
+    const sourceCards = state.players[located.playerId].zones[located.zoneId].cards;
+    const compositeCards = getCompositeSortedCards(
+      sourceCards.filter((card) => getCompositeId(card) === compositeId)
+    );
+    if (compositeCards.length > 1) {
+      if (compositeCards.some((card) => card.instanceId === target.card.instanceId)) {
+        return state;
+      }
+      const targetStackId = getAreaStackId(target.card);
+      const targetAreaStack = getAreaStacks(
+        state.players[target.playerId].zones[input.toZone].cards
+      ).find((areaStack) => areaStack.stackId === targetStackId);
+      if (!targetAreaStack) return state;
+
+      const nextState = cloneBattleState(state);
+      const player = nextState.players[located.playerId];
+      const movingIds = new Set(compositeCards.map((card) => card.instanceId));
+      player.zones[located.zoneId].cards = player.zones[located.zoneId].cards.filter(
+        (card) => !movingIds.has(card.instanceId)
+      );
+      player.zones[input.toZone].cards.push(
+        ...compositeCards.map((card) =>
+          withAreaStackData(
+            withoutDeckRevealData({
+              ...resetMovedCard(card),
+              zoneId: input.toZone,
+              visibility: getVisibilityForZone(input.toZone),
+              meta: { ...card.meta, isRested: false }
+            }),
+            targetAreaStack.stackId,
+            targetAreaStack.areaSlot
+          )
+        )
+      );
+      if (located.zoneId === "deck") {
+        for (const card of compositeCards) {
+          cleanupDeckLookForMovedCard(nextState, card.instanceId);
+        }
+      }
+      return nextState;
+    }
+  }
 
   const targetStackId = getAreaStackId(target.card);
   const targetAreaSlot = getAreaSlot(target.card);
@@ -842,7 +937,46 @@ export function placeCardInAreaSlot(
 
   const targetCards = state.players[located.playerId].zones[input.toZone].cards;
   const areaStacks = getAreaStacks(targetCards);
-  if (areaStacks.length >= getAreaStackLimit(state, input.toZone)) return state;
+  if (areaStacks.length >= getAreaStackLimit(state, input.toZone, located.playerId)) return state;
+
+  const compositeId = getCompositeId(located.card);
+  if (compositeId && isAreaStackZone(located.zoneId)) {
+    const sourceCards = state.players[located.playerId].zones[located.zoneId].cards;
+    const compositeCards = getCompositeSortedCards(
+      sourceCards.filter((card) => getCompositeId(card) === compositeId)
+    );
+    if (compositeCards.length > 1) {
+      const nextState = cloneBattleState(state);
+      const player = nextState.players[located.playerId];
+      const movingIds = new Set(compositeCards.map((card) => card.instanceId));
+      player.zones[located.zoneId].cards = player.zones[located.zoneId].cards.filter(
+        (card) => !movingIds.has(card.instanceId)
+      );
+      const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks, located.playerId);
+      if (areaSlot == null) return state;
+      const stackId = `area-stack:${input.toZone}:${compositeId}`;
+      player.zones[input.toZone].cards.push(
+        ...compositeCards.map((card) =>
+          withAreaStackData(
+            withoutDeckRevealData({
+              ...resetMovedCard(card),
+              zoneId: input.toZone,
+              visibility: getVisibilityForZone(input.toZone),
+              meta: { ...card.meta, isRested: false }
+            }),
+            stackId,
+            areaSlot
+          )
+        )
+      );
+      if (located.zoneId === "deck") {
+        for (const card of compositeCards) {
+          cleanupDeckLookForMovedCard(nextState, card.instanceId);
+        }
+      }
+      return nextState;
+    }
+  }
 
   const nextState = cloneBattleState(state);
   const player = nextState.players[located.playerId];
@@ -854,7 +988,7 @@ export function placeCardInAreaSlot(
   if (!removedCard) return state;
 
   const stackId = `area-stack:${input.toZone}:${removedCard.instanceId}`;
-  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks, located.playerId);
   if (areaSlot == null) return state;
   const movedCard = withAreaStackData(
     withoutDeckRevealData({
@@ -916,7 +1050,7 @@ export function placeOrStackAreaCard(
   }
 
   const stacks = getAreaStacks(state.players[source.playerId].zones[input.toZone].cards);
-  if (input.toZone === "set" && stacks.length < getAreaStackLimit(state, input.toZone)) {
+  if (input.toZone === "set" && stacks.length < getAreaStackLimit(state, input.toZone, source.playerId)) {
     return placeCardInAreaSlot(state, input);
   }
 
@@ -1042,12 +1176,12 @@ export function addSoulCard(
   if (!targetCard) return state;
 
   targetCard.soul.push(
-    withoutAreaStackData({
+    withoutCompositeData(withoutAreaStackData({
       ...resetMovedCard(withoutDeckRevealData(removedCard)),
       zoneId: target.zoneId,
       visibility: input.visibility,
       meta: { ...withoutDeckRevealData(removedCard).meta }
-    })
+    }))
   );
 
   if (located.zoneId === "deck") {
@@ -1180,7 +1314,7 @@ function getAreaPlacementForSoulCard(
     };
   }
 
-  if (areaStacks.length >= getAreaStackLimit(state, input.toZone)) return null;
+  if (areaStacks.length >= getAreaStackLimit(state, input.toZone, input.playerId)) return null;
 
   if (!input.placeAsNewStack && areaStacks.length === 1) {
     return {
@@ -1189,7 +1323,7 @@ function getAreaPlacementForSoulCard(
     };
   }
 
-  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks);
+  const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks, input.playerId);
   if (areaSlot == null) return null;
 
   return {
@@ -1428,6 +1562,34 @@ export function toggleCardOrientation(
   return nextState;
 }
 
+export function standAllBattleCards(state: BattleState): BattleState {
+  const zoneIds = ["center", "left", "right", "item"] as const;
+  const restedCompositeIds = new Set<string>();
+  let hasRestedCard = false;
+  for (const zoneId of zoneIds) {
+    for (const card of state.players.self.zones[zoneId].cards) {
+      if (card.meta.isRested !== true) continue;
+      hasRestedCard = true;
+      const compositeId = getCompositeId(card);
+      if (compositeId) restedCompositeIds.add(compositeId);
+    }
+  }
+  if (!hasRestedCard) return state;
+
+  const nextState = cloneBattleState(state);
+  for (const zoneId of zoneIds) {
+    nextState.players.self.zones[zoneId].cards =
+      nextState.players.self.zones[zoneId].cards.map((card) => {
+        const compositeId = getCompositeId(card);
+        return card.meta.isRested === true ||
+          (compositeId != null && restedCompositeIds.has(compositeId))
+          ? { ...card, meta: { ...card.meta, isRested: false } }
+          : card;
+      });
+  }
+  return nextState;
+}
+
 export function changeLife(
   state: BattleState,
   input: ChangeLifeInput
@@ -1503,6 +1665,7 @@ export function applyRuleChange(
   return {
     ...state,
     ruleState: {
+      ...state.ruleState,
       itemLimit:
         Object.prototype.hasOwnProperty.call(input, "itemLimit")
           ? input.itemLimit ?? null
@@ -1513,6 +1676,126 @@ export function applyRuleChange(
       ]
     }
   };
+}
+
+export function setLaevateinnEffect(
+  state: BattleState,
+  input: SetLaevateinnEffectInput
+): BattleState {
+  const effectId = "text-command:laevateinn";
+  const isActive = state.ruleState.appliedRuleEffectIds.includes(effectId);
+  if (isActive === input.active) return state;
+
+  if (input.active) {
+    return {
+      ...state,
+      ruleState: {
+        ...state.ruleState,
+        itemLimitBeforeLaevateinn: state.ruleState.itemLimit,
+        itemLimit: null,
+        appliedRuleEffectIds: [...state.ruleState.appliedRuleEffectIds, effectId]
+      }
+    };
+  }
+
+  const previousLimit = Object.prototype.hasOwnProperty.call(
+    state.ruleState,
+    "itemLimitBeforeLaevateinn"
+  )
+    ? state.ruleState.itemLimitBeforeLaevateinn ?? null
+    : 1;
+  const {
+    itemLimitBeforeLaevateinn: _savedLimit,
+    ...ruleStateWithoutSavedLimit
+  } = state.ruleState;
+
+  return {
+    ...state,
+    ruleState: {
+      ...ruleStateWithoutSavedLimit,
+      itemLimit: previousLimit,
+      appliedRuleEffectIds: state.ruleState.appliedRuleEffectIds.filter(
+        (id) => id !== effectId
+      )
+    }
+  };
+}
+
+export function turnFlagFaceDown(state: BattleState): BattleState {
+  const topFlag = state.players.self.zones.flag.cards[0];
+  if (!topFlag || topFlag.visibility === "face_down") return state;
+
+  const nextState = cloneBattleState(state);
+  nextState.players.self.zones.flag.cards[0] = {
+    ...topFlag,
+    visibility: "face_down"
+  };
+  return nextState;
+}
+
+export function setHandOpenEffect(
+  state: BattleState,
+  input: SetHandOpenEffectInput
+): BattleState {
+  const effectId = "text-command:hand_open";
+  const currentPlayer = state.players.self;
+  const isActive = currentPlayer.activeEffectIds?.includes(effectId) ?? false;
+  if (isActive === input.active) return state;
+
+  const nextState = cloneBattleState(state);
+  const player = nextState.players.self;
+  const effects = player.activeEffectIds ?? [];
+  player.activeEffectIds = input.active
+    ? [...effects, effectId]
+    : effects.filter((id) => id !== effectId);
+  player.zones.hand.cards = player.zones.hand.cards.map((card) => {
+    if (input.active) {
+      return {
+        ...card,
+        visibility: "public",
+        meta: { ...card.meta, handOpenExposed: true }
+      };
+    }
+    if (card.meta.handOpenExposed !== true) return card;
+    const meta = { ...card.meta };
+    delete meta.handOpenExposed;
+    return { ...card, visibility: "private", meta };
+  });
+  return nextState;
+}
+
+export function placeQuenatarCard(
+  state: BattleState,
+  input: PlaceQuenatarCardInput
+): BattleState {
+  const located = findBattleCard(state, input.instanceId);
+  if (!located || located.playerId !== "self") return state;
+  if (input.fromZone && located.zoneId !== input.fromZone) return state;
+  if (!canMoveFromZone(located.zoneId) || !canMoveToZone("center")) return state;
+
+  if (located.zoneId !== "center") {
+    return moveCard(state, {
+      instanceId: input.instanceId,
+      fromZone: located.zoneId,
+      toZone: "center",
+      visibility: "face_down"
+    });
+  }
+
+  const compositeId = getCompositeId(located.card);
+  const nextState = cloneBattleState(state);
+  const centerCards = nextState.players.self.zones.center.cards;
+  let changed = false;
+  nextState.players.self.zones.center.cards = centerCards.map((card) => {
+    const belongsToSelection = compositeId
+      ? getCompositeId(card) === compositeId
+      : card.instanceId === input.instanceId;
+    if (!belongsToSelection || card.visibility === "face_down") return card;
+    changed = true;
+    return { ...card, visibility: "face_down" };
+  });
+
+  return changed ? nextState : state;
 }
 
 export function resolveBiriKinataNotification(
@@ -1572,8 +1855,10 @@ export function placeHyakuganComposite(
   const source = findBattleCard(state, input.sourceInstanceId);
   const pair = findBattleCard(state, input.pairInstanceId);
   if (!source || !pair) return state;
+  if (source.card.instanceId === pair.card.instanceId) return state;
   if (source.playerId !== "self" || pair.playerId !== "self") return state;
-  if (source.zoneId !== pair.zoneId) return state;
+  if (source.zoneId !== "hand" || pair.zoneId !== "hand") return state;
+  if (input.sourceRole !== "heaven" || input.pairRole !== "earth") return state;
 
   const destinationCards = state.players.self.zones[input.toZone].cards;
   const destinationStacks = getAreaStacks(destinationCards);

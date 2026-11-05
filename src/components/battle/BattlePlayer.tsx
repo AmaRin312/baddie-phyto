@@ -18,6 +18,7 @@ type BattlePlayerProps = {
   imagesByCard: Map<string, CardImageRecord[]>;
   sleeveImageUrl?: string | null;
   playmatImageUrl?: string | null;
+  activePersistentEffects?: string[];
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
   draggedSoulCard: BattleCard | null;
@@ -63,6 +64,7 @@ function BattlePlayerComponent({
   imagesByCard,
   sleeveImageUrl = null,
   playmatImageUrl = null,
+  activePersistentEffects = [],
   draggedCard,
   draggedInstanceCount,
   draggedSoulCard,
@@ -348,6 +350,7 @@ function BattlePlayerComponent({
             draggedSoulInstanceCount={draggedSoulInstanceCount}
             selectedInstanceIds={selectedInstanceIds}
             stack
+            activeEffects={activePersistentEffects}
             onSelectCard={onSelectCard}
             onDoubleClickCard={onDoubleClickCard}
             onContextMenuCard={onContextMenuCard}

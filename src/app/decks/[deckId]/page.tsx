@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
@@ -108,6 +108,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
   const [searchScrollTop, setSearchScrollTop] = useState(0);
+  const searchResultsRef = useRef<HTMLDivElement | null>(null);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -372,23 +373,37 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const searchPageCount = Math.max(1, Math.ceil(searchTotalCount / 100));
   const safeSearchPage = Math.min(searchPage, searchPageCount - 1);
   const visibleFilteredCards = filteredCards;
+  const SEARCH_COLUMN_COUNT = 4;
   const SEARCH_ROW_HEIGHT = 150;
-  const SEARCH_OVERSCAN = 6;
+  const SEARCH_OVERSCAN_ROWS = 2;
   const SEARCH_VIEWPORT_HEIGHT = 520;
   const searchVisibleRange = useMemo(() => {
-    const startIndex = Math.max(
+    const totalRows = Math.ceil(visibleFilteredCards.length / SEARCH_COLUMN_COUNT);
+    const startRow = Math.max(
       0,
-      Math.floor(searchScrollTop / SEARCH_ROW_HEIGHT) - SEARCH_OVERSCAN
+      Math.floor(searchScrollTop / SEARCH_ROW_HEIGHT) - SEARCH_OVERSCAN_ROWS
     );
-    const visibleCount =
-      Math.ceil(SEARCH_VIEWPORT_HEIGHT / SEARCH_ROW_HEIGHT) + SEARCH_OVERSCAN * 2;
-    const endIndex = Math.min(visibleFilteredCards.length, startIndex + visibleCount);
+    const endRow = Math.min(
+      totalRows,
+      Math.ceil((searchScrollTop + SEARCH_VIEWPORT_HEIGHT) / SEARCH_ROW_HEIGHT) +
+        SEARCH_OVERSCAN_ROWS
+    );
+    const startIndex = startRow * SEARCH_COLUMN_COUNT;
+    const endIndex = Math.min(visibleFilteredCards.length, endRow * SEARCH_COLUMN_COUNT);
     return { startIndex, endIndex };
   }, [searchScrollTop, visibleFilteredCards.length]);
   const virtualizedFilteredCards = useMemo(
     () => visibleFilteredCards.slice(searchVisibleRange.startIndex, searchVisibleRange.endIndex),
     [searchVisibleRange.endIndex, searchVisibleRange.startIndex, visibleFilteredCards]
   );
+
+  useEffect(() => {
+    const resultsElement = searchResultsRef.current;
+    if (resultsElement && resultsElement.scrollTop !== 0) {
+      resultsElement.scrollTop = 0;
+    }
+    setSearchScrollTop(0);
+  }, [deferredSearchFilters, safeSearchPage]);
 
   useEffect(() => {
     if (deferredSearchFilters.worlds.length === 0) {
@@ -1116,6 +1131,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                 <div
                   className="dm-deck-list dm-deck-search-results"
+                  ref={searchResultsRef}
                 onScroll={(event) => {
                   setSearchScrollTop(event.currentTarget.scrollTop);
                 }}

@@ -28,6 +28,7 @@ type BattleZoneProps = {
   rotateCard?: boolean;
   stack?: boolean;
   showCount?: boolean;
+  activeEffects?: string[];
   playerId: "self" | "opponent";
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
@@ -80,6 +81,26 @@ function isBattleCardRested(card: BattleCard) {
   return false;
 }
 
+function getItemSlotStyle(slot: number): CSSProperties {
+  const spacing = 179;
+  if (slot < 5) {
+    const column = [0, 1, -1, 2, -2][slot] ?? 0;
+    return {
+      "--bf-item-slot-x": `${column * spacing}px`,
+      "--bf-item-slot-y": "0px"
+    } as CSSProperties;
+  }
+
+  const rowOffset = slot - 5;
+  const row = Math.floor(rowOffset / 7) + 1;
+  const columnIndex = rowOffset % 7;
+  const column = [0, 1, -1, 2, -2, 3, -3][columnIndex] ?? 0;
+  return {
+    "--bf-item-slot-x": `${column * spacing}px`,
+    "--bf-item-slot-y": `${-row * spacing}px`
+  } as CSSProperties;
+}
+
 export function BattleZone({
   zoneId,
   label,
@@ -90,6 +111,7 @@ export function BattleZone({
   rotateCard = false,
   stack = false,
   showCount = false,
+  activeEffects = [],
   playerId,
   draggedCard,
   draggedInstanceCount,
@@ -241,6 +263,13 @@ export function BattleZone({
       }}
     >
       <div className="bf-zone-title">{label}</div>
+      {zoneId === "flag" && activeEffects.length > 0 && (
+        <div className="bf-active-effects" aria-label="発動中の常在効果">
+          {activeEffects.map((effect) => (
+            <span key={effect}>{effect}</span>
+          ))}
+        </div>
+      )}
       {zoneId === "resolution" ? (
         <div className="bf-resolution-card-row">
           {cards.map((battleCard) => {
@@ -312,6 +341,9 @@ export function BattleZone({
               areaStack.cards,
               areaTopCard
             );
+            const isHyakuganComposite = compositeCards.some(
+              (card) => card.meta.compositeKind === "hyakugan_yamigedo"
+            );
             const areaIsSelected = selectedInstanceIds.has(areaTopCard.instanceId);
             const areaIsDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
@@ -319,12 +351,17 @@ export function BattleZone({
             const areaIsRested = isBattleCardRested(areaTopCard);
             const areaIsNativeHorizontal =
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
+            const visibleSoulCards =
+              areaTopCard.soul.length > 5
+                ? areaTopCard.soul.slice(-1)
+                : areaTopCard.soul;
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal ? " is-native-horizontal" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
+                style={zoneId === "item" ? getItemSlotStyle(areaStack.areaSlot) : undefined}
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
                 onDragLeave={() => handleAreaStackDragLeave(areaStack.stackId)}
@@ -374,6 +411,28 @@ export function BattleZone({
                   onContextMenuCard(areaTopCard, event, playerId)
                 }
               >
+                {visibleSoulCards.map((soulCard, soulIndex) => {
+                  const soulRecord = cardMap.get(soulCard.cardId);
+                  if (!soulRecord) return null;
+
+                  return (
+                    <span
+                      aria-hidden="true"
+                      className="bf-attached-soul-card"
+                      key={soulCard.instanceId}
+                      style={{ "--bf-soul-layer": soulIndex + 1 } as CSSProperties}
+                    >
+                      <BoardCard
+                        card={soulRecord}
+                        images={imagesByCard.get(soulRecord.id) ?? []}
+                        selectedImageId={soulCard.selectedImageId}
+                        isPublic={shouldShowFace(soulCard)}
+                        variant="board"
+                        sleeveImageUrl={sleeveImageUrl}
+                      />
+                    </span>
+                  );
+                })}
                 {compositeCards.length > 1 ? (
                   <BattleCompositeCardView
                     cards={compositeCards}

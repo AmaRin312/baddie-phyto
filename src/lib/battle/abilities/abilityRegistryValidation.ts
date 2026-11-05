@@ -17,20 +17,17 @@ export type AbilityRegistryIssue = {
 
 const SUPPORTED_ABILITY_ACTION_IDS = {
   use_face_down_soul: true,
-  use_biri_kinata_face_down: true,
-  use_hyakugan_yamigedo_composite: true
+  use_biri_kinata_face_down: true
 } satisfies Readonly<Record<AbilityActionId, true>>;
 
 const SUPPORTED_TARGET_DEFINITION_IDS = {
   one_own_card_from_face_down_soul_sources: true,
-  one_opponent_drop_card: true,
-  matching_hyakugan_half_same_container: true
+  one_opponent_drop_card: true
 } satisfies Readonly<Record<TargetDefinitionId, true>>;
 
 const SUPPORTED_EXECUTOR_IDS = {
   add_selected_card_to_source_soul_face_down: true,
-  place_opponent_drop_card_to_opponent_center_face_down: true,
-  place_hyakugan_composite: true
+  place_opponent_drop_card_to_opponent_center_face_down: true
 } satisfies Readonly<Record<ExecutorId, true>>;
 
 export function validateBattleAbilityRegistry(): AbilityRegistryIssue[] {

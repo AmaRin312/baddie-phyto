@@ -21,18 +21,15 @@ export function isBattleAbilityId(value: string): value is AbilityId {
 
 export type AbilityActionId =
   | "use_face_down_soul"
-  | "use_biri_kinata_face_down"
-  | "use_hyakugan_yamigedo_composite";
+  | "use_biri_kinata_face_down";
 
 export type TargetDefinitionId =
   | "one_own_card_from_face_down_soul_sources"
-  | "one_opponent_drop_card"
-  | "matching_hyakugan_half_same_container";
+  | "one_opponent_drop_card";
 
 export type ExecutorId =
   | "add_selected_card_to_source_soul_face_down"
-  | "place_opponent_drop_card_to_opponent_center_face_down"
-  | "place_hyakugan_composite";
+  | "place_opponent_drop_card_to_opponent_center_face_down";
 
 export type BattleCardAbilityMap = Map<string, AbilityId[]>;
 

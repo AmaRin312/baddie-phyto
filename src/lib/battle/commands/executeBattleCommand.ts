@@ -20,17 +20,22 @@ import {
   placeCardInAreaSlot,
   placeHyakuganComposite,
   placeAsFlag,
+  placeQuenatarCard,
   placeOrStackAreaCard,
   reorderLookedCards,
   returnLookedCards,
   revealDeckCards,
   resolveBiriKinataNotification,
   rollDice,
+  setHandOpenEffect,
+  setLaevateinnEffect,
   setViewerCard,
   shuffleDeck,
+  standAllBattleCards,
   stackCardOnAreaCard,
   swapAreaStacks,
-  toggleCardOrientation
+  toggleCardOrientation,
+  turnFlagFaceDown
 } from "@/lib/battle/battleActions";
 import type { BattleState } from "@/types/battle";
 import type { BattleCommand } from "@/lib/battle/commands/battleCommandTypes";
@@ -54,6 +59,8 @@ export function executeBattleCommand(
       return setViewerCard(state, command.payload.instanceId);
     case "TOGGLE_CARD_ORIENTATION":
       return toggleCardOrientation(state, command.payload);
+    case "STAND_ALL_BATTLE_CARDS":
+      return standAllBattleCards(state);
     case "CHANGE_LIFE":
       return changeLife(state, command.payload);
     case "ROLL_DICE":
@@ -76,6 +83,14 @@ export function executeBattleCommand(
       return placeAsFlag(state, command.payload);
     case "APPLY_RULE_CHANGE":
       return applyRuleChange(state, command.payload);
+    case "SET_LAEVATEINN_EFFECT":
+      return setLaevateinnEffect(state, command.payload);
+    case "SET_HAND_OPEN_EFFECT":
+      return setHandOpenEffect(state, command.payload);
+    case "TURN_FLAG_FACE_DOWN":
+      return turnFlagFaceDown(state);
+    case "PLACE_QUENATAR_CARD":
+      return placeQuenatarCard(state, command.payload);
     case "RESOLVE_BIRI_KINATA_NOTIFICATION":
       return resolveBiriKinataNotification(state, command.payload);
     case "PLACE_HYAKUGAN_COMPOSITE":

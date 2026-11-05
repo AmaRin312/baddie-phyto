@@ -41,10 +41,13 @@ export function BattleCompositeCardView({
   const isHorizontal = visibleCards.some(
     ({ battleCard }) => battleCard.orientation === "horizontal"
   );
+  const isHyakugan = visibleCards.some(
+    ({ battleCard }) => battleCard.meta.compositeKind === "hyakugan_yamigedo"
+  );
 
   return (
     <div
-      className={`bf-composite-card-view is-${variant}${isHorizontal ? " is-horizontal" : ""}`}
+      className={`bf-composite-card-view is-${variant}${isHorizontal ? " is-horizontal" : ""}${isHyakugan ? " is-hyakugan" : ""}`}
     >
       {visibleCards.map(({ battleCard, cardRecord }) => (
         <div
@@ -67,6 +70,7 @@ export function BattleCompositeCardView({
               images={imagesByCard.get(cardRecord.id) ?? []}
               selectedImageId={battleCard.selectedImageId}
               faceDown={battleCard.visibility === "face_down"}
+              preserveOrientation
             />
           )}
         </div>

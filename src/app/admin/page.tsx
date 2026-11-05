@@ -5,6 +5,10 @@ import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import {
+  DECK_CARD_ERA_OPTIONS,
+  type DeckCardEraKey
+} from "@/lib/decks/deckCardSearch";
+import {
   loadManagedCardSets,
   setCardSetVisibility,
   type ManagedCardSet
@@ -22,6 +26,8 @@ export default function AdminPage() {
   const [supplies, setSupplies] = useState<BattleSupplyRecord[]>([]);
   const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
   const [cardSets, setCardSets] = useState<ManagedCardSet[]>([]);
+  const [selectedProductEra, setSelectedProductEra] =
+    useState<DeckCardEraKey>("first");
   const [updatingSetId, setUpdatingSetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,6 +100,9 @@ export default function AdminPage() {
 
   const selectedSupply = supplies.find((supply) => supply.id === selectedSleeveSupplyId);
   const selectedImageUrl = getPublicSupplyImageUrl(selectedSupply?.image_path);
+  const selectedEraCardSets = cardSets.filter(
+    (cardSet) => (cardSet.era_key ?? "first") === selectedProductEra
+  );
 
   return (
     <AppShell>
@@ -140,11 +149,26 @@ export default function AdminPage() {
           </AppCard>
           <AppCard
             title="カード商品ごとの表示設定"
-            description="非表示にした商品は、デッキ編集のカード検索と収録商品選択肢から除外されます。変更は管理者のみ行えます。"
+            description="シリーズを選び、そのシリーズに含まれる商品ごとに表示を切り替えます。新規登録した商品は初期状態で非表示となり、表示に切り替えるまでデッキ編集のカード検索と収録商品選択肢から除外されます。"
           >
-            {cardSets.length > 0 ? (
+            <label className="dm-admin-supply-field">
+              シリーズ
+              <select
+                value={selectedProductEra}
+                onChange={(event) =>
+                  setSelectedProductEra(event.target.value as DeckCardEraKey)
+                }
+              >
+                {DECK_CARD_ERA_OPTIONS.map((era) => (
+                  <option key={era.value} value={era.value}>
+                    {era.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedEraCardSets.length > 0 ? (
               <div className="dm-admin-product-list">
-                {cardSets.map((cardSet) => (
+                {selectedEraCardSets.map((cardSet) => (
                   <label className="dm-admin-product-row" key={cardSet.id}>
                     <span>
                       <strong>{cardSet.name ?? cardSet.set_code}</strong>
@@ -165,7 +189,10 @@ export default function AdminPage() {
                 ))}
               </div>
             ) : (
-              <p className="dm-muted-text">登録されている商品はありません。</p>
+              <p className="dm-muted-text">
+                {DECK_CARD_ERA_OPTIONS.find((era) => era.value === selectedProductEra)?.label}
+                シリーズに登録されている商品はありません。
+              </p>
             )}
           </AppCard>
         </>

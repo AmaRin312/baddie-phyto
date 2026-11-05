@@ -37,7 +37,7 @@ type BattleSidebarProps = {
   selectedInstanceIds: ReadonlySet<string>;
   selectedSoulInstanceIds: ReadonlySet<string>;
   viewerPinned: boolean;
-  onCloseViewer: () => void;
+  onCloseViewer: (instanceId: string) => void;
   onSelectCard: (
     card: BattleCard,
     input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
@@ -305,7 +305,7 @@ export function BattleSidebar({
                   key={`${viewerCard.instanceId}-${viewerIndex}`}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
-                    onCloseViewer();
+                    onCloseViewer(viewerCard.instanceId);
                   }}
                 >
                   {compositeCards.length > 1 ? (

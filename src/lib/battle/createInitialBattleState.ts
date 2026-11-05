@@ -108,7 +108,8 @@ function createEmptyPlayer(id: BattlePlayerId, name: string): PlayerState {
     name,
     life: { value: 0 },
     dice: null,
-    zones: createEmptyZones()
+    zones: createEmptyZones(),
+    activeEffectIds: []
   };
 }
 

@@ -1,15 +1,12 @@
-export type ShortcutCategory = "basic" | "life" | "card_move" | "battle";
+export type ShortcutCategory = "basic" | "life" | "battle";
 
 export type ShortcutActionId =
   | "draw_one"
   | "clear_selection"
   | "life_plus"
   | "life_minus"
-  | "hand_to_gauge"
-  | "hand_to_resolution"
-  | "selected_to_drop"
-  | "gauge_to_drop"
-  | "toggle_rest";
+  | "toggle_rest"
+  | "turn_start";
 
 export type ShortcutBinding = {
   code: string;

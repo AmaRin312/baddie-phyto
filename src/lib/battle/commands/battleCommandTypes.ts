@@ -10,10 +10,13 @@ import type {
   PlaceHyakuganCompositeInput,
   ResolveBiriKinataNotificationInput,
   PlaceAsFlagInput,
+  PlaceQuenatarCardInput,
   ReorderLookedCardsInput,
   ReturnLookedCardsInput,
   RevealDeckCardsInput,
   RollDiceInput,
+  SetHandOpenEffectInput,
+  SetLaevateinnEffectInput,
   SwapAreaStacksInput
 } from "@/lib/battle/battleActions";
 
@@ -33,7 +36,27 @@ export type MoveCardCommand = {
     toZone: BattleZoneId;
     index?: number;
     deckPosition?: DeckPosition;
+    visibility?: "public" | "private" | "face_down";
   };
+};
+
+export type SetLaevateinnEffectCommand = {
+  type: "SET_LAEVATEINN_EFFECT";
+  payload: SetLaevateinnEffectInput;
+};
+
+export type SetHandOpenEffectCommand = {
+  type: "SET_HAND_OPEN_EFFECT";
+  payload: SetHandOpenEffectInput;
+};
+
+export type TurnFlagFaceDownCommand = {
+  type: "TURN_FLAG_FACE_DOWN";
+};
+
+export type PlaceQuenatarCardCommand = {
+  type: "PLACE_QUENATAR_CARD";
+  payload: PlaceQuenatarCardInput;
 };
 
 export type MoveCardsCommand = {
@@ -81,6 +104,10 @@ export type ToggleCardOrientationCommand = {
   payload: {
     instanceId: string;
   };
+};
+
+export type StandAllBattleCardsCommand = {
+  type: "STAND_ALL_BATTLE_CARDS";
 };
 
 export type ChangeLifeCommand = {
@@ -265,6 +292,7 @@ export type BattleCommand =
     | ShuffleDeckCommand
     | SetViewerCardCommand
     | ToggleCardOrientationCommand
+    | StandAllBattleCardsCommand
     | ChangeLifeCommand
     | RollDiceCommand
     | ClearDiceCommand
@@ -290,6 +318,10 @@ export type BattleCommand =
     | RevealSoulCardCommand
     | SwapAreaStacksCommand
     | MoveAreaStackToSlotCommand
+    | SetLaevateinnEffectCommand
+    | SetHandOpenEffectCommand
+    | TurnFlagFaceDownCommand
+    | PlaceQuenatarCardCommand
   ) & {
     source?: BattleCommandSource;
   };

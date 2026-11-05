@@ -17,7 +17,6 @@ function key(code: string): ShortcutBinding {
 export const SHORTCUT_CATEGORY_LABELS: Readonly<Record<ShortcutCategory, string>> = {
   basic: "基本操作",
   life: "ライフ",
-  card_move: "カード移動",
   battle: "盤面操作"
 };
 
@@ -47,35 +46,17 @@ export const SHORTCUT_ACTION_DEFINITIONS: readonly ShortcutActionDefinition[] = 
     defaultBinding: key("ArrowDown")
   },
   {
-    id: "hand_to_gauge",
-    label: "手札 → ゲージ",
-    category: "card_move",
-    defaultBinding: key("KeyC")
-  },
-  {
-    id: "hand_to_resolution",
-    label: "手札 → どこでもないゾーン",
-    category: "card_move",
-    defaultBinding: key("KeyG")
-  },
-  {
-    id: "selected_to_drop",
-    label: "選択カード → ドロップ",
-    category: "card_move",
-    defaultBinding: key("KeyD")
-  },
-  {
-    id: "gauge_to_drop",
-    label: "ゲージ → ドロップ",
-    category: "card_move",
-    defaultBinding: key("Digit1")
-  },
-  {
     id: "toggle_rest",
     label: "レスト/スタンド",
     category: "battle",
     defaultBinding: null,
     inputKind: "double_click"
+  },
+  {
+    id: "turn_start",
+    label: "ターン開始（全カードをスタンド）",
+    category: "battle",
+    defaultBinding: key("KeyM")
   }
 ];
 

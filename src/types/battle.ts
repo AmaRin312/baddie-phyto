@@ -48,17 +48,27 @@ export type DiceState = {
   rolledAt: string;
 };
 
+export type BattleActivityLogEntry = {
+  id: string;
+  createdAt: string;
+  actorName: string;
+  message: string;
+};
+
 export type PlayerState = {
   id: BattlePlayerId;
   name: string;
   life: LifeState;
   dice: DiceState | null;
   zones: Record<BattleZoneId, BattleZone>;
+  activeEffectIds?: string[];
+  activityLogs?: BattleActivityLogEntry[];
 };
 
 export type BattleRuleState = {
   itemLimit: number | null;
   appliedRuleEffectIds: string[];
+  itemLimitBeforeLaevateinn?: number | null;
 };
 
 export type BattleState = {

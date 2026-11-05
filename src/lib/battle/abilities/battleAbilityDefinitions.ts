@@ -99,36 +99,12 @@ export const BATTLE_ABILITY_DEFINITIONS: Readonly<
   ten_no_hanshin_composite: {
     id: "ten_no_hanshin_composite",
     label: "天の半身",
-    databaseDescription:
-      "同じゾーン内の地の半身と組み合わせて、ヒャクガンヤミゲドウとして配置するAbility。",
-    actionId: "use_hyakugan_yamigedo_composite",
-    targetDefinitionId: "matching_hyakugan_half_same_container",
-    executorId: "place_hyakugan_composite",
-    getMenuContribution: (context) => {
-      if (!hasAbility(context, "ten_no_hanshin_composite")) return null;
-      return {
-        actionId: "use_hyakugan_yamigedo_composite",
-        label: "ヒャクガンヤミゲドウ",
-        direction: "W"
-      };
-    }
+    databaseDescription: "百眼コマンドで使用する天の半身。"
   },
   chi_no_hanshin_composite: {
     id: "chi_no_hanshin_composite",
     label: "地の半身",
-    databaseDescription:
-      "同じゾーン内の天の半身と組み合わせて、ヒャクガンヤミゲドウとして配置するAbility。",
-    actionId: "use_hyakugan_yamigedo_composite",
-    targetDefinitionId: "matching_hyakugan_half_same_container",
-    executorId: "place_hyakugan_composite",
-    getMenuContribution: (context) => {
-      if (!hasAbility(context, "chi_no_hanshin_composite")) return null;
-      return {
-        actionId: "use_hyakugan_yamigedo_composite",
-        label: "ヒャクガンヤミゲドウ",
-        direction: "W"
-      };
-    }
+    databaseDescription: "百眼コマンドで使用する地の半身。"
   }
 };
 

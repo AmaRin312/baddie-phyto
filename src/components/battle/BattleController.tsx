@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   BattleActionPopup,
@@ -23,6 +23,11 @@ import {
   isAreaStackZone
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
+import {
+  getBattleTextCommandSuggestions,
+  parseBattleTextCommand,
+  type BattleTextCommandId
+} from "@/lib/battle/textCommands";
 import {
   cleanupExpiredBattleRooms,
   deleteBattleRoom,
@@ -96,6 +101,7 @@ import {
 } from "@/lib/shortcuts/shortcutUtils";
 import type {
   BattleCard,
+  BattleActivityLogEntry,
   BattleDropInput,
   BattlePlayerId,
   BattleState,
@@ -194,12 +200,6 @@ type PendingSoulVisibilityPopup = {
   soulInstanceId: string;
   cardName: string;
   mode: "choose" | "name";
-};
-
-type PendingHyakuganPopup = {
-  sourceInstanceId: string;
-  pairCandidates: BattleCard[];
-  selectedPairInstanceId: string | null;
 };
 
 type BattleResetSource = {
@@ -326,8 +326,6 @@ export function BattleController() {
     useState<PendingFaceDownSoulPopup | null>(null);
   const [pendingSoulVisibilityPopup, setPendingSoulVisibilityPopup] =
     useState<PendingSoulVisibilityPopup | null>(null);
-  const [pendingHyakuganPopup, setPendingHyakuganPopup] =
-    useState<PendingHyakuganPopup | null>(null);
   const [dropBrowserPlayerId, setDropBrowserPlayerId] =
     useState<BattlePlayerId | null>(null);
   const [abilityNotifications, setAbilityNotifications] = useState<
@@ -338,6 +336,22 @@ export function BattleController() {
   const [showAbilityNotificationList, setShowAbilityNotificationList] =
     useState(false);
   const [viewerPinned, setViewerPinned] = useState(false);
+  const [battleMenuOpen, setBattleMenuOpen] = useState(false);
+  const [battleLogsOpen, setBattleLogsOpen] = useState(false);
+  const [battleLogsVisible, setBattleLogsVisible] = useState(false);
+  const [battleLogDisplayCount, setBattleLogDisplayCount] = useState(10);
+  const [pendingLogSettings, setPendingLogSettings] =
+    useState<"visibility" | "count" | null>(null);
+  const [logCountInput, setLogCountInput] = useState("10");
+  const [commandInputOpen, setCommandInputOpen] = useState(false);
+  const [commandInput, setCommandInput] = useState("");
+  const [specialCommandMessage, setSpecialCommandMessage] = useState("");
+  const [pendingTextCommandSelection, setPendingTextCommandSelection] =
+    useState<"frag_new" | "quenatar" | "hyakugan-heaven" | "hyakugan-earth" | null>(null);
+  const [pendingHyakuganZone, setPendingHyakuganZone] =
+    useState<"center" | "left" | "right" | null>(null);
+  const [pendingHyakuganHeavenId, setPendingHyakuganHeavenId] =
+    useState<string | null>(null);
   const [soulListPosition, setSoulListPosition] = useState<{ left: number; top: number } | null>(null);
   const [viewerInstanceIds, setViewerInstanceIds] = useState<string[]>([]);
   const nextViewerSlotRef = useRef<0 | 1>(0);
@@ -997,6 +1011,177 @@ export function BattleController() {
     };
   }
 
+  function findBattleCardLocation(state: BattleState, instanceId: string) {
+    for (const playerId of ["self", "opponent"] as const) {
+      const player = state.players[playerId];
+      for (const zone of Object.values(player.zones)) {
+        for (const card of zone.cards) {
+          if (card.instanceId === instanceId) {
+            return { card, playerId, zoneId: zone.id };
+          }
+          const soulCard = card.soul.find((item) => item.instanceId === instanceId);
+          if (soulCard) return { card: soulCard, playerId, zoneId: zone.id };
+        }
+      }
+    }
+    return null;
+  }
+
+  function getMovementLogEntries(
+    previousState: BattleState,
+    nextState: BattleState,
+    command: BattleCommand
+  ): BattleActivityLogEntry[] {
+    const now = new Date().toISOString();
+    const actorName = previousState.players.self.name || "自分";
+    const entry = (message: string, index = 0): BattleActivityLogEntry => ({
+      id: `${now}:${command.type}:${index}:${crypto.randomUUID()}`,
+      createdAt: now,
+      actorName,
+      message
+    });
+    const zoneLabel = (playerId: BattlePlayerId, zoneId: BattleZoneId) =>
+      previousState.players[playerId].zones[zoneId].label;
+    const cardName = (instanceId: string, publicOnly = false) => {
+      const location = findBattleCardLocation(previousState, instanceId);
+      if (publicOnly && location?.card.visibility !== "public") return null;
+      return location ? cardMap.get(location.card.cardId)?.name ?? null : null;
+    };
+
+    if (command.type === "SHUFFLE_DECK") {
+      return [entry("山札をシャッフル")];
+    }
+    if (command.type === "LOOK_TOP_DECK") {
+      return [entry(`山札を確認（上から${command.payload.count}枚）`)];
+    }
+    if (command.type === "REVEAL_DECK_CARD") {
+      const count = command.payload.count ?? (command.payload.instanceId ? 1 : 0);
+      return [entry(`山札から${count}枚を公開`)];
+    }
+
+    if (command.type === "DRAW_CARD") {
+      const movedCount = Math.max(
+        0,
+        previousState.players[command.payload.playerId].zones.deck.cards.length -
+          nextState.players[command.payload.playerId].zones.deck.cards.length
+      );
+      return movedCount > 0
+        ? [entry(`山札から手札にカードが移動（${movedCount}枚）`)]
+        : [];
+    }
+
+    let movementIds: string[] = [];
+    let destinationZone: BattleZoneId | null = null;
+    let targetInstanceId: string | null = null;
+    if (command.type === "MOVE_TOP_DECK_CARD") {
+      const topCard = previousState.players[command.payload.playerId].zones.deck.cards[0];
+      movementIds = topCard ? [topCard.instanceId] : [];
+      destinationZone = command.payload.toZone;
+    } else
+    if (command.type === "MOVE_CARD" || command.type === "MOVE_REVEALED_CARD") {
+      movementIds = [command.payload.instanceId];
+      destinationZone = command.payload.toZone;
+      if (command.type === "MOVE_REVEALED_CARD") {
+        targetInstanceId = command.payload.targetInstanceId ?? null;
+      }
+    } else if (command.type === "MOVE_CARDS") {
+      movementIds = command.payload.instanceIds;
+      destinationZone = command.payload.toZone;
+    } else if (
+      command.type === "PLACE_AREA_SLOT" ||
+      command.type === "PLACE_OR_STACK_AREA_CARD" ||
+      command.type === "STACK_CARD"
+    ) {
+      movementIds = [command.payload.instanceId];
+      destinationZone = command.payload.toZone;
+      if (command.type !== "PLACE_AREA_SLOT") {
+        targetInstanceId = command.payload.targetInstanceId;
+      }
+    } else if (
+      command.type === "PLACE_AS_FLAG" ||
+      command.type === "PLACE_QUENATAR_CARD"
+    ) {
+      movementIds = [command.payload.instanceId];
+      destinationZone = command.type === "PLACE_AS_FLAG" ? "flag" : "center";
+    } else if (command.type === "MOVE_SOUL_CARD") {
+      movementIds = [command.payload.soulInstanceId];
+      destinationZone = command.payload.toZone;
+      targetInstanceId = command.payload.targetInstanceId ?? null;
+    } else if (command.type === "MOVE_SOUL_CARDS") {
+      movementIds = command.payload.soulInstanceIds;
+      destinationZone = command.payload.toZone;
+    } else if (
+      command.type === "ADD_SOUL_FACE_UP" ||
+      command.type === "ADD_SOUL_FACE_DOWN"
+    ) {
+      movementIds = [command.payload.instanceId];
+      const target = findBattleCardLocation(nextState, command.payload.targetInstanceId);
+      destinationZone = target?.zoneId ?? null;
+      targetInstanceId = command.payload.targetInstanceId;
+    } else {
+      return [];
+    }
+
+    if (!destinationZone) return [];
+    const targetName = targetInstanceId
+      ? cardName(targetInstanceId, true)
+      : null;
+    const entries: BattleActivityLogEntry[] = [];
+    if (
+      movementIds.some((instanceId) =>
+        findBattleCardLocation(previousState, instanceId)?.zoneId === "deck"
+      )
+    ) {
+      entries.push(entry("デッキをサーチ"));
+    }
+    movementIds.forEach((instanceId, index) => {
+      const source = findBattleCardLocation(previousState, instanceId);
+      const destination = findBattleCardLocation(nextState, instanceId);
+      if (!source || !destination || source.zoneId === destination.zoneId) return;
+      if (source.zoneId !== "deck" && destination.zoneId !== "hand") return;
+
+      const movedCardName = cardName(instanceId);
+      const isPublicDestination =
+        destination.zoneId !== "deck" &&
+        destination.zoneId !== "hand" &&
+        destination.card.visibility === "public";
+      let message: string;
+      if (targetInstanceId) {
+        message = isPublicDestination && movedCardName
+          ? targetName
+            ? `「${movedCardName}」が「${targetName}」の下に移動`
+            : "カードの下に公開カードが移動"
+          : targetName
+            ? `「${targetName}」の下にカードが移動`
+            : "カードの下にカードが移動";
+      } else if (isPublicDestination && movedCardName) {
+        message = `${zoneLabel(source.playerId, source.zoneId)}から${zoneLabel(destination.playerId, destination.zoneId)}に「${movedCardName}」が移動`;
+      } else {
+        message = `${zoneLabel(source.playerId, source.zoneId)}から${zoneLabel(destination.playerId, destination.zoneId)}にカードが移動`;
+      }
+      entries.push(entry(message, index + 1));
+    });
+    return entries;
+  }
+
+  function appendBattleActivityLogs(
+    state: BattleState,
+    entries: BattleActivityLogEntry[]
+  ): BattleState {
+    if (entries.length === 0) return state;
+    const player = state.players.self;
+    return {
+      ...state,
+      players: {
+        ...state.players,
+        self: {
+          ...player,
+          activityLogs: [...(player.activityLogs ?? []), ...entries].slice(-30)
+        }
+      }
+    };
+  }
+
   function persistBattleState(nextState: BattleState) {
     if (!roomId) return;
 
@@ -1087,7 +1272,11 @@ export function BattleController() {
       const nextState = applyBattleCommand(current, command);
       if (nextState === current) return current;
 
-      const versionedState = incrementBattleVersion(nextState);
+      const loggedState = appendBattleActivityLogs(
+        nextState,
+        getMovementLogEntries(current, nextState, command)
+      );
+      const versionedState = incrementBattleVersion(loggedState);
       persistSelfPlayerState(current, versionedState);
       return versionedState;
     });
@@ -1111,10 +1300,14 @@ export function BattleController() {
     setBattleState((current) => {
       if (!current) return current;
 
-      const nextState = effectiveCommands.reduce(
-        (state, command) => executeBattleCommand(state, command),
-        current
-      );
+      const nextState = effectiveCommands.reduce((state, command) => {
+        const commandState = executeBattleCommand(state, command);
+        if (commandState === state) return state;
+        return appendBattleActivityLogs(
+          commandState,
+          getMovementLogEntries(state, commandState, command)
+        );
+      }, current);
       if (nextState === current) return current;
 
       const versionedState = incrementBattleVersion(nextState);
@@ -1169,7 +1362,9 @@ export function BattleController() {
     setPendingDeckCountPopup(null);
     setPendingBiriKinataPopup(null);
     setPendingFaceDownSoulPopup(null);
-    setPendingHyakuganPopup(null);
+    setPendingTextCommandSelection(null);
+    setPendingHyakuganZone(null);
+    setPendingHyakuganHeavenId(null);
   }
 
   function handleChangeSelfLife(amount: number) {
@@ -1386,18 +1581,6 @@ export function BattleController() {
     });
   }
 
-  function getSingleSelectedSelfCard() {
-    if (!battleState || selection.instanceIds.length !== 1 || !selection.zoneId) {
-      return null;
-    }
-
-    return (
-      battleState.players.self.zones[selection.zoneId].cards.find(
-        (card) => card.instanceId === selection.instanceIds[0]
-      ) ?? null
-    );
-  }
-
   function executeShortcutAction(actionId: ShortcutActionId) {
     switch (actionId) {
       case "draw_one":
@@ -1430,86 +1613,16 @@ export function BattleController() {
           }
         });
         return;
-      case "hand_to_gauge":
-      case "hand_to_resolution": {
-        const selectedCard = getSingleSelectedSelfCard();
-        if (!selectedCard || selectedCard.zoneId !== "hand") return;
-        executeShortcutCommand({
-          type: "MOVE_CARD",
-          payload: {
-            instanceId: selectedCard.instanceId,
-            fromZone: "hand",
-            toZone: actionId === "hand_to_gauge" ? "gauge" : "resolution"
-          }
-        });
-        handleClearSelection();
-        return;
-      }
-      case "gauge_to_drop": {
-        const selectedCard = getSingleSelectedSelfCard();
-        if (!selectedCard || selectedCard.zoneId !== "gauge") return;
-        executeShortcutCommand({
-          type: "MOVE_CARD",
-          payload: {
-            instanceId: selectedCard.instanceId,
-            fromZone: "gauge",
-            toZone: "drop"
-          }
-        });
-        handleClearSelection();
-        return;
-      }
-      case "selected_to_drop":
-        if (soulSelection.parentInstanceId && soulSelection.instanceIds.length > 0) {
-          executeShortcutCommand(
-            soulSelection.instanceIds.length > 1
-              ? {
-                  type: "MOVE_SOUL_CARDS",
-                  payload: {
-                    parentInstanceId: soulSelection.parentInstanceId,
-                    soulInstanceIds: soulSelection.instanceIds,
-                    toZone: "drop"
-                  }
-                }
-              : {
-                  type: "MOVE_SOUL_CARD",
-                  payload: {
-                    parentInstanceId: soulSelection.parentInstanceId,
-                    soulInstanceId: soulSelection.instanceIds[0],
-                    toZone: "drop"
-                  }
-                }
-          );
-          handleClearSelection();
-          return;
-        }
-
-        if (!selection.zoneId || selection.instanceIds.length === 0) return;
-        if (!["hand", "gauge", "center", "left", "right", "item", "set", "resolution"].includes(selection.zoneId)) {
-          return;
-        }
-        executeShortcutCommand(
-          selection.instanceIds.length > 1
-            ? {
-                type: "MOVE_CARDS",
-                payload: {
-                  instanceIds: selection.instanceIds,
-                  toZone: "drop"
-                }
-              }
-            : {
-                type: "MOVE_CARD",
-                payload: {
-                  instanceId: selection.instanceIds[0],
-                  fromZone: selection.zoneId,
-                  toZone: "drop"
-                }
-              }
-        );
-        handleClearSelection();
+      case "turn_start":
+        executeShortcutCommand({ type: "STAND_ALL_BATTLE_CARDS" });
         return;
       case "toggle_rest": {
-        const selectedCard = getSingleSelectedSelfCard();
+        const selectedCard =
+          battleState && selection.instanceIds.length === 1 && selection.zoneId
+            ? battleState.players.self.zones[selection.zoneId].cards.find(
+                (card) => card.instanceId === selection.instanceIds[0]
+              ) ?? null
+            : null;
         if (
           !selectedCard ||
           !["center", "left", "right", "item"].includes(selectedCard.zoneId)
@@ -1529,23 +1642,188 @@ export function BattleController() {
     }
   }
 
+  function handleSpecialCommandSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const parsedCommand = parseBattleTextCommand(commandInput);
+    if (!parsedCommand) {
+      setSpecialCommandMessage(
+        commandInput.trim()
+          ? "未登録のコマンドです。"
+          : "コマンドを入力してください。"
+      );
+      return;
+    }
+
+    const handlers: Record<BattleTextCommandId, (args: string[]) => void> = {
+      frag_new: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("frag_newの後には追加の指定を入力できません。");
+          return;
+        }
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("");
+        setPendingTextCommandSelection("frag_new");
+      },
+      frag_reverse: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("frag_reverseの後には追加の指定を入力できません。");
+          return;
+        }
+        if (!battleState?.players.self.zones.flag.cards[0]) {
+          setSpecialCommandMessage("裏向きにするフラッグカードがありません。");
+          return;
+        }
+        executeCommand({ type: "TURN_FLAG_FACE_DOWN", source: "ability" });
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("フラッグカードを裏向きにしました。");
+      },
+      laevateinn: (args) => {
+        if (args.length > 0 || !battleState) {
+          setSpecialCommandMessage("Laevateinnの後には追加の指定を入力できません。");
+          return;
+        }
+        const currentlyActive = battleState.ruleState.appliedRuleEffectIds.includes(
+          "text-command:laevateinn"
+        );
+        const active = !currentlyActive;
+        executeCommand({
+          type: "SET_LAEVATEINN_EFFECT",
+          payload: { active },
+          source: "ability"
+        });
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage(
+          active
+            ? "レヴァンティンが有効です。アイテムの装備枚数制限を解除しました。"
+            : "レヴァンティンを解除し、装備枚数制限を元に戻しました。"
+        );
+      },
+      hand_open: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("hand_openの後には追加の指定を入力できません。");
+          return;
+        }
+        if (!battleState) return;
+        const active = !(
+          battleState.players.self.activeEffectIds ?? []
+        ).includes("text-command:hand_open");
+        executeCommand({
+          type: "SET_HAND_OPEN_EFFECT",
+          payload: { active },
+          source: "ability"
+        });
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage(
+          active
+            ? "hand_openが有効です。自分の手札を公開しました。"
+            : "hand_openを解除し、自分の手札を非公開にしました。"
+        );
+      },
+      turn_start: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("turn_startの後には追加の指定を入力できません。");
+          return;
+        }
+        executeCommand({
+          type: "STAND_ALL_BATTLE_CARDS",
+          source: "ability"
+        });
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("ターン開始処理を実行しました。レスト状態のカードをスタンドしました。");
+      },
+      log: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("logの後には追加の指定を入力できません。");
+          return;
+        }
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("");
+        setPendingLogSettings("visibility");
+      },
+      quenatar: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("Quenatarの後には追加の指定を入力できません。");
+          return;
+        }
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("");
+        setPendingTextCommandSelection("quenatar");
+      },
+      hyakugan: (args) => {
+        if (args.length > 0) {
+          setSpecialCommandMessage("Hyakuganの後には追加の指定を入力できません。");
+          return;
+        }
+        setCommandInputOpen(false);
+        setCommandInput("");
+        setSpecialCommandMessage("");
+        setSelectionMode({
+          type: "zone",
+          title: "百眼の配置先を選択してください",
+          description: "センター・レフト・ライトから選択します。",
+          allowedZones: HYAKUGAN_PLACEMENT_TARGET_ZONES,
+          playerId: "self",
+          onSelect: (zoneId) => {
+            if (!battleState || !HYAKUGAN_PLACEMENT_TARGET_ZONES.includes(zoneId)) return;
+            const destinationZone = zoneId as "center" | "left" | "right";
+            const occupied = getAreaStacks(
+              battleState.players.self.zones[destinationZone].cards
+            ).length;
+            if (occupied >= 2) {
+              const zoneLabel = destinationZone === "center" ? "センター" : destinationZone === "left" ? "レフト" : "ライト";
+              setSpecialCommandMessage(`${zoneLabel}には既にカードがあるため、百眼を配置できません。`);
+              setSelectionMode(null);
+              return;
+            }
+            setPendingHyakuganZone(destinationZone);
+            setPendingHyakuganHeavenId(null);
+            setPendingTextCommandSelection("hyakugan-heaven");
+            setSelectionMode(null);
+          },
+          onCancel: () => {
+            setSelectionMode(null);
+            setSpecialCommandMessage("Hyakuganをキャンセルしました。");
+          }
+        });
+      }
+    };
+    handlers[parsedCommand.id](parsedCommand.args);
+  }
+
   const executeShortcutActionRef = useRef(executeShortcutAction);
   executeShortcutActionRef.current = executeShortcutAction;
 
   useEffect(() => {
     function handleShortcutKeyDown(event: KeyboardEvent) {
       if (shouldIgnoreShortcutTarget(event.target)) return;
+      if (
+        event.code === "KeyT" &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        return;
+      }
 
       if (
         isBattleShortcutBlocked({
+          isShortcutCaptureOpen: commandInputOpen,
           isBattleActionPopupOpen: pendingActionPopup != null,
-          isSelectionModeOpen: selectionMode != null,
+          isSelectionModeOpen: selectionMode != null || pendingTextCommandSelection != null,
           isDeckCountPopupOpen: pendingDeckCountPopup != null,
           isDeckBrowserPopupOpen: lookedDeckCards.length > 0 || dropBrowserPlayerId != null,
           isDeckDropDialogOpen: pendingDeckDrop != null,
           isBiriKinataPopupOpen: pendingBiriKinataPopup != null,
           isFaceDownSoulPopupOpen: pendingFaceDownSoulPopup != null,
-          isHyakuganPopupOpen: pendingHyakuganPopup != null,
           isAbilityNotificationOpen: activeAbilityNotification != null
         })
       ) {
@@ -1572,10 +1850,59 @@ export function BattleController() {
     pendingDeckCountPopup,
     pendingDeckDrop,
     pendingFaceDownSoulPopup,
-    pendingHyakuganPopup,
     activeAbilityNotification,
     selectionMode,
-    shortcutSettings
+    pendingTextCommandSelection,
+    shortcutSettings,
+    commandInputOpen
+  ]);
+
+  useEffect(() => {
+    function handleCommandToggle(event: KeyboardEvent) {
+      if (
+        event.code !== "KeyT" ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        event.metaKey ||
+        shouldIgnoreShortcutTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (
+        isBattleShortcutBlocked({
+          isBattleActionPopupOpen: pendingActionPopup != null,
+          isSelectionModeOpen: selectionMode != null || pendingTextCommandSelection != null,
+          isDeckCountPopupOpen: pendingDeckCountPopup != null,
+          isDeckBrowserPopupOpen: lookedDeckCards.length > 0 || dropBrowserPlayerId != null,
+          isDeckDropDialogOpen: pendingDeckDrop != null,
+          isBiriKinataPopupOpen: pendingBiriKinataPopup != null,
+          isFaceDownSoulPopupOpen: pendingFaceDownSoulPopup != null,
+          isAbilityNotificationOpen: activeAbilityNotification != null
+        })
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      setCommandInputOpen((open) => !open);
+      setSpecialCommandMessage("");
+    }
+
+    window.addEventListener("keydown", handleCommandToggle);
+    return () => window.removeEventListener("keydown", handleCommandToggle);
+  }, [
+    activeAbilityNotification,
+    dropBrowserPlayerId,
+    lookedDeckCards.length,
+    pendingActionPopup,
+    pendingBiriKinataPopup,
+    pendingDeckCountPopup,
+    pendingDeckDrop,
+    pendingFaceDownSoulPopup,
+    selectionMode,
+    pendingTextCommandSelection
   ]);
 
   function setViewer(instanceId: string | null, input?: { force?: boolean }) {
@@ -1616,6 +1943,22 @@ export function BattleController() {
     });
   }
 
+  function closeViewerCard(instanceId: string) {
+    const remainingInstanceIds = viewerInstanceIds.filter(
+      (currentInstanceId) => currentInstanceId !== instanceId
+    );
+    setViewerInstanceIds(remainingInstanceIds);
+    if (remainingInstanceIds.length === 0) {
+      nextViewerSlotRef.current = 0;
+    }
+    executeCommand({
+      type: "SET_VIEWER_CARD",
+      payload: {
+        instanceId: remainingInstanceIds[0] ?? null
+      }
+    });
+  }
+
   function canDisplayInViewer(
     card: BattleCard,
     playerId: BattlePlayerId
@@ -1632,6 +1975,124 @@ export function BattleController() {
   ) {
     const shiftKey = input?.shiftKey ?? false;
     const playerId = input?.playerId ?? "self";
+
+    if (pendingTextCommandSelection) {
+      if (playerId !== "self") return;
+      if (
+        pendingTextCommandSelection === "hyakugan-heaven" ||
+        pendingTextCommandSelection === "hyakugan-earth"
+      ) {
+        if (card.zoneId !== "hand") {
+          setSpecialCommandMessage("百眼の半身は手札から選択してください。");
+          return;
+        }
+
+        const requiredAbility: AbilityId =
+          pendingTextCommandSelection === "hyakugan-heaven"
+            ? "ten_no_hanshin_composite"
+            : "chi_no_hanshin_composite";
+        if (!hasBattleAbility(cardAbilityMap, card, requiredAbility)) {
+          setSpecialCommandMessage(
+            pendingTextCommandSelection === "hyakugan-heaven"
+              ? "天の半身を選択してください。"
+              : "地の半身を選択してください。"
+          );
+          return;
+        }
+        if (cardMap.get(card.cardId)?.orientation !== "horizontal") {
+          setSpecialCommandMessage("選択した半身のカード画像が横向きカードとして登録されていません。");
+          return;
+        }
+
+        if (pendingTextCommandSelection === "hyakugan-heaven") {
+          setPendingHyakuganHeavenId(card.instanceId);
+          setPendingTextCommandSelection("hyakugan-earth");
+          setSpecialCommandMessage("続けて地の半身を選択してください。");
+          setSelection({ zoneId: "hand", instanceIds: [card.instanceId] });
+          return;
+        }
+
+        if (!pendingHyakuganZone || !pendingHyakuganHeavenId) {
+          setPendingTextCommandSelection(null);
+          setSpecialCommandMessage("百眼の選択状態が失われました。もう一度実行してください。");
+          return;
+        }
+
+        const hyakuganCommand: BattleCommand = {
+          type: "PLACE_HYAKUGAN_COMPOSITE",
+          payload: {
+            sourceInstanceId: pendingHyakuganHeavenId,
+            pairInstanceId: card.instanceId,
+            sourceRole: "heaven",
+            pairRole: "earth",
+            toZone: pendingHyakuganZone
+          },
+          source: "ability"
+        };
+        if (
+          !battleState ||
+          executeBattleCommand(battleState, hyakuganCommand) === battleState
+        ) {
+          const zoneLabel = pendingHyakuganZone === "center" ? "センター" : pendingHyakuganZone === "left" ? "レフト" : "ライト";
+          setSpecialCommandMessage(`${zoneLabel}には既にカードがあるか、選択した半身が手札にありません。百眼を終了しました。`);
+          setPendingTextCommandSelection(null);
+          setPendingHyakuganZone(null);
+          setPendingHyakuganHeavenId(null);
+          handleClearSelection();
+          return;
+        }
+
+        executeCommand(hyakuganCommand);
+        setPendingTextCommandSelection(null);
+        setPendingHyakuganZone(null);
+        setPendingHyakuganHeavenId(null);
+        setSpecialCommandMessage("百眼を複合カードとして配置しました。");
+        handleClearSelection();
+        return;
+      }
+
+      const command: BattleCommand =
+        pendingTextCommandSelection === "frag_new"
+          ? {
+              type: "MOVE_CARD",
+              payload: {
+                instanceId: card.instanceId,
+                fromZone: card.zoneId,
+                toZone: "flag",
+                index: 0
+              }
+            }
+          : {
+              type: "PLACE_QUENATAR_CARD",
+              payload: {
+                instanceId: card.instanceId,
+                fromZone: card.zoneId
+              },
+              source: "ability"
+            };
+
+      if (
+        pendingTextCommandSelection === "quenatar" &&
+        battleState &&
+        executeBattleCommand(battleState, command) === battleState
+      ) {
+        setSpecialCommandMessage(
+          "センターに置けないか、選択したカードはすでに裏向きです。別のカードを選んでください。"
+        );
+        return;
+      }
+
+      executeCommand(command);
+      const completedCommand = pendingTextCommandSelection;
+      setPendingTextCommandSelection(null);
+      setSpecialCommandMessage(
+        completedCommand === "frag_new"
+          ? "選択したカードをフラッグに重ねました。"
+          : "選択したカードを裏向きでセンターに出しました。"
+      );
+      handleClearSelection();
+      return;
+    }
 
     if (input?.anchor && card.soul.length > 0 && canDisplayInViewer(card, playerId)) {
       setSoulListPosition({
@@ -1736,15 +2197,24 @@ export function BattleController() {
 
     const isSelectedDrag =
       selection.zoneId === card.zoneId && selection.instanceIds.includes(card.instanceId);
+    const compositeInstanceIds = getBattleSelectionUnitInstanceIds(battleState, card);
 
     setDragSelection({
       sourceCard: card,
-      instanceIds: isSelectedDrag ? selection.instanceIds : [card.instanceId]
+      instanceIds:
+        compositeInstanceIds.length > 1
+          ? compositeInstanceIds
+          : isSelectedDrag
+            ? selection.instanceIds
+            : [card.instanceId]
     });
   }
 
   function handlePopupDragStartCard(card: BattleCard) {
-    setDragSelection({ sourceCard: card, instanceIds: [card.instanceId] });
+    setDragSelection({
+      sourceCard: card,
+      instanceIds: getBattleSelectionUnitInstanceIds(battleState, card)
+    });
   }
 
   function handleDragEndCard() {
@@ -1879,14 +2349,19 @@ export function BattleController() {
 
     if (!dragSelection) return;
 
-    if (dragSelection.instanceIds.length > 1 && isAreaStackZone(toZone)) {
+    if (
+      dragSelection.instanceIds.length > 1 &&
+      !dragSelection.sourceCard.meta.compositeId &&
+      isAreaStackZone(toZone)
+    ) {
       setDragSelection(null);
       return;
     }
 
     if (
       battleState &&
-      dragSelection.instanceIds.length === 1 &&
+      (dragSelection.instanceIds.length === 1 ||
+        typeof dragSelection.sourceCard.meta.compositeId === "string") &&
       isAreaStackZone(toZone) &&
       input.clientX != null &&
       input.clientY != null
@@ -1939,8 +2414,9 @@ export function BattleController() {
 
     const { sourceCard, instanceIds } = targetSelection;
 
+    const isComposite = typeof sourceCard.meta.compositeId === "string";
     const command: BattleCommand =
-      instanceIds.length > 1
+      instanceIds.length > 1 && !isComposite
         ? {
             type: "MOVE_CARDS",
             payload: {
@@ -2073,6 +2549,22 @@ export function BattleController() {
     onClose: () => selectionMode?.onCancel()
   });
 
+  useEscapeToClose({
+    enabled: pendingTextCommandSelection != null,
+    onClose: () => {
+      setSpecialCommandMessage(
+        pendingTextCommandSelection === "frag_new"
+          ? "frag_newをキャンセルしました。"
+          : pendingTextCommandSelection === "quenatar"
+            ? "Quenatarをキャンセルしました。"
+            : "Hyakuganをキャンセルしました。"
+      );
+      setPendingTextCommandSelection(null);
+      setPendingHyakuganZone(null);
+      setPendingHyakuganHeavenId(null);
+    }
+  });
+
   function handleBattleActionPopupCancel() {
     setPendingActionPopup(null);
   }
@@ -2087,72 +2579,6 @@ export function BattleController() {
         (zoneId) => battleState.players.self.zones[zoneId].cards
       )
     ].filter((card) => card.instanceId !== sourceInstanceId);
-  }
-
-  function getHyakuganPairCandidates(sourceCard: BattleCard) {
-    if (!battleState) return [];
-    const sourceIsTen = hasBattleAbility(
-      cardAbilityMap,
-      sourceCard,
-      "ten_no_hanshin_composite"
-    );
-    const requiredAbility: AbilityId = sourceIsTen
-      ? "chi_no_hanshin_composite"
-      : "ten_no_hanshin_composite";
-    const zoneCards =
-      battleState.players.self.zones[sourceCard.zoneId]?.cards ?? [];
-
-    return zoneCards.filter(
-      (card) =>
-        card.instanceId !== sourceCard.instanceId &&
-        hasBattleAbility(cardAbilityMap, card, requiredAbility)
-    );
-  }
-
-  function handleStartHyakuganPlacement(pairInstanceId: string) {
-    if (!pendingHyakuganPopup) return;
-    setPendingHyakuganPopup({
-      ...pendingHyakuganPopup,
-      selectedPairInstanceId: pairInstanceId
-    });
-    setSelectionMode({
-      type: "zone",
-      title: "ヒャクガンヤミゲドウの配置先を選択してください",
-      description: "Center / Left / Right から選択します。",
-      allowedZones: HYAKUGAN_PLACEMENT_TARGET_ZONES,
-      playerId: "self",
-      onSelect: (zoneId) => {
-        const sourceCard = findBattleCardByInstanceId(
-          battleState,
-          pendingHyakuganPopup.sourceInstanceId
-        );
-        if (!sourceCard) return;
-        const sourceRole = hasBattleAbility(
-          cardAbilityMap,
-          sourceCard,
-          "ten_no_hanshin_composite"
-        )
-          ? "heaven"
-          : "earth";
-        executeCommand({
-          type: "PLACE_HYAKUGAN_COMPOSITE",
-          payload: {
-            sourceInstanceId: pendingHyakuganPopup.sourceInstanceId,
-            pairInstanceId,
-            sourceRole,
-            pairRole: sourceRole === "heaven" ? "earth" : "heaven",
-            toZone: zoneId as "center" | "left" | "right"
-          },
-          source: "ability"
-        });
-        setPendingHyakuganPopup(null);
-        setSelectionMode(null);
-      },
-      onCancel: () => {
-        setPendingHyakuganPopup(null);
-        setSelectionMode(null);
-      }
-    });
   }
 
   function handleFaceDownSoulTargetSelect(targetInstanceId: string) {
@@ -2297,6 +2723,33 @@ export function BattleController() {
 
     const { source, sourceCard, targetInstanceId, toZone } = pendingActionPopup;
     let command: BattleCommand | null = null;
+
+    if (
+      source.kind === "card" &&
+      typeof sourceCard.meta.compositeId === "string" &&
+      (action === "soulFaceUp" || action === "soulFaceDown")
+    ) {
+      const compositeCards = battleState
+        ? findCompositeGroupCardsInBattleState(battleState, sourceCard)
+        : [];
+      if (compositeCards.length > 1) {
+        const pairedSoulCommands: BattleCommand[] = compositeCards.map(
+          (card): BattleCommand => ({
+            type: action === "soulFaceUp" ? "ADD_SOUL_FACE_UP" : "ADD_SOUL_FACE_DOWN",
+            payload: {
+              instanceId: card.instanceId,
+              fromZone: card.zoneId,
+              targetInstanceId
+            },
+            source: "popup"
+          })
+        );
+        executeCommands(pairedSoulCommands);
+        handleClearSelection();
+        setPendingActionPopup(null);
+        return;
+      }
+    }
 
     if (source.kind === "soul") {
       switch (action) {
@@ -2479,11 +2932,35 @@ export function BattleController() {
     );
   }
 
+  const commandSuggestions = getBattleTextCommandSuggestions(commandInput);
+  const isLaevateinnActive = battleState.ruleState.appliedRuleEffectIds.includes(
+    "text-command:laevateinn"
+  );
+  const isHandOpenActive = (
+    battleState.players.self.activeEffectIds ?? []
+  ).includes("text-command:hand_open");
+  const battleActivityLogs = Object.values(battleState.players)
+    .flatMap((player) => player.activityLogs ?? [])
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .slice(-battleLogDisplayCount);
+  const selectedBattleUnitCount = new Set(
+    selection.instanceIds.map((instanceId) => {
+      const selectedCard = findBattleCardByInstanceId(battleState, instanceId);
+      return typeof selectedCard?.meta.compositeId === "string"
+        ? `composite:${selectedCard.meta.compositeId}`
+        : instanceId;
+    })
+  ).size;
+  const selectedUnitCount = selectedBattleUnitCount + soulSelection.instanceIds.length;
+
   return (
-    <main className="bf-battle-app" onClick={handleBattleBackgroundClick}>
-      {(selection.instanceIds.length > 1 || soulSelection.instanceIds.length > 1) && (
+    <main
+      className={`bf-battle-app${battleMenuOpen ? " is-menu-open" : " is-menu-closed"}`}
+      onClick={handleBattleBackgroundClick}
+    >
+      {selectedUnitCount > 1 && (
         <div className="bf-selection-count-badge" aria-live="polite">
-          選択中 {selection.instanceIds.length + soulSelection.instanceIds.length}枚
+          選択中 {selectedUnitCount}枚
         </div>
       )}
       {selectionMode?.type === "zone" && (
@@ -2492,13 +2969,72 @@ export function BattleController() {
           {selectionMode.description && <span>{selectionMode.description}</span>}
         </div>
       )}
+      {pendingTextCommandSelection && (
+        <div className="bf-placement-mode-banner is-frag-selection" role="status">
+          {pendingTextCommandSelection === "frag_new"
+            ? "フラッグに新たに重ねる自分のカードを選択してください。"
+            : pendingTextCommandSelection === "quenatar"
+              ? "裏向きでセンターに出す自分のカードを選択してください。"
+              : pendingTextCommandSelection === "hyakugan-heaven"
+                ? "手札から天の半身を選択してください。"
+                : "手札から地の半身を選択してください。"}
+          {specialCommandMessage && <span>{specialCommandMessage}</span>}
+          <button
+            type="button"
+            onClick={() => {
+              setPendingTextCommandSelection(null);
+              setPendingHyakuganZone(null);
+              setPendingHyakuganHeavenId(null);
+              setSpecialCommandMessage(
+                pendingTextCommandSelection === "frag_new"
+                  ? "frag_newをキャンセルしました。"
+                  : pendingTextCommandSelection === "quenatar"
+                    ? "Quenatarをキャンセルしました。"
+                    : "Hyakuganをキャンセルしました。"
+              );
+            }}
+          >
+            キャンセル
+          </button>
+        </div>
+      )}
+      {isLaevateinnActive && (
+        <div className="bf-laevateinn-status" role="status">
+          <span>レヴァンティン発動中：アイテム装備数の制限なし</span>
+          <button
+            type="button"
+            onClick={() => {
+              executeCommand({
+                type: "SET_LAEVATEINN_EFFECT",
+                payload: { active: false },
+                source: "ability"
+              });
+              setSpecialCommandMessage("レヴァンティンを解除しました。");
+            }}
+          >
+            解除
+          </button>
+        </div>
+      )}
       <aside className="bf-left-menu" aria-label="対戦操作">
+        <button
+          type="button"
+          className="bf-left-menu-home"
+          aria-expanded={battleMenuOpen}
+          aria-controls="bf-battle-menu-actions"
+          onClick={(event) => {
+            event.stopPropagation();
+            setBattleMenuOpen((open) => !open);
+          }}
+        >
+          {battleMenuOpen ? "閉じる" : "ホーム"}
+        </button>
         <div className="bf-left-menu-brand" aria-label="Baddie Phyto">
           <span>Baddie</span>
           <b>Phyto</b>
         </div>
 
-        <div className="bf-battle-danger-actions">
+        <div className="bf-battle-danger-actions" id="bf-battle-menu-actions">
           <span>Version {battleState.version ?? 0}</span>
           <span>
             Realtime {realtimeStatus}
@@ -2519,8 +3055,193 @@ export function BattleController() {
           <button type="button" onClick={handleDeleteRoomState}>
             退室
           </button>
+          {battleLogsVisible && (
+            <button
+              type="button"
+              aria-expanded={battleLogsOpen}
+              onClick={() => setBattleLogsOpen((open) => !open)}
+            >
+              操作ログ（最新{battleLogDisplayCount}件）
+            </button>
+          )}
+          {battleLogsVisible && battleLogsOpen && (
+            <ol className="bf-battle-log-list" aria-label="対戦操作ログ">
+              {battleActivityLogs.length > 0 ? (
+                [...battleActivityLogs].reverse().map((log) => (
+                  <li key={log.id}>
+                    <time dateTime={log.createdAt}>
+                      {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })}
+                    </time>
+                    <span className="bf-battle-log-copy">
+                      <small>{log.actorName}</small>
+                      <span>{log.message}</span>
+                    </span>
+                  </li>
+                ))
+              ) : (
+                <li className="is-empty">まだ操作ログはありません。</li>
+              )}
+            </ol>
+          )}
         </div>
       </aside>
+
+      {commandInputOpen && (
+        <div
+          className="bf-special-command-backdrop"
+          role="presentation"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <form
+            className="bf-special-command-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bf-special-command-title"
+            onSubmit={handleSpecialCommandSubmit}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setCommandInputOpen(false);
+                setCommandInput("");
+                setSpecialCommandMessage("");
+              }
+            }}
+          >
+            <label id="bf-special-command-title" htmlFor="bf-special-command-input">
+              コマンド
+            </label>
+            <input
+              id="bf-special-command-input"
+              autoFocus
+              value={commandInput}
+              onChange={(event) => setCommandInput(event.target.value)}
+              placeholder="frag_new / frag_reverse / Laevateinn / Quenatar"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {commandSuggestions.length > 0 && (
+              <div className="bf-command-suggestions" role="listbox" aria-label="コマンド候補">
+                {commandSuggestions.map((suggestion) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    key={suggestion.id}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setCommandInput(suggestion.label);
+                      setSpecialCommandMessage("");
+                    }}
+                  >
+                    <strong>{suggestion.label}</strong>
+                    <span>{suggestion.localizedName}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {specialCommandMessage && (
+              <p role="status">{specialCommandMessage}</p>
+            )}
+            <div className="bf-special-command-actions">
+              <button type="submit" className="primary">実行</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCommandInputOpen(false);
+                  setCommandInput("");
+                  setSpecialCommandMessage("");
+                }}
+              >
+                閉じる
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {pendingLogSettings && (
+        <div
+          className="bf-special-command-backdrop"
+          role="presentation"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <section
+            className="bf-special-command-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bf-log-settings-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="bf-log-settings-title">
+              {pendingLogSettings === "visibility" ? "操作ログの表示設定" : "表示件数を選択"}
+            </h2>
+            {pendingLogSettings === "visibility" ? (
+              <div className="bf-special-command-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => {
+                    setLogCountInput(String(battleLogDisplayCount));
+                    setPendingLogSettings("count");
+                  }}
+                >
+                  表示する
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBattleLogsVisible(false);
+                    setBattleLogsOpen(false);
+                    setPendingLogSettings(null);
+                  }}
+                >
+                  非表示にする
+                </button>
+              </div>
+            ) : (
+              <form
+                className="bf-log-count-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const count = Number.parseInt(logCountInput, 10);
+                  if (!Number.isInteger(count) || count < 1 || count > 30) return;
+                  setBattleLogDisplayCount(count);
+                  setBattleLogsVisible(true);
+                  setBattleLogsOpen(true);
+                  setBattleMenuOpen(true);
+                  setPendingLogSettings(null);
+                }}
+              >
+                <label htmlFor="bf-log-count-input">表示する最新件数（1〜30）</label>
+                <input
+                  id="bf-log-count-input"
+                  type="number"
+                  min={1}
+                  max={30}
+                  step={1}
+                  autoFocus
+                  value={logCountInput}
+                  onChange={(event) => setLogCountInput(event.target.value)}
+                />
+                <div className="bf-special-command-actions">
+                  <button type="submit" className="primary">設定する</button>
+                  <button type="button" onClick={() => setPendingLogSettings(null)}>
+                    キャンセル
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
+      )}
+      {!commandInputOpen && specialCommandMessage && !pendingTextCommandSelection && (
+        <div className="bf-special-command-status" role="status">
+          {specialCommandMessage}
+        </div>
+      )}
 
       <BattleBoard
         battleState={battleState}
@@ -2528,6 +3249,10 @@ export function BattleController() {
         imagesByCard={imagesByCard}
         sleeveImageUrls={playerSleeveImageUrls}
         playmatImageUrls={playerPlaymatImageUrls}
+        activePersistentEffects={[
+          ...(isLaevateinnActive ? ["レヴァンティン"] : []),
+          ...(isHandOpenActive ? ["hand_open"] : [])
+        ]}
         draggedCard={dragSelection?.sourceCard ?? null}
         draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
         draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
@@ -2579,7 +3304,7 @@ export function BattleController() {
         selectedInstanceIds={selectedInstanceIds}
         selectedSoulInstanceIds={selectedSoulInstanceIds}
         viewerPinned={viewerPinned}
-        onCloseViewer={() => setViewer(null, { force: true })}
+        onCloseViewer={closeViewerCard}
         onSelectCard={handleSelectCard}
         onToggleViewerPin={() => setViewerPinned((current) => !current)}
         onContextMenuCard={handleContextMenuCard}
@@ -2850,18 +3575,6 @@ export function BattleController() {
           imagesByCard={imagesByCard}
           onSelect={handleFaceDownSoulTargetSelect}
           onCancel={() => setPendingFaceDownSoulPopup(null)}
-        />
-      )}
-
-      {pendingHyakuganPopup && pendingHyakuganPopup.selectedPairInstanceId == null && (
-        <AbilityCardTargetPopup
-          title="ヒャクガンヤミゲドウ"
-          description="同じゾーンからもう片方の半身を1枚選択してください。"
-          candidates={pendingHyakuganPopup.pairCandidates}
-          cardMap={cardMap}
-          imagesByCard={imagesByCard}
-          onSelect={handleStartHyakuganPlacement}
-          onCancel={() => setPendingHyakuganPopup(null)}
         />
       )}
 
