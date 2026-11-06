@@ -99,7 +99,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [detailCardId, setDetailCardId] = useState("");
   const [detailImageContext, setDetailImageContext] =
     useState<DetailImageContext>("deck");
-  const [previewCardId, setPreviewCardId] = useState("");
+  const [selectedSearchCardId, setSelectedSearchCardId] = useState("");
+  const [searchPreviewCardId, setSearchPreviewCardId] = useState("");
   const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
@@ -344,7 +345,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     ? draftDeckCardMap.get(selectedDeckCardId)
     : undefined;
   const detailCard = cardMap.get(detailCardId) ?? null;
-  const previewCard = cardMap.get(previewCardId) ?? null;
   const detailDeckDraft = detailCard ? draftDeckCardMap.get(detailCard.id) : undefined;
   const detailIsSelectedFlag = Boolean(
     detailCard && selectedFlagCard && detailCard.id === selectedFlagCard.id
@@ -369,6 +369,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   );
 
   const filteredCards = searchResults;
+  const searchPreviewCard =
+    filteredCards.find((card) => card.id === searchPreviewCardId) ??
+    filteredCards[0] ??
+    null;
   const searchPageCount = Math.max(1, Math.ceil(searchTotalCount / 100));
   const safeSearchPage = Math.min(searchPage, searchPageCount - 1);
   const visibleFilteredCards = filteredCards;
@@ -431,8 +435,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           ...(flagPickerOpen ? flags.map((flag) => flag.card_id) : []),
           selectedFlagCard?.id,
           selectedBuddyCard?.id,
-          detailCard?.id,
-          previewCard?.id
+          detailCard?.id
         ].filter(Boolean)
       )
     ] as string[];
@@ -443,18 +446,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     visibleFilteredCards,
     selectedFlagCard?.id,
     selectedBuddyCard?.id,
-    detailCard?.id,
-    previewCard?.id
+    detailCard?.id
   ]);
-  const previewCardIndex = previewCardId
-    ? filteredCards.findIndex((card) => card.id === previewCardId)
-    : -1;
-  const previousPreviewCard =
-    previewCardIndex > 0 ? filteredCards[previewCardIndex - 1] : null;
-  const nextPreviewCard =
-    previewCardIndex >= 0 && previewCardIndex < filteredCards.length - 1
-      ? filteredCards[previewCardIndex + 1]
-      : null;
   const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
   const canEditDeck = Boolean(
     currentUserId && (isNewDeckDraft || (deck && deck.owner_id === currentUserId))
@@ -758,16 +751,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   function closeCardDetail() {
     setDetailCardId("");
     setDetailImageContext("deck");
-  }
-
-  function moveSearchPreview(direction: "previous" | "next") {
-    const nextCard = direction === "previous" ? previousPreviewCard : nextPreviewCard;
-    if (!nextCard) return;
-    setPreviewCardId(nextCard.id);
-    const nextIndex = filteredCards.findIndex((card) => card.id === nextCard.id);
-    if (nextIndex >= 0) {
-      setSearchPage(Math.floor(nextIndex / 100));
-    }
   }
 
   function handleDeckCardDrop(targetCardId: string) {
@@ -1093,24 +1076,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
           <aside className="dm-deck-editor-column dm-deck-editor-search">
             <AppCard title="カード検索">
-              <form className="dm-auth-form dm-card-form">
-                <DeckCardSearchPanel
-                  filters={searchFilters}
-                  worlds={searchWorlds}
-                  initialWorlds={
-                    selectedFlagCard?.worlds?.length
-                      ? selectedFlagCard.worlds
-                      : selectedFlag?.usable_worlds ?? []
-                  }
-                  sets={cardSets}
-                  onChange={handleSearchFiltersChange}
-                />
-              </form>
-
-                <div
-                  className="dm-deck-list dm-deck-search-results"
-                  ref={searchResultsRef}
-                >
+              <div className="dm-deck-search-layout">
+                <div className="dm-deck-search-card-column">
+                  <div
+                    className="dm-deck-list dm-deck-search-results"
+                    ref={searchResultsRef}
+                  >
                 <div
                   style={{
                     position: "relative",
@@ -1124,7 +1095,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         key={card.id}
                         type="button"
                         className={`dm-deck-search-card${
-                          draggedSearchCardId === card.id ? " is-dragging" : ""
+                          draggedSearchCardId === card.id
+                            ? " is-dragging"
+                            : selectedSearchCardId === card.id
+                              ? " is-selected"
+                              : ""
                         }`}
                         style={{
                           position: "absolute",
@@ -1132,7 +1107,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                           left: `${(actualIndex % 4) * 25}%`
                         }}
                         draggable={canEditDeck}
-                        onClick={() => setPreviewCardId(card.id)}
+                        aria-pressed={selectedSearchCardId === card.id}
+                        onClick={() => setSelectedSearchCardId(card.id)}
+                        onDoubleClick={() => setSearchPreviewCardId(card.id)}
                         onKeyDown={(event) => {
                           if ((event.key === "Enter" || event.key === " ") && canEditDeck) {
                             event.preventDefault();
@@ -1196,6 +1173,38 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </Button>
                   </div>
                 )}
+                  </div>
+                </div>
+
+                <aside className="dm-deck-search-side">
+                  <div className="dm-deck-search-selected-preview">
+                    {searchPreviewCard ? (
+                      <CardViewer
+                        card={searchPreviewCard}
+                        images={imagesByCard.get(searchPreviewCard.id) ?? []}
+                        className="dm-deck-search-preview-image"
+                      />
+                    ) : (
+                      <span className="dm-muted-text">カードを選択してください。</span>
+                    )}
+                  </div>
+                  <form
+                    className="dm-auth-form dm-card-form dm-deck-search-side-controls"
+                    onSubmit={(event) => event.preventDefault()}
+                  >
+                    <DeckCardSearchPanel
+                      filters={searchFilters}
+                      worlds={searchWorlds}
+                      initialWorlds={
+                        selectedFlagCard?.worlds?.length
+                          ? selectedFlagCard.worlds
+                          : selectedFlag?.usable_worlds ?? []
+                      }
+                      sets={cardSets}
+                      onChange={handleSearchFiltersChange}
+                    />
+                  </form>
+                </aside>
               </div>
             </AppCard>
           </aside>
@@ -1373,79 +1382,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               {buddyCandidates.length === 0 && (
                 <p className="dm-muted-text">バディ候補はデッキへカードを追加すると表示されます。</p>
               )}
-            </div>
-          </section>
-        </div>
-      )}
-
-      {previewCard && (
-        <div
-          className="dm-card-detail-modal-backdrop"
-          role="presentation"
-          onClick={() => setPreviewCardId("")}
-        >
-          <section
-            className="dm-card-detail-modal dm-deck-preview-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="deck-search-preview-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="dm-card-detail-modal-header">
-              <div>
-                <p className="dm-kicker">CARD PREVIEW</p>
-                <h2 id="deck-search-preview-title">{previewCard.name}</h2>
-              </div>
-              <button
-                type="button"
-                className="dm-dialog-close"
-                onClick={() => setPreviewCardId("")}
-              >
-                ×
-              </button>
-            </header>
-            <div className="dm-deck-preview-modal-body">
-              <div className="dm-deck-preview-navigation" aria-label="検索結果の前後移動">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!previousPreviewCard}
-                  onClick={() => moveSearchPreview("previous")}
-                >
-                  ← 前のカード
-                </Button>
-                <span>
-                  {previewCardIndex >= 0 ? previewCardIndex + 1 : "-"} / {filteredCards.length}
-                </span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!nextPreviewCard}
-                  onClick={() => moveSearchPreview("next")}
-                >
-                  次のカード →
-                </Button>
-              </div>
-              <CardViewer
-                card={previewCard}
-                images={imagesByCard.get(previewCard.id) ?? []}
-              />
-              <div className="dm-dialog-actions">
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={!canEditDeck}
-                  onClick={() => {
-                    setLocalCardQuantity(
-                      previewCard,
-                      (draftDeckCardMap.get(previewCard.id)?.quantity ?? 0) + 1
-                    );
-                    setPreviewCardId("");
-                  }}
-                >
-                  デッキへ追加
-                </Button>
-              </div>
             </div>
           </section>
         </div>

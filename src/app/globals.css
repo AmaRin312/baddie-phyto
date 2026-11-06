@@ -7372,28 +7372,170 @@ body:has(.bf-battle-app) {
 }
 
 .bf-battle-app.is-menu-closed .bf-left-menu {
-  position: absolute !important;
+  position: relative !important;
   z-index: 1000;
-  top: 6px;
-  right: auto;
-  bottom: auto;
-  left: 6px;
-  width: 40px;
+  grid-column: 1;
+  width: 48px;
+  height: 100%;
   min-height: 0;
   padding: 4px;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
 }
 
 .bf-battle-app.is-menu-open .bf-left-menu {
-  position: absolute !important;
+  position: relative !important;
+  isolation: isolate;
   z-index: 1000;
-  top: 6px;
-  right: auto;
-  bottom: 6px;
-  left: 6px;
-  width: 190px;
+  grid-column: 1;
+  width: 48px;
+  height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: visible;
   padding: 10px 8px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bf-battle-app.is-menu-open .bf-left-menu::before {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 190px;
+  border-radius: 12px;
+  background: var(--bf-sidebar-bg);
+  box-shadow: 0 12px 34px rgba(2, 6, 23, 0.42);
+  content: "";
+  pointer-events: none;
+}
+
+.bf-battle-app.is-menu-open .bf-left-menu > * {
+  position: relative;
+  width: 174px;
+}
+
+/* Deck editor: keep its settings edge fixed while reallocating space to search. */
+.dm-deck-editor-layout.is-three-column {
+  width: calc(100% + 30px);
+  grid-template-columns: minmax(210px, 240px) minmax(420px, 0.6fr) minmax(560px, 0.9fr);
+}
+
+.dm-deck-editor-settings {
+  transform: translateX(-30px);
+}
+
+.dm-deck-editor-deck .dm-deck-visual-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.dm-deck-editor-search .dm-app-card {
+  min-height: 0;
+}
+
+.dm-deck-search-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dm-deck-search-card-column {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dm-deck-search-results {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin-top: 0;
+  overflow-y: auto;
+}
+
+.dm-deck-search-side {
+  display: grid;
+  grid-template-rows: minmax(190px, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dm-deck-search-selected-preview {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(147, 197, 253, 0.7);
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.6);
+}
+
+.dm-deck-search-selected-preview > .dm-deck-search-preview-image {
+  width: min(100%, 180px);
+  height: auto;
+  aspect-ratio: 5 / 7;
+}
+
+.dm-deck-search-side-controls {
+  flex: 1 1 0 !important;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px !important;
+}
+
+.dm-deck-search-side-controls .dm-deck-search-panel {
+  gap: 8px;
+}
+
+.dm-deck-search-card.is-selected {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.22);
+}
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    grid-template-columns: minmax(180px, 210px) minmax(300px, 0.6fr) minmax(420px, 0.9fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .dm-deck-editor-layout.is-three-column {
+    width: 100%;
+  }
+
+  .dm-deck-editor-settings {
+    transform: none;
+  }
+
+  .dm-deck-search-layout {
+    min-height: 720px;
+  }
+}
+
+@media (max-width: 760px) {
+  .dm-deck-search-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 1fr) auto;
+    min-height: 760px;
+  }
+
+  .dm-deck-search-side {
+    grid-template-columns: minmax(120px, 0.65fr) minmax(0, 1fr);
+    grid-template-rows: minmax(190px, auto);
+  }
+
+  .dm-deck-search-side-controls {
+    max-height: 300px;
+  }
 }
 
 .bf-player-board > .bf-zone-set {
