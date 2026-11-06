@@ -2972,14 +2972,14 @@ select {
 }
 
 .bf-resolution-card {
-  width: var(--bf-battle-card-w);
-  height: var(--bf-battle-card-h);
+  width: calc(var(--bf-battle-card-w) * 0.9);
+  height: calc(var(--bf-battle-card-h) * 0.9);
   flex: 0 0 auto;
 }
 
 .bf-resolution-card.is-native-horizontal {
-  width: var(--bf-battle-card-h);
-  height: var(--bf-battle-card-w);
+  width: calc(var(--bf-battle-card-h) * 0.9);
+  height: calc(var(--bf-battle-card-w) * 0.9);
 }
 
 .bf-zone-flag {
@@ -7339,8 +7339,20 @@ body:has(.bf-battle-app) {
 }
 
 .bf-player-board > .bf-zone-resolution {
+  left: calc(50% + var(--bf-resolution-offset-x, 200px)) !important;
   top: -14px !important;
   transform: translate(-50%, -50%) !important;
+}
+
+/* Keep the hand and viewer above the board where the two panels meet. */
+.bf-battle-app > .bf-board-stage {
+  z-index: 1;
+  width: calc(104% - 20px);
+}
+
+.bf-battle-app > .bf-right-panel {
+  position: relative;
+  z-index: 2;
 }
 
 /* Move the board/sidebar split left by about 10% of the battle field width. */
@@ -7425,7 +7437,7 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-editor-settings {
-  transform: translateX(-30px);
+  transform: translateX(-14px);
 }
 
 .dm-deck-editor-deck .dm-deck-visual-grid {
@@ -7440,7 +7452,8 @@ body:has(.bf-battle-app) {
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
   gap: 10px;
-  flex: 1 1 0;
+  flex: 1 1 0%;
+  height: 0;
   min-width: 0;
   min-height: 0;
 }
@@ -7460,8 +7473,8 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-side {
-  display: grid;
-  grid-template-rows: minmax(190px, 0.8fr) minmax(0, 1.2fr);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -7469,9 +7482,11 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-selected-preview {
+  flex: 0 0 35%;
   display: grid;
   place-items: center;
-  min-height: 0;
+  min-height: 190px;
+  max-height: 300px;
   overflow: hidden;
   border: 1px solid rgba(147, 197, 253, 0.7);
   border-radius: 12px;
@@ -7485,9 +7500,11 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-side-controls {
-  flex: 1 1 0 !important;
+  display: block !important;
+  flex: 1 1 0% !important;
+  width: 100% !important;
   min-width: 0;
-  min-height: 0;
+  min-height: 220px;
   overflow: auto;
   padding: 8px !important;
 }
@@ -7517,6 +7534,8 @@ body:has(.bf-battle-app) {
   }
 
   .dm-deck-search-layout {
+    flex: none;
+    height: auto;
     min-height: 720px;
   }
 }
@@ -7529,15 +7548,71 @@ body:has(.bf-battle-app) {
   }
 
   .dm-deck-search-side {
+    display: grid;
     grid-template-columns: minmax(120px, 0.65fr) minmax(0, 1fr);
     grid-template-rows: minmax(190px, auto);
   }
 
+  .dm-deck-search-selected-preview {
+    min-height: 190px;
+    max-height: none;
+  }
+
   .dm-deck-search-side-controls {
     max-height: 300px;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 1788px) {
+  .dm-deck-editor-settings {
+    transform: translateX(max(-30px, calc((1760px - 100vw) / 2)));
+  }
+}
+
+@media (max-width: 1787px) and (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    width: calc(100% + 14px);
   }
 }
 
 .bf-player-board > .bf-zone-set {
-  transform: translate(150px, -53px) !important;
+  transform: translate(50px, -53px) !important;
+}
+
+.bf-zone-set > .bf-area-stack-zone.is-set-area {
+  transform: translateX(calc(100px - var(--bf-battle-card-w) - 20px));
+}
+
+/* Center life and dice between the flag and buddy, straddling the flag center. */
+.bf-board-half .bf-life-badge,
+.bf-board-half .bf-dice-panel {
+  left: 61% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+}
+
+.bf-board-half.is-self .bf-life-badge {
+  top: 83.333% !important;
+  bottom: auto !important;
+}
+
+.bf-board-half.is-self .bf-dice-panel {
+  top: calc(83.333% + 44px) !important;
+  bottom: auto !important;
+}
+
+.bf-board-half.is-opponent .bf-life-badge,
+.bf-board-half.is-opponent .bf-dice-panel {
+  left: calc(61% - 90px) !important;
+}
+
+.bf-board-half.is-opponent .bf-life-badge {
+  top: calc(16.667% - 80px) !important;
+  bottom: auto !important;
+}
+
+.bf-board-half.is-opponent .bf-dice-panel {
+  top: calc(16.667% - 36px) !important;
+  bottom: auto !important;
 }

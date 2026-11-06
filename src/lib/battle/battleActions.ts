@@ -44,8 +44,7 @@ export const DROPPABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "center",
   "left",
   "right",
-  "resolution",
-  "flag"
+  "resolution"
 ]);
 
 export const AREA_STACK_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([

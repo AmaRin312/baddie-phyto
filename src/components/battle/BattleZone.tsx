@@ -143,28 +143,30 @@ export function BattleZone({
     (placementTargetZones?.has(zoneId) ?? false) &&
     (placementTargetPlayerId == null || placementTargetPlayerId === playerId);
   const canDrop =
-    (draggedSoulCard != null &&
-      (draggedSoulInstanceCount > 1
-        ? canDropMultipleSoulCards({
-            toZone: zoneId,
-            targetPlayerId: playerId
-          })
-        : canDropSingleSoulCard({
-            toZone: zoneId,
-            targetPlayerId: playerId
-          }))) ||
-    (draggedCard != null &&
-      (draggedInstanceCount > 1
-      ? canDropMultipleCards({
-          card: draggedCard,
-          toZone: zoneId,
-          targetPlayerId: playerId
-        })
-      : canDropSingleCard({
-          card: draggedCard,
-          toZone: zoneId,
-          targetPlayerId: playerId
-        })));
+    zoneId !== "flag" && (
+      (draggedSoulCard != null &&
+        (draggedSoulInstanceCount > 1
+          ? canDropMultipleSoulCards({
+              toZone: zoneId,
+              targetPlayerId: playerId
+            })
+          : canDropSingleSoulCard({
+              toZone: zoneId,
+              targetPlayerId: playerId
+            }))) ||
+      (draggedCard != null &&
+        (draggedInstanceCount > 1
+          ? canDropMultipleCards({
+              card: draggedCard,
+              toZone: zoneId,
+              targetPlayerId: playerId
+            })
+          : canDropSingleCard({
+              card: draggedCard,
+              toZone: zoneId,
+              targetPlayerId: playerId
+            })))
+    );
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
