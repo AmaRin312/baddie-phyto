@@ -52,6 +52,9 @@ export function FlagAdminForm({
   const [usableWorldsText, setUsableWorldsText] = useState(
     arrayToInput(initialFlag?.usable_worlds)
   );
+  const [usableRaceKeywordsText, setUsableRaceKeywordsText] = useState(
+    arrayToInput(initialFlag?.usable_race_keywords)
+  );
   const [initialHand, setInitialHand] = useState(
     numberToInput(initialFlag?.initial_hand, 6)
   );
@@ -71,6 +74,10 @@ export function FlagAdminForm({
     () => inputToArray(usableWorldsText),
     [usableWorldsText]
   );
+  const usableRaceKeywords = useMemo(
+    () => inputToArray(usableRaceKeywordsText),
+    [usableRaceKeywordsText]
+  );
 
   const selectedCardExists = cards.some((card) => card.id === cardId);
   const shouldShowCurrentMissingCard =
@@ -84,16 +91,12 @@ export function FlagAdminForm({
       return;
     }
 
-    if (usableWorlds.length === 0) {
-      setMessage("使用可能ワールドを1つ以上入力してください。");
-      return;
-    }
-
     setMessage("");
     await onSubmit({
       name: name.trim() || null,
       cardId: cardId || null,
       usableWorlds,
+      usableRaceKeywords,
       initialHand: parseNonNegativeInteger(initialHand, 0),
       initialGauge: parseNonNegativeInteger(initialGauge, 0),
       initialLife: parseNonNegativeInteger(initialLife, 0),
@@ -138,8 +141,17 @@ export function FlagAdminForm({
         使用可能ワールド
         <input
           value={usableWorldsText}
-          placeholder="例: ドラゴンワールド, スタードラゴンワールド"
+          placeholder="ワールド条件なしの場合は空欄"
           onChange={(event) => setUsableWorldsText(event.target.value)}
+        />
+      </label>
+
+      <label>
+        使用可能種族キーワード（いずれかを含む）
+        <input
+          value={usableRaceKeywordsText}
+          placeholder="例: ドラゴン, 竜 または 百鬼"
+          onChange={(event) => setUsableRaceKeywordsText(event.target.value)}
         />
       </label>
 
@@ -196,6 +208,7 @@ export function FlagAdminForm({
 
       <div className="dm-card-form-preview">
         <p>使用可能ワールド：{usableWorlds.join("・") || "未入力"}</p>
+        <p>種族条件：{usableRaceKeywords.join("・") || "未設定"}</p>
         <p>
           初期値：手札{initialHand || "-"} / ゲージ{initialGauge || "-"} /
           ライフ{initialLife || "-"}

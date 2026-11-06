@@ -45,10 +45,13 @@ export default function NewFlagPage() {
     let cardId = input.cardId;
 
     if (!cardId) {
-      const flagCardName = input.name?.trim() || input.usableWorlds[0]?.trim();
+      const flagCardName =
+        input.name?.trim() ||
+        input.usableWorlds[0]?.trim() ||
+        input.usableRaceKeywords[0]?.trim();
       if (!flagCardName) {
         setSaving(false);
-        setMessage("既存カードを選ばない場合は、管理名または使用可能ワールドを入力してください。");
+        setMessage("既存カードを選ばない場合は、管理名を入力してください。");
         return;
       }
 

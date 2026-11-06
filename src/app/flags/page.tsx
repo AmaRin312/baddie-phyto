@@ -88,7 +88,7 @@ export default function FlagsPage() {
             <div className="dm-flag-admin-row dm-flag-admin-head">
               <span>名前</span>
               <span>カード名</span>
-              <span>usable_worlds</span>
+              <span>使用条件</span>
               <span>初期手札</span>
               <span>初期ゲージ</span>
               <span>初期ライフ</span>
@@ -102,7 +102,12 @@ export default function FlagsPage() {
                   <b>{getFlagDisplayName(flag)}</b>
                 </span>
                 <span>{flag.card?.name ?? "未設定"}</span>
-                <span>{flag.usable_worlds.join(", ") || "-"}</span>
+                <span>
+                  {[
+                    ...flag.usable_worlds,
+                    ...flag.usable_race_keywords.map((keyword) => `種族:${keyword}`)
+                  ].join(", ") || "条件なし"}
+                </span>
                 <span>{flag.initial_hand}</span>
                 <span>{flag.initial_gauge}</span>
                 <span>{flag.initial_life}</span>

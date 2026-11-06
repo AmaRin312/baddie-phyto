@@ -3091,77 +3091,53 @@ export function BattleController() {
       </aside>
 
       {commandInputOpen && (
-        <div
-          className="bf-special-command-backdrop"
-          role="presentation"
+        <form
+          className="bf-special-command-inline"
+          aria-label="コマンド入力"
+          onSubmit={handleSpecialCommandSubmit}
           onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setCommandInputOpen(false);
+              setCommandInput("");
+              setSpecialCommandMessage("");
+            }
+          }}
         >
-          <form
-            className="bf-special-command-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="bf-special-command-title"
-            onSubmit={handleSpecialCommandSubmit}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setCommandInputOpen(false);
-                setCommandInput("");
-                setSpecialCommandMessage("");
-              }
-            }}
-          >
-            <label id="bf-special-command-title" htmlFor="bf-special-command-input">
-              コマンド
-            </label>
-            <input
-              id="bf-special-command-input"
-              autoFocus
-              value={commandInput}
-              onChange={(event) => setCommandInput(event.target.value)}
-              placeholder="frag_new / frag_reverse / Laevateinn / Quenatar"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {commandSuggestions.length > 0 && (
-              <div className="bf-command-suggestions" role="listbox" aria-label="コマンド候補">
-                {commandSuggestions.map((suggestion) => (
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected="false"
-                    key={suggestion.id}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      setCommandInput(suggestion.label);
-                      setSpecialCommandMessage("");
-                    }}
-                  >
-                    <strong>{suggestion.label}</strong>
-                    <span>{suggestion.localizedName}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {specialCommandMessage && (
-              <p role="status">{specialCommandMessage}</p>
-            )}
-            <div className="bf-special-command-actions">
-              <button type="submit" className="primary">実行</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCommandInputOpen(false);
-                  setCommandInput("");
-                  setSpecialCommandMessage("");
-                }}
-              >
-                閉じる
-              </button>
+          <input
+            id="bf-special-command-input"
+            autoFocus
+            value={commandInput}
+            onChange={(event) => setCommandInput(event.target.value)}
+            placeholder="frag_new / frag_reverse / Laevateinn / Quenatar"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {commandSuggestions.length > 0 && (
+            <div className="bf-command-suggestions" role="listbox" aria-label="コマンド候補">
+              {commandSuggestions.map((suggestion) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  key={suggestion.id}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setCommandInput(suggestion.label);
+                    setSpecialCommandMessage("");
+                  }}
+                >
+                  <strong>{suggestion.label}</strong>
+                  <span>{suggestion.localizedName}</span>
+                </button>
+              ))}
             </div>
-          </form>
-        </div>
+          )}
+          {specialCommandMessage && (
+            <p role="status">{specialCommandMessage}</p>
+          )}
+        </form>
       )}
       {pendingLogSettings && (
         <div

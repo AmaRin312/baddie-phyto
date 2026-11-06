@@ -1,12 +1,11 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Button } from "@/components/common/button";
 import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
   DECK_CARD_ERA_OPTIONS,
   EMPTY_DECK_CARD_SEARCH_FILTERS,
-  resolveDeckSearchWorlds,
   type DeckCardAttributeKey,
   type DeckCardEraKey,
   type DeckCardSearchFilters,
@@ -21,7 +20,6 @@ import {
 type DeckCardSearchPanelProps = {
   filters: DeckCardSearchFilters;
   worlds: string[];
-  initialWorlds?: string[];
   sets: DeckCardSetOption[];
   onChange: (filters: DeckCardSearchFilters) => void;
 };
@@ -62,7 +60,6 @@ function SearchSection(props: {
 function DeckCardSearchPanelComponent({
   filters,
   worlds,
-  initialWorlds = [],
   sets,
   onChange
 }: DeckCardSearchPanelProps) {
@@ -73,13 +70,6 @@ function DeckCardSearchPanelComponent({
     eras: false,
     attributes: false
   });
-
-  useEffect(() => {
-    const resolvedInitialWorlds = resolveDeckSearchWorlds(worlds, initialWorlds);
-    if (filters.worlds.length === 0 && resolvedInitialWorlds.length > 0) {
-      onChange({ ...filters, worlds: resolvedInitialWorlds });
-    }
-  }, [filters, initialWorlds, onChange, worlds]);
 
   const setsByEra = useMemo(() => {
     const map = new Map<DeckCardEraKey, DeckCardSetOption[]>();
@@ -140,15 +130,15 @@ function DeckCardSearchPanelComponent({
           }
         ]
       : []),
-    ...(filters.races[0]?.trim()
-      ? [
-          {
-            key: "raceText",
-            label: `種族: ${filters.races[0].trim()}`,
-            onRemove: () => setFilters({ ...filters, races: [] })
-          }
-        ]
-      : []),
+    ...filters.races.map((race, index) => ({
+      key: `race:${index}:${race}`,
+      label: `種族: ${race}`,
+      onRemove: () =>
+        setArray(
+          "races",
+          filters.races.filter((_, raceIndex) => raceIndex !== index)
+        )
+    })),
     ...filters.worlds.map((world) => ({
       key: `world:${world}`,
       label: world,
@@ -265,12 +255,19 @@ function DeckCardSearchPanelComponent({
               <label className="dm-deck-search-name">
                 種族
                 <input
-                  value={filters.races[0] ?? ""}
-                  placeholder="種族名を入力"
+                  value={filters.races.join(", ")}
+                  placeholder="種族キーワードをカンマ区切りで入力（いずれか）"
                   onChange={(event) =>
                     setFilters({
                       ...filters,
-                      races: event.target.value.trim() ? [event.target.value] : []
+                      races: [
+                        ...new Set(
+                          event.target.value
+                            .split(",")
+                            .map((race) => race.trim())
+                            .filter(Boolean)
+                        )
+                      ]
                     })
                   }
                 />

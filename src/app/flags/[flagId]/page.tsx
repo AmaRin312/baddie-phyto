@@ -250,7 +250,8 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
             <div className="dm-card-text-preview">
               <b>{getFlagDisplayName(flag)}</b>
               <span>card名：{flag.card?.name ?? "未設定"}</span>
-              <span>使用可能ワールド：{flag.usable_worlds.join(", ") || "-"}</span>
+              <span>使用可能ワールド：{flag.usable_worlds.join(", ") || "条件なし"}</span>
+              <span>使用可能種族：{flag.usable_race_keywords.join(", ") || "未設定"}</span>
               <span>
                 初期値：手札{flag.initial_hand} / ゲージ{flag.initial_gauge} /
                 ライフ{flag.initial_life}

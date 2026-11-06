@@ -81,10 +81,16 @@ function isBattleCardRested(card: BattleCard) {
   return false;
 }
 
-function getItemSlotStyle(slot: number): CSSProperties {
+function getItemSlotStyle(slot: number, totalSlots: number): CSSProperties {
   const spacing = 179;
+  if (slot === 0 || slot === 1) {
+    return {
+      "--bf-item-slot-x": `${slot === 0 && totalSlots === 1 ? 0 : slot === 0 ? -66.5 : 66.5}px`,
+      "--bf-item-slot-y": "0px"
+    } as CSSProperties;
+  }
   if (slot < 5) {
-    const column = [0, 1, -1, 2, -2][slot] ?? 0;
+    const column = [-1, 2, -2][slot - 2] ?? 0;
     return {
       "--bf-item-slot-x": `${column * spacing}px`,
       "--bf-item-slot-y": "0px"
@@ -131,7 +137,7 @@ export function BattleZone({
 }: BattleZoneProps) {
   const holdTimerRef = useRef<number | null>(null);
   const [heldStackId, setHeldStackId] = useState<string | null>(null);
-  const topCard = cards[0] ?? null;
+  const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
   const cardRecord = topCard ? cardMap.get(topCard.cardId) : null;
   const isSelected = topCard ? selectedInstanceIds.has(topCard.instanceId) : false;
   const revealedDeckCards =
@@ -335,7 +341,17 @@ export function BattleZone({
           {cards.length === 0 && <div className="bf-empty-zone">空</div>}
         </div>
       ) : isAreaStackZone(zoneId) ? (
-        <div className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}>
+        <div
+          className={`bf-set-area-scroll${zoneId === "set" && areaStacks.length >= 5 ? " is-scrollable" : ""}`}
+        >
+          <div
+            className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}
+            style={
+              zoneId === "set" && areaStacks.length >= 5
+                ? ({ "--bf-set-card-count": areaStacks.length } as CSSProperties)
+                : undefined
+            }
+          >
           {areaStacks.map((areaStack) => {
             const areaTopCard = areaStack.topCard;
             const areaCardRecord = cardMap.get(areaTopCard.cardId);
@@ -355,15 +371,21 @@ export function BattleZone({
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
             const visibleSoulCards =
               areaTopCard.soul.length > 5
-                ? areaTopCard.soul.slice(-1)
+                ? areaTopCard.soul.slice(0, 1)
                 : areaTopCard.soul;
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${zoneId === "set" && canDrop ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
-                style={zoneId === "item" ? getItemSlotStyle(areaStack.areaSlot) : undefined}
+                style={
+                  zoneId === "item"
+                    ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length)
+                    : zoneId === "set" && areaStacks.length >= 5
+                      ? ({ "--bf-set-slot-index": areaStack.areaSlot } as CSSProperties)
+                      : undefined
+                }
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
                 onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
                 onDragLeave={() => handleAreaStackDragLeave(areaStack.stackId)}
@@ -422,7 +444,12 @@ export function BattleZone({
                       aria-hidden="true"
                       className="bf-attached-soul-card"
                       key={soulCard.instanceId}
-                      style={{ "--bf-soul-layer": soulIndex + 1 } as CSSProperties}
+                      style={
+                        {
+                          "--bf-soul-layer": soulIndex + 1,
+                          zIndex: areaTopCard.soul.length - soulIndex
+                        } as CSSProperties
+                      }
                     >
                       <BoardCard
                         card={soulRecord}
@@ -463,6 +490,7 @@ export function BattleZone({
           {areaStacks.length === 1 && heldStackId && (
             <div className="bf-area-new-slot-preview">2枠目</div>
           )}
+          </div>
         </div>
       ) : (
         <div className={stack ? "bf-stack-zone" : "bf-battle-slot"}>

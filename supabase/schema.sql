@@ -43,6 +43,7 @@ create table public.flags (
   name text,
   card_id uuid not null unique references public.cards(id) on delete restrict,
   usable_worlds text[] not null default '{}' check (array_position(usable_worlds, null) is null),
+  usable_race_keywords text[] not null default '{}' check (array_position(usable_race_keywords, null) is null),
   initial_life integer not null check (initial_life >= 0),
   initial_hand integer not null check (initial_hand >= 0),
   initial_gauge integer not null check (initial_gauge >= 0),
@@ -114,6 +115,7 @@ create index cards_active_index on public.cards (is_active);
 create index cards_search_flags_index on public.cards (is_dragon, is_hyakki, is_chaos, is_generic);
 create index flags_card_id_index on public.flags (card_id);
 create index flags_usable_worlds_index on public.flags using gin (usable_worlds);
+create index flags_usable_race_keywords_index on public.flags using gin (usable_race_keywords);
 create index flags_selectable_index on public.flags (can_be_selected_as_flag);
 create index flags_active_index on public.flags (is_active);
 create index card_images_card_id_index on public.card_images (card_id);

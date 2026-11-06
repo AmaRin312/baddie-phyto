@@ -5,9 +5,10 @@ import { Button } from "@/components/common/button";
 
 type BackButtonProps = {
   fallbackHref: string;
+  fullWidth?: boolean;
 };
 
-export function BackButton({ fallbackHref }: BackButtonProps) {
+export function BackButton({ fallbackHref, fullWidth = false }: BackButtonProps) {
   const router = useRouter();
 
   function handleBack() {
@@ -20,7 +21,7 @@ export function BackButton({ fallbackHref }: BackButtonProps) {
   }
 
   return (
-    <Button variant="secondary" onClick={handleBack}>
+    <Button variant="secondary" onClick={handleBack} fullWidth={fullWidth}>
       戻る
     </Button>
   );

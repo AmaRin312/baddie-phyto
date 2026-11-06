@@ -165,7 +165,7 @@ export async function searchDeckCards(input: {
       p_card_text: input.filters.cardText.trim() || null,
       p_worlds: input.filters.worlds,
       p_card_types: input.filters.cardTypes,
-      p_race_keyword: input.filters.races[0]?.trim() || null,
+      p_race_keywords: input.filters.races.map((race) => race.trim()).filter(Boolean),
       p_eras: input.filters.eras,
       p_set_ids: input.filters.setIds,
       p_original_mode: input.filters.originalMode,

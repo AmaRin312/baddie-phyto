@@ -6,6 +6,7 @@ const FLAG_SELECT_COLUMNS = [
   "name",
   "card_id",
   "usable_worlds",
+  "usable_race_keywords",
   "initial_life",
   "initial_hand",
   "initial_gauge",
@@ -50,6 +51,7 @@ export type CreateFlagInput = {
   cardId: string | null;
   name?: string | null;
   usableWorlds: string[];
+  usableRaceKeywords: string[];
   initialLife: number;
   initialHand: number;
   initialGauge: number;
@@ -61,6 +63,7 @@ export type UpdateFlagInput = {
   cardId?: string | null;
   name?: string | null;
   usableWorlds: string[];
+  usableRaceKeywords: string[];
   initialLife: number;
   initialHand: number;
   initialGauge: number;
@@ -169,6 +172,7 @@ export async function createFlag(input: CreateFlagInput) {
       name: input.name,
       card_id: input.cardId,
       usable_worlds: input.usableWorlds,
+      usable_race_keywords: input.usableRaceKeywords,
       initial_life: input.initialLife,
       initial_hand: input.initialHand,
       initial_gauge: input.initialGauge,
@@ -188,6 +192,7 @@ export async function updateFlag(flagId: string, input: UpdateFlagInput) {
   const payload: Partial<FlagRecord> = {
     name: input.name ?? null,
     usable_worlds: input.usableWorlds,
+    usable_race_keywords: input.usableRaceKeywords,
     initial_life: input.initialLife,
     initial_hand: input.initialHand,
     initial_gauge: input.initialGauge,

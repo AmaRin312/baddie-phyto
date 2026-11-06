@@ -44,6 +44,7 @@ export type FlagRecord = {
   name: string | null;
   card_id: string | null;
   usable_worlds: string[];
+  usable_race_keywords: string[];
   initial_life: number;
   initial_hand: number;
   initial_gauge: number;
