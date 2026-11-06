@@ -7315,6 +7315,34 @@ body:has(.bf-battle-app) {
   }
 }
 
+/* Final board zone coordinate adjustments. */
+.bf-player-board > .bf-zone-flag {
+  transform: translateY(40px) !important;
+}
+
+.bf-player-board > .bf-zone-item,
+.bf-player-board.is-mirrored > .bf-zone-item {
+  top: calc(50% - 137px) !important;
+}
+
+.bf-player-board > .bf-zone-buddy {
+  transform: translateY(30px) !important;
+}
+
+.bf-player-board > .bf-zone-center {
+  transform: translateY(40px) !important;
+}
+
+.bf-player-board > .bf-zone-left,
+.bf-player-board > .bf-zone-right {
+  transform: translateY(60px) !important;
+}
+
+.bf-player-board > .bf-zone-resolution {
+  top: -14px !important;
+  transform: translate(-50%, -50%) !important;
+}
+
 /* Move the board/sidebar split left by about 10% of the battle field width. */
 .bf-battle-app {
   --bf-right-panel-width: calc(clamp(360px, 31vw, 620px) + 6.4vw);
@@ -7336,4 +7364,38 @@ body:has(.bf-battle-app) {
   .bf-battle-app.is-menu-open {
     grid-template-columns: 48px minmax(0, 1fr);
   }
+}
+
+/* Keep the menu out of the board grid so toggling it never shifts the layout. */
+.bf-battle-app {
+  position: relative;
+}
+
+.bf-battle-app.is-menu-closed .bf-left-menu {
+  position: absolute !important;
+  z-index: 1000;
+  top: 6px;
+  right: auto;
+  bottom: auto;
+  left: 6px;
+  width: 40px;
+  min-height: 0;
+  padding: 4px;
+}
+
+.bf-battle-app.is-menu-open .bf-left-menu {
+  position: absolute !important;
+  z-index: 1000;
+  top: 6px;
+  right: auto;
+  bottom: 6px;
+  left: 6px;
+  width: 190px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+
+.bf-player-board > .bf-zone-set {
+  transform: translate(150px, -53px) !important;
 }
