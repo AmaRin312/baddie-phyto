@@ -463,8 +463,20 @@ export default function DecksPage() {
             </header>
 
             <div className="dm-card-detail-modal-body">
-              <AppCard title={selectedDeckForAction.name}>
-                {renderDeckContentList(selectedDeckForAction)}
+              <AppCard title="">
+                <div className="dm-deck-action-card-content">
+                  {selectedDeckForAction.owner_id === currentUserId && (
+                    <button
+                      type="button"
+                      className="dm-button primary dm-deck-action-edit"
+                      onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
+                      disabled={deletingDeck}
+                    >
+                      編集する
+                    </button>
+                  )}
+                  {renderDeckContentList(selectedDeckForAction)}
+                </div>
               </AppCard>
               <div className="dm-deck-supply-summary">
                 {(["sleeve", "playmat"] as const).map((type) => {
@@ -483,8 +495,8 @@ export default function DecksPage() {
               </div>
 
               {selectedDeckForAction.owner_id === currentUserId ? (
-                <div className="dm-dialog-actions">
-                  {selectedDeckForAction.deck_visibility !== "default" && (
+                selectedDeckForAction.deck_visibility !== "default" && (
+                  <div className="dm-dialog-actions">
                     <button
                       type="button"
                       className="dm-button danger"
@@ -493,16 +505,8 @@ export default function DecksPage() {
                     >
                       {deletingDeck ? "削除中..." : "削除"}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="dm-button primary"
-                    onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
-                    disabled={deletingDeck}
-                  >
-                    編集する
-                  </button>
-                </div>
+                  </div>
+                )
               ) : (
                 <div className="dm-dialog-actions">
                   <button

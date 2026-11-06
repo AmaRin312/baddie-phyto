@@ -35,7 +35,7 @@ import {
   stackCardOnAreaCard,
   swapAreaStacks,
   toggleCardOrientation,
-  turnFlagFaceDown
+  toggleFlagVisibility
 } from "@/lib/battle/battleActions";
 import type { BattleState } from "@/types/battle";
 import type { BattleCommand } from "@/lib/battle/commands/battleCommandTypes";
@@ -87,8 +87,8 @@ export function executeBattleCommand(
       return setLaevateinnEffect(state, command.payload);
     case "SET_HAND_OPEN_EFFECT":
       return setHandOpenEffect(state, command.payload);
-    case "TURN_FLAG_FACE_DOWN":
-      return turnFlagFaceDown(state);
+    case "TOGGLE_FLAG_VISIBILITY":
+      return toggleFlagVisibility(state);
     case "PLACE_QUENATAR_CARD":
       return placeQuenatarCard(state, command.payload);
     case "RESOLVE_BIRI_KINATA_NOTIFICATION":

@@ -1672,14 +1672,19 @@ export function BattleController() {
           setSpecialCommandMessage("frag_reverseの後には追加の指定を入力できません。");
           return;
         }
-        if (!battleState?.players.self.zones.flag.cards[0]) {
+        const topFlag = battleState?.players.self.zones.flag.cards[0];
+        if (!topFlag) {
           setSpecialCommandMessage("裏向きにするフラッグカードがありません。");
           return;
         }
-        executeCommand({ type: "TURN_FLAG_FACE_DOWN", source: "ability" });
+        executeCommand({ type: "TOGGLE_FLAG_VISIBILITY", source: "ability" });
         setCommandInputOpen(false);
         setCommandInput("");
-        setSpecialCommandMessage("フラッグカードを裏向きにしました。");
+        setSpecialCommandMessage(
+          topFlag.visibility === "face_down"
+            ? "フラッグカードを表向きにしました。"
+            : "フラッグカードを裏向きにしました。"
+        );
       },
       laevateinn: (args) => {
         if (args.length > 0 || !battleState) {

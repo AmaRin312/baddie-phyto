@@ -1720,14 +1720,14 @@ export function setLaevateinnEffect(
   };
 }
 
-export function turnFlagFaceDown(state: BattleState): BattleState {
+export function toggleFlagVisibility(state: BattleState): BattleState {
   const topFlag = state.players.self.zones.flag.cards[0];
-  if (!topFlag || topFlag.visibility === "face_down") return state;
+  if (!topFlag) return state;
 
   const nextState = cloneBattleState(state);
   nextState.players.self.zones.flag.cards[0] = {
     ...topFlag,
-    visibility: "face_down"
+    visibility: topFlag.visibility === "face_down" ? "public" : "face_down"
   };
   return nextState;
 }

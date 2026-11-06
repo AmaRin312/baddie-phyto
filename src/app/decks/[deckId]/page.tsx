@@ -878,7 +878,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       ) : deck || isNewDeckDraft ? (
         <div className="dm-deck-editor-layout is-three-column">
           <aside className="dm-deck-editor-column dm-deck-editor-settings">
-            <AppCard title={deckName || "無題のデッキ"}>
+            <AppCard title="">
               <form
                 className="dm-auth-form dm-card-form"
                 onSubmit={(event) => {
@@ -1016,7 +1016,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
             </AppCard>
           </aside>
           <main className="dm-deck-editor-column dm-deck-editor-deck">
-            <AppCard title={deckName || "デッキ内容"}>
+            <AppCard title="">
               <div className="dm-deck-list-header">
                 <span>デッキ内カード</span>
                 <div className="dm-deck-total-panel is-compact" aria-label="デッキ総枚数">
@@ -1132,7 +1132,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           </main>
 
           <aside className="dm-deck-editor-column dm-deck-editor-search">
-            <AppCard title="カード検索">
+            <AppCard title="">
               <div className="dm-deck-search-layout">
                 <div className="dm-deck-search-card-column">
                   <div

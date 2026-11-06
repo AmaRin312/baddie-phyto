@@ -5094,6 +5094,16 @@ select {
   max-width: 720px;
 }
 
+.dm-deck-action-card-content {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.dm-deck-action-edit {
+  justify-self: start;
+}
+
 .dm-deck-supply-summary {
   display: flex;
   justify-content: center;
@@ -6925,7 +6935,7 @@ body:has(.bf-battle-app) {
 .bf-battle-app .bf-special-command-inline {
   position: absolute;
   z-index: 230;
-  top: calc(50% + 6px);
+  top: calc(50% - 24px);
   left: 54px;
   display: grid;
   gap: 6px;
@@ -7099,7 +7109,7 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-zone-flag .bf-active-effects {
   position: absolute;
   z-index: 8;
-  top: calc(50% + var(--bf-battle-card-h) * 0.43);
+  top: calc(50% + var(--bf-battle-card-h) * 0.5 + 6px);
   left: 50%;
   display: flex;
   flex-wrap: wrap;
@@ -7913,4 +7923,69 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-zone-gauge .bf-card-button.is-gauge-card {
   width: calc(var(--bf-battle-card-w) * 0.72);
   height: calc(var(--bf-battle-card-h) * 0.72);
+}
+
+/* Deck editor: remove redundant headings and allocate more room to search. */
+@media (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    height: calc(100dvh - 140px);
+    grid-template-columns: minmax(210px, 240px) minmax(360px, 0.55fr) minmax(600px, 1fr);
+  }
+}
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    grid-template-columns: minmax(180px, 210px) minmax(280px, 0.55fr) minmax(440px, 1fr);
+  }
+}
+
+.dm-deck-editor-deck .dm-deck-visual-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dm-deck-search-grid > .dm-deck-search-card {
+  display: grid;
+  place-items: center;
+}
+
+.dm-deck-search-grid > .dm-deck-search-card > article {
+  width: 90%;
+  height: 90%;
+}
+
+/* Final battle-board position adjustments. */
+.bf-player-board > .bf-zone-flag {
+  transform: translateY(20px) !important;
+}
+
+.bf-player-board > .bf-zone-buddy {
+  transform: translateY(10px) !important;
+}
+
+.bf-player-board > .bf-zone-drop {
+  transform: translateY(40px) !important;
+}
+
+.bf-player-board > .bf-zone-resolution {
+  left: calc(50% + var(--bf-resolution-offset-x, 250px) - 50px) !important;
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card {
+  width: calc(var(--bf-battle-card-w) * 0.765);
+  height: calc(var(--bf-battle-card-h) * 0.765);
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card.is-native-horizontal {
+  width: calc(var(--bf-battle-card-h) * 0.765);
+  height: calc(var(--bf-battle-card-w) * 0.765);
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card:first-child {
+  margin-left: calc(50% - var(--bf-battle-card-w) * 0.3825);
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card-row:has(
+    > .bf-resolution-card:first-child.is-native-horizontal
+  ) > .bf-resolution-card:first-child {
+  margin-left: calc(50% - var(--bf-battle-card-h) * 0.3825);
 }

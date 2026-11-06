@@ -50,8 +50,8 @@ export type SetHandOpenEffectCommand = {
   payload: SetHandOpenEffectInput;
 };
 
-export type TurnFlagFaceDownCommand = {
-  type: "TURN_FLAG_FACE_DOWN";
+export type ToggleFlagVisibilityCommand = {
+  type: "TOGGLE_FLAG_VISIBILITY";
 };
 
 export type PlaceQuenatarCardCommand = {
@@ -320,7 +320,7 @@ export type BattleCommand =
     | MoveAreaStackToSlotCommand
     | SetLaevateinnEffectCommand
     | SetHandOpenEffectCommand
-    | TurnFlagFaceDownCommand
+    | ToggleFlagVisibilityCommand
     | PlaceQuenatarCardCommand
   ) & {
     source?: BattleCommandSource;

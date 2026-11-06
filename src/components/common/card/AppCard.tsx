@@ -9,10 +9,12 @@ type AppCardProps = {
 export function AppCard({ title, description, children }: AppCardProps) {
   return (
     <section className="dm-app-card">
-      <div>
-        <h2>{title}</h2>
-        {description && <p>{description}</p>}
-      </div>
+      {(title || description) && (
+        <div>
+          {title && <h2>{title}</h2>}
+          {description && <p>{description}</p>}
+        </div>
+      )}
 
       {children}
     </section>
