@@ -1095,7 +1095,7 @@ export function BattleController() {
       movementIds = [command.payload.instanceId];
       destinationZone = command.payload.toZone;
       if (command.type !== "PLACE_AREA_SLOT") {
-        targetInstanceId = command.payload.targetInstanceId;
+        targetInstanceId = command.payload.targetInstanceId ?? null;
       }
     } else if (
       command.type === "PLACE_AS_FLAG" ||
@@ -1246,6 +1246,7 @@ export function BattleController() {
 
   function isAllowedSelfSideCommand(command: BattleCommand) {
     if (
+      "payload" in command &&
       "playerId" in command.payload &&
       command.payload.playerId === "opponent"
     ) {

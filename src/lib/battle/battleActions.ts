@@ -1921,11 +1921,6 @@ export function placeHyakuganComposite(
     )
   );
 
-  if (source.zoneId === "deck") {
-    cleanupDeckLookForMovedCard(nextState, input.sourceInstanceId);
-    cleanupDeckLookForMovedCard(nextState, input.pairInstanceId);
-  }
-
   return nextState;
 }
 
