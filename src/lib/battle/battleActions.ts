@@ -694,13 +694,16 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (input.fromZone && located.zoneId !== input.fromZone) return state;
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
 
+  const movedFromGauge = located.zoneId === "gauge" && input.toZone !== "gauge";
   const compositeId = getCompositeId(located.card);
   const handOpenActive =
     input.toZone === "hand" &&
     state.players[located.playerId].activeEffectIds?.includes("text-command:hand_open");
   const visibility =
-    input.visibility ??
-    (handOpenActive ? "public" : getVisibilityForZone(input.toZone));
+    movedFromGauge
+      ? "face_down"
+      : input.visibility ??
+        (handOpenActive ? "public" : getVisibilityForZone(input.toZone));
   const movedMeta = (card: BattleCard) => {
     const meta = { ...card.meta };
     delete meta.handOpenExposed;
@@ -751,7 +754,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                     visibility,
                     meta: {
                       ...movedMeta(card),
-                      isRested: false
+                      isRested: movedFromGauge
                     }
                   }),
                   stackId,
@@ -768,7 +771,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                   visibility,
                   meta: {
                     ...movedMeta(card),
-                    isRested: false
+                    isRested: movedFromGauge
                   }
                 })
               )
@@ -798,7 +801,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     visibility,
     meta: {
       ...movedMeta(removedCard),
-      isRested: false
+      isRested: movedFromGauge
     }
   };
   const revealNormalizedMovedCard =
@@ -907,10 +910,11 @@ export function stackCardOnAreaCard(
     withoutDeckRevealData({
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
-      visibility: getVisibilityForZone(input.toZone),
+      visibility:
+        located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
       meta: {
         ...removedCard.meta,
-        isRested: false
+        isRested: located.zoneId === "gauge"
       }
     }),
     targetStackId,
@@ -961,8 +965,9 @@ export function placeCardInAreaSlot(
             withoutDeckRevealData({
               ...resetMovedCard(card),
               zoneId: input.toZone,
-              visibility: getVisibilityForZone(input.toZone),
-              meta: { ...card.meta, isRested: false }
+              visibility:
+                located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
+              meta: { ...card.meta, isRested: located.zoneId === "gauge" }
             }),
             stackId,
             areaSlot
@@ -994,10 +999,11 @@ export function placeCardInAreaSlot(
     withoutDeckRevealData({
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
-      visibility: getVisibilityForZone(input.toZone),
+      visibility:
+        located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
       meta: {
         ...removedCard.meta,
-        isRested: false
+        isRested: located.zoneId === "gauge"
       }
     }),
     stackId,
