@@ -5770,7 +5770,7 @@ select {
   background: transparent;
 }
 
-.bf-zone-resolution:not(:has(.bf-resolution-card)) {
+.bf-zone-resolution:not(:has(.bf-resolution-card)):not(.is-own-drag-label) {
   visibility: hidden;
 }
 
@@ -6033,12 +6033,13 @@ body:has(.bf-battle-app) {
   height: var(--bf-battle-card-h);
 }
 
-.bf-zone-resolution:not(:has(.bf-resolution-card)):not(.is-drop-target):not(.is-placement-target) {
+.bf-zone-resolution:not(:has(.bf-resolution-card)):not(.is-drop-target):not(.is-placement-target):not(.is-own-drag-label) {
   visibility: hidden;
 }
 
 .bf-zone-resolution.is-drop-target,
-.bf-zone-resolution.is-placement-target {
+.bf-zone-resolution.is-placement-target,
+.bf-zone-resolution.is-own-drag-label {
   visibility: visible;
 }
 
@@ -8395,16 +8396,37 @@ body:has(.bf-battle-app) {
   overflow-y: visible !important;
 }
 
-/* Keep the local resolution label inside the visible half of its boundary zone. */
-.bf-player-board:not(.is-mirrored) > .bf-zone-resolution.is-own-drag-label > .bf-zone-title {
-  display: block !important;
-  top: calc(50% + 40px);
-  z-index: 200;
+/* The set-zone extension owns its overlap with the gauge during a drag. */
+.bf-player-board:not(.is-mirrored) > .bf-zone-set.is-dragging-over-board {
+  z-index: 6;
 }
 
-.bf-player-board:not(.is-mirrored) > .bf-zone-resolution.is-drop-target > .bf-zone-title {
-  border: 2px solid #22c55e !important;
-  color: #166534 !important;
-  background: rgba(220, 252, 231, 0.98) !important;
-  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.22), 0 10px 24px rgba(15, 23, 42, 0.2) !important;
+/* Show the empty resolution destination independently of zone visibility. */
+.bf-player-board:not(.is-mirrored) > .bf-zone-resolution.is-own-drag-label > .bf-zone-title {
+  display: none !important;
+}
+
+.bf-player-board > .bf-resolution-drag-indicator {
+  position: absolute;
+  z-index: 50;
+  top: 26px;
+  left: calc(50% + var(--bf-resolution-offset-x, 250px) - 50px);
+  width: max-content;
+  padding: 6px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.bf-player-board:has(> .bf-zone-resolution.is-drop-target) > .bf-resolution-drag-indicator {
+  border: 2px solid #22c55e;
+  color: #166534;
+  background: rgba(220, 252, 231, 0.98);
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.22), 0 10px 24px rgba(15, 23, 42, 0.2);
 }

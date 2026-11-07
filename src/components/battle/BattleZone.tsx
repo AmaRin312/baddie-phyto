@@ -219,6 +219,19 @@ export function BattleZone({
     holdTimerRef.current = null;
   }
 
+  function isGaugeOverSetArea(event: DragEvent<HTMLElement>) {
+    if (zoneId !== "gauge" || playerId !== "self") return false;
+    const setZone = event.currentTarget
+      .closest(".bf-player-board")
+      ?.querySelector<HTMLElement>(":scope > .bf-zone-set");
+    if (!setZone) return false;
+    const rect = setZone.getBoundingClientRect();
+    return (
+      event.clientX >= rect.left && event.clientX < rect.right &&
+      event.clientY >= rect.top && event.clientY < rect.bottom
+    );
+  }
+
   function handleAreaStackDragEnter(stackId: string) {
     if (!canDrop || !draggedSingleCard || draggedItemCount > 1) return;
     if (areaStacks.length !== 1) return;
@@ -239,6 +252,12 @@ export function BattleZone({
 
   function handleZoneDrop(event: DragEvent<HTMLDivElement>) {
     if (!canDrop) return;
+    if (isGaugeOverSetArea(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDragOverZone(false);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     onDropCard(zoneId, {
@@ -258,6 +277,12 @@ export function BattleZone({
     }
   ) {
     if (!canDrop) return;
+    if (isGaugeOverSetArea(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDragOverZone(false);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     onDropCard(zoneId, {
@@ -281,6 +306,10 @@ export function BattleZone({
       }}
       onDragOver={(event) => {
         if (!canDrop) return;
+        if (isGaugeOverSetArea(event)) {
+          setIsDragOverZone(false);
+          return;
+        }
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         setIsDragOverZone(true);
@@ -610,6 +639,10 @@ export function BattleZone({
                   }
                   onDragOver={(event) => {
                     if (!canDrop) return;
+                    if (isGaugeOverSetArea(event)) {
+                      setIsDragOverZone(false);
+                      return;
+                    }
                     event.preventDefault();
                     event.stopPropagation();
                     event.dataTransfer.dropEffect = "move";
