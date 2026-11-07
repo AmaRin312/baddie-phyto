@@ -6938,6 +6938,16 @@ body:has(.bf-battle-app) {
   object-fit: contain;
 }
 
+.bf-zone.is-dragging-over-board:not(.is-own-drag-label) > .bf-zone-title {
+  display: none !important;
+}
+
+/* Shrink gauge cards on the local board by 15% from their current scale. */
+.bf-player-board:not(.is-mirrored) > .bf-zone-gauge .bf-card-button.is-gauge-card {
+  width: calc(var(--bf-battle-card-w) * 0.612) !important;
+  height: calc(var(--bf-battle-card-h) * 0.612) !important;
+}
+
 .bf-area-stack-card.has-soul-preview > .bp-board-card,
 .bf-area-stack-card.has-soul-preview > .bf-composite-card-view {
   z-index: 100;
@@ -8237,17 +8247,17 @@ body:has(.bf-battle-app) {
 /* Deck editor frame sizing: expand the deck panel while trimming only the search frame. */
 @media (min-width: 981px) {
   .dm-deck-editor-deck > .dm-app-card {
-    width: calc(100% + 50px);
+    width: calc(100% + 60px);
   }
 
   .dm-deck-editor-search {
-    width: calc(100% - 50px);
-    margin-left: 50px;
+    width: calc(100% - 60px);
+    margin-left: 60px;
   }
 
   .dm-deck-editor-search,
   .dm-deck-editor-search > .dm-app-card {
-    height: calc(100% + 60px);
+    height: calc(100% + 90px);
   }
 }
 
@@ -8327,4 +8337,16 @@ body:has(.bf-battle-app) {
 
 .bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card img {
   object-fit: contain;
+}
+
+/* Final set hitbox override: leftward drop area, unchanged card viewport. */
+.bf-player-board > .bf-zone-set {
+  width: calc(100% + 60px) !important;
+  margin-left: -60px !important;
+}
+
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll:not(.is-scrollable),
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll.is-scrollable {
+  width: calc(100% - 60px) !important;
+  margin-left: 60px !important;
 }

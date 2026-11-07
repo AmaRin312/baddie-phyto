@@ -183,6 +183,10 @@ export function BattleZone({
     );
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
   const isDraggingCard = draggedCard != null || draggedSoulCard != null;
+  const showOwnDragZoneLabel =
+    isDraggingCard &&
+    playerId === "self" &&
+    ["center", "left", "right", "item", "set", "drop"].includes(zoneId);
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
   const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
@@ -268,7 +272,7 @@ export function BattleZone({
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${isDraggingCard ? " is-dragging-over-board" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${isDraggingCard ? " is-dragging-over-board" : ""}${showOwnDragZoneLabel ? " is-own-drag-label" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
