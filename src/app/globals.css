@@ -7993,7 +7993,7 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-editor-deck .dm-deck-visual-card > article {
-  transform: scale(1.5);
+  transform: scale(1.05);
 }
 
 .dm-deck-search-grid > .dm-deck-search-card {
@@ -8046,6 +8046,19 @@ body:has(.bf-battle-app) {
   align-items: flex-start;
   justify-content: flex-end;
   gap: 5px;
+}
+
+@media (min-width: 981px) {
+  .dm-deck-search-grid {
+    transform: translateX(-50px);
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1240px) {
+  .dm-deck-search-grid {
+    justify-content: flex-start;
+    transform: none;
+  }
 }
 
 .dm-deck-search-count {
@@ -8345,6 +8358,7 @@ body:has(.bf-battle-app) {
   height: auto;
   aspect-ratio: 5 / 7;
   overflow: hidden;
+  background: transparent;
 }
 
 .bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card img {
@@ -8379,4 +8393,18 @@ body:has(.bf-battle-app) {
 
 .bf-player-board:not(.is-mirrored) > .bf-zone-gauge > .bf-stack-zone {
   overflow-y: visible !important;
+}
+
+/* Keep the local resolution label inside the visible half of its boundary zone. */
+.bf-player-board:not(.is-mirrored) > .bf-zone-resolution.is-own-drag-label > .bf-zone-title {
+  display: block !important;
+  top: calc(50% + 40px);
+  z-index: 200;
+}
+
+.bf-player-board:not(.is-mirrored) > .bf-zone-resolution.is-drop-target > .bf-zone-title {
+  border: 2px solid #22c55e !important;
+  color: #166534 !important;
+  background: rgba(220, 252, 231, 0.98) !important;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.22), 0 10px 24px rgba(15, 23, 42, 0.2) !important;
 }
