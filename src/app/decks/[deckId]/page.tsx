@@ -1261,8 +1261,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                             card={searchPreviewCard}
                             images={searchPreviewImages}
                             selectedImageId={activeSearchPreviewImageId || null}
-                            className="dm-deck-search-preview-image"
-                            horizontalRotation="counterclockwise"
+                            className={`dm-deck-search-preview-image${searchPreviewCard.orientation === "horizontal" ? " is-horizontal" : ""}`}
+                            preserveOrientation={searchPreviewCard.orientation === "horizontal"}
                           />
                         </div>
                         <div className="dm-deck-search-preview-thumbnails" aria-label="登録画像">

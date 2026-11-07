@@ -13,6 +13,7 @@ import { AbilityNotificationListPanel } from "@/components/battle/AbilityNotific
 import { AbilityCardTargetPopup } from "@/components/battle/AbilityCardTargetPopup";
 import { BiriKinataTargetPopup } from "@/components/battle/BiriKinataTargetPopup";
 import { BattleBoard } from "@/components/battle/BattleBoard";
+import { BattleDeckContextMenu } from "@/components/battle/BattleDeckContextMenu";
 import { BattlePopup } from "@/components/battle/BattlePopup";
 import { BattleSidebar } from "@/components/battle/BattleSidebar";
 import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
@@ -187,6 +188,11 @@ type PendingDeckCountPopup = {
   y: number;
 };
 
+type DeckContextMenuPosition = {
+  x: number;
+  y: number;
+};
+
 type PendingBiriKinataPopup = {
   sourceInstanceId: string;
 };
@@ -321,6 +327,9 @@ export function BattleController() {
   const [selectionMode, setSelectionMode] = useState<BattleSelectionMode>(null);
   const [pendingDeckCountPopup, setPendingDeckCountPopup] =
     useState<PendingDeckCountPopup | null>(null);
+  const [deckContextMenu, setDeckContextMenu] =
+    useState<DeckContextMenuPosition | null>(null);
+  const [deckViewerOpen, setDeckViewerOpen] = useState(false);
   const [pendingBiriKinataPopup, setPendingBiriKinataPopup] =
     useState<PendingBiriKinataPopup | null>(null);
   const [pendingFaceDownSoulPopup, setPendingFaceDownSoulPopup] =
@@ -967,6 +976,10 @@ export function BattleController() {
     if (!battleState || !dropBrowserPlayerId) return [];
     return battleState.players[dropBrowserPlayerId].zones.drop.cards;
   }, [battleState, dropBrowserPlayerId]);
+  const deckViewerCards = useMemo(
+    () => battleState?.players.self.zones.deck.cards ?? [],
+    [battleState]
+  );
   const soulTargetCandidates = useMemo(() => {
     if (!battleState) return [];
     return (["center", "left", "right", "item", "set"] as const).flatMap(
@@ -2199,6 +2212,35 @@ export function BattleController() {
     setDropBrowserPlayerId(playerId);
   }
 
+  function openDeckContextMenu(
+    event: MouseEvent<HTMLElement>,
+    playerId: BattlePlayerId
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (playerId !== "self") return;
+
+    setDeckContextMenu({
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 228)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 154))
+    });
+  }
+
+  function handleDeckContextMenuSelect(action: "look" | "reveal" | "view") {
+    const position = deckContextMenu;
+    setDeckContextMenu(null);
+    if (action === "view") {
+      setDeckViewerOpen(true);
+      return;
+    }
+    if (!position) return;
+    setPendingDeckCountPopup({
+      mode: action,
+      x: position.x,
+      y: position.y
+    });
+  }
+
   function handleDragStartCard(
     card: BattleCard,
     playerId: "self" | "opponent" = "self"
@@ -2328,12 +2370,23 @@ export function BattleController() {
   }
 
   function handleContextMenuCard(
-    _card: BattleCard,
+    card: BattleCard,
     event: MouseEvent<HTMLButtonElement>,
-    _playerId: "self" | "opponent" = "self"
+    playerId: "self" | "opponent" = "self"
   ) {
     event.preventDefault();
     event.stopPropagation();
+    if (card.zoneId === "deck") {
+      openDeckContextMenu(event, playerId);
+    }
+  }
+
+  function handleContextMenuZone(
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLDivElement>,
+    playerId: "self" | "opponent"
+  ) {
+    if (zoneId === "deck") openDeckContextMenu(event, playerId);
   }
 
   function handleDropCard(toZone: BattleZoneId, input: BattleDropInput = {}) {
@@ -2552,6 +2605,16 @@ export function BattleController() {
   useEscapeToClose({
     enabled: pendingDeckDrop != null,
     onClose: () => handleDeckDropChoice(null)
+  });
+
+  useEscapeToClose({
+    enabled: deckContextMenu != null,
+    onClose: () => setDeckContextMenu(null)
+  });
+
+  useEscapeToClose({
+    enabled: deckViewerOpen,
+    onClose: () => setDeckViewerOpen(false)
   });
 
   useEscapeToClose({
@@ -3251,6 +3314,7 @@ export function BattleController() {
         onDragEndCard={handleDragEndCard}
         onDropCard={handleDropCard}
         onDoubleClickZone={handleDoubleClickZone}
+        onContextMenuZone={handleContextMenuZone}
         onChangeLife={handleChangeSelfLife}
         onRollDice={handleRollSelfDice}
         onClearDice={handleClearSelfDice}
@@ -3304,6 +3368,15 @@ export function BattleController() {
         onDoubleClickFaceDownSoul={handleDoubleClickFaceDownSoul}
         onDropCard={handleDropCard}
       />
+
+      {deckContextMenu && (
+        <BattleDeckContextMenu
+          x={deckContextMenu.x}
+          y={deckContextMenu.y}
+          onSelect={handleDeckContextMenuSelect}
+          onClose={() => setDeckContextMenu(null)}
+        />
+      )}
 
       {hasHiddenAbilityNotification && (
         <button
@@ -3550,6 +3623,20 @@ export function BattleController() {
           onDragEndCard={handleDragEndCard}
           onExecute={() => undefined}
           onClose={() => setDropBrowserPlayerId(null)}
+        />
+      )}
+
+      {deckViewerOpen && (
+        <DeckBrowserPopup
+          cards={deckViewerCards}
+          cardMap={cardMap}
+          imagesByCard={imagesByCard}
+          soulCandidates={soulTargetCandidates}
+          title="デッキ一覧"
+          description="山札にあるカードの一覧です。"
+          mode="browse"
+          onExecute={() => undefined}
+          onClose={() => setDeckViewerOpen(false)}
         />
       )}
 

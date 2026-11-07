@@ -7983,7 +7983,7 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-editor-deck .dm-deck-visual-card > article {
-  transform: scale(1.15);
+  transform: scale(1.5);
 }
 
 .dm-deck-search-grid > .dm-deck-search-card {
@@ -8018,6 +8018,13 @@ body:has(.bf-battle-app) {
   max-width: min(100%, 420px);
 }
 
+.dm-deck-search-preview-main > .dm-deck-search-preview-image.is-horizontal {
+  width: min(100%, 420px);
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 7 / 5;
+}
+
 .dm-deck-search-side-controls {
   margin-top: 58px;
 }
@@ -8027,7 +8034,7 @@ body:has(.bf-battle-app) {
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 5px;
 }
 
@@ -8082,7 +8089,37 @@ body:has(.bf-battle-app) {
 
 .bf-player-board > .bf-zone-item,
 .bf-player-board.is-mirrored > .bf-zone-item {
-  top: calc(50% - 227px) !important;
+  top: calc(50% - 197px) !important;
+}
+
+/* Keep full-size battle cards visible in the five battle zones. */
+.bf-player-board > .bf-zone-left,
+.bf-player-board > .bf-zone-center,
+.bf-player-board > .bf-zone-right,
+.bf-player-board > .bf-zone-item,
+.bf-player-board > .bf-zone-set {
+  min-height: calc(var(--bf-battle-card-h) + 8px) !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.bf-player-board > .bf-zone-left > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-center > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-right > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-item > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll {
+  min-height: var(--bf-battle-card-h) !important;
+  overflow-y: clip;
+}
+
+.bf-player-board > .bf-zone-item > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll {
+  height: var(--bf-battle-card-h) !important;
+}
+
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll.is-scrollable {
+  overflow-x: auto;
+  overflow-y: clip;
 }
 
 .bf-player-board > .bf-zone-buddy {
@@ -8115,4 +8152,84 @@ body:has(.bf-battle-app) {
     > .bf-resolution-card:first-child.is-native-horizontal
   ) > .bf-resolution-card:first-child {
   margin-left: calc(50% - var(--bf-battle-card-h) * 0.3825);
+}
+
+/* Browse-mode drop cards need breathing room inside the scroll viewport. */
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-grid {
+  align-content: start;
+  gap: 10px;
+  padding: 10px;
+  scroll-padding: 10px;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card {
+  box-sizing: border-box;
+  min-height: 133px;
+  overflow: visible;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card {
+  flex: 0 0 auto;
+  width: 95px;
+  height: 133px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Match the gauge drop outline to the rotated, overlapped gauge-card bounds. */
+.bf-zone-gauge .bf-stack-zone.is-gauge-drop-has-cards::before,
+.bf-zone-gauge .bf-stack-zone.is-gauge-drop-empty::before {
+  top: calc(18px - 50px + (var(--bf-battle-card-h) - var(--bf-battle-card-w)) * 0.4);
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-stack-zone.is-gauge-drop-has-cards::before,
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-stack-zone.is-gauge-drop-empty::before {
+  top: calc(18px + 50px + (var(--bf-battle-card-h) - var(--bf-battle-card-w)) * 0.4);
+}
+
+.bf-deck-context-backdrop {
+  position: fixed;
+  z-index: 240;
+  inset: 0;
+  background: transparent;
+}
+
+.bf-deck-context-menu {
+  position: fixed;
+  z-index: 1;
+  display: grid;
+  gap: 5px;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.72);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+}
+
+.bf-deck-context-menu button {
+  min-height: 38px;
+  border: 1px solid rgba(147, 197, 253, 0.64);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #1e3a8a;
+  background: #f8fbff;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bf-deck-context-menu button:hover,
+.bf-deck-context-menu button:focus-visible {
+  border-color: #22c55e;
+  color: #166534;
+  background: #dcfce7;
+  outline: none;
 }

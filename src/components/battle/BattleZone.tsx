@@ -56,6 +56,11 @@ type BattleZoneProps = {
     event: MouseEvent<HTMLElement>,
     playerId: "self" | "opponent"
   ) => void;
+  onContextMenuZone?: (
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLDivElement>,
+    playerId: "self" | "opponent"
+  ) => void;
   placementTargetZones?: ReadonlySet<BattleZoneId>;
   placementTargetPlayerId?: "self" | "opponent";
   onPlacementZoneClick?: (
@@ -131,6 +136,7 @@ export function BattleZone({
   onDragEndCard,
   onDropCard,
   onDoubleClickZone,
+  onContextMenuZone,
   placementTargetZones,
   placementTargetPlayerId,
   onPlacementZoneClick
@@ -261,7 +267,7 @@ export function BattleZone({
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${canDrop && isDragOverZone && !hasAreaStackCards && zoneId !== "gauge" ? " is-drop-target" : ""}${hasAreaStackCards && canDrop && isDragOverZone ? " has-area-card-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${canDrop && isDragOverZone && dropTargetStackId == null && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
@@ -286,6 +292,12 @@ export function BattleZone({
         if (event.defaultPrevented) return;
         if (zoneId === "deck") return;
         onDoubleClickZone?.(zoneId, event, playerId);
+      }}
+      onContextMenu={(event) => {
+        if (zoneId !== "deck") return;
+        event.preventDefault();
+        event.stopPropagation();
+        onContextMenuZone?.(zoneId, event, playerId);
       }}
     >
       <div className="bf-zone-title">{label}</div>
@@ -533,12 +545,12 @@ export function BattleZone({
         </div>
       ) : (
         <div
-          className={`${stack ? "bf-stack-zone" : "bf-battle-slot"}${zoneId === "gauge" && canDrop ? cards.length > 0 ? " is-gauge-drop-has-cards" : " is-gauge-drop-empty" : ""}`}
+          className={`${stack ? "bf-stack-zone" : "bf-battle-slot"}${zoneId === "gauge" && canDrop && isDragOverZone ? cards.length > 0 ? " is-gauge-drop-has-cards" : " is-gauge-drop-empty" : ""}`}
           style={
             zoneId === "gauge"
               ? ({
-                  "--bf-gauge-drop-col-offset": `${Math.max(0, Math.ceil(cards.length / 10) - 1) * 58}px`,
-                  "--bf-gauge-drop-row-offset": `${Math.max(0, Math.min(cards.length, 10) - 1) * 41}px`
+                  "--bf-gauge-drop-col-offset": `${Math.max(0, Math.ceil(cards.length / 10) - 1) * 77}px`,
+                  "--bf-gauge-drop-row-offset": `${Math.max(0, Math.min(cards.length, 10) - 1) * 33}px`
                 } as CSSProperties)
               : undefined
           }
@@ -595,6 +607,7 @@ export function BattleZone({
                     event.preventDefault();
                     event.stopPropagation();
                     event.dataTransfer.dropEffect = "move";
+                    if (zoneId === "gauge") setIsDragOverZone(true);
                   }}
                   onDrop={handleCardDrop}
                 >

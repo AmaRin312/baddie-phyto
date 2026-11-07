@@ -41,6 +41,11 @@ type BattleBoardProps = {
     event: MouseEvent<HTMLElement>,
     playerId: "self" | "opponent"
   ) => void;
+  onContextMenuZone?: (
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLDivElement>,
+    playerId: "self" | "opponent"
+  ) => void;
   placementTargetZones?: ReadonlySet<BattleZoneId>;
   placementTargetPlayerId?: "self" | "opponent";
   sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
@@ -72,6 +77,7 @@ function BattleBoardComponent({
   onDragEndCard,
   onDropCard,
   onDoubleClickZone,
+  onContextMenuZone,
   placementTargetZones,
   placementTargetPlayerId,
   sleeveImageUrls,
@@ -114,6 +120,7 @@ function BattleBoardComponent({
         onDragEndCard={onDragEndCard}
         onDropCard={onDropCard}
         onDoubleClickZone={onDoubleClickZone}
+        onContextMenuZone={onContextMenuZone}
         placementTargetZones={placementTargetZones}
         placementTargetPlayerId={placementTargetPlayerId}
         onPlacementZoneClick={onPlacementZoneClick}
@@ -138,6 +145,7 @@ function BattleBoardComponent({
         onDragEndCard={onDragEndCard}
         onDropCard={onDropCard}
         onDoubleClickZone={onDoubleClickZone}
+        onContextMenuZone={onContextMenuZone}
         placementTargetZones={placementTargetZones}
         placementTargetPlayerId={placementTargetPlayerId}
         onPlacementZoneClick={onPlacementZoneClick}
