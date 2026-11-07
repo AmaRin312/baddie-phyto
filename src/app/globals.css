@@ -7772,8 +7772,8 @@ body:has(.bf-battle-app) {
   z-index: 0;
   left: calc(10px + (var(--bf-battle-card-w) - var(--bf-battle-card-h)) * 0.4);
   top: calc(18px + (var(--bf-battle-card-h) - var(--bf-battle-card-w)) * 0.4);
-  width: calc(var(--bf-battle-card-h) * 0.8 + var(--bf-gauge-drop-col-offset, 0px));
-  height: calc(var(--bf-battle-card-w) * 0.8 + var(--bf-gauge-drop-row-offset, 0px));
+  width: calc(var(--bf-battle-card-h) * 0.72 + var(--bf-gauge-drop-col-offset, 0px));
+  height: calc(var(--bf-battle-card-w) * 0.72 + var(--bf-gauge-drop-row-offset, 0px));
   border: 3px dashed rgba(34, 197, 94, 0.92);
   border-radius: 9px;
   background: rgba(220, 252, 231, 0.13);
@@ -8299,7 +8299,7 @@ body:has(.bf-battle-app) {
 
   .dm-deck-editor-search,
   .dm-deck-editor-search > .dm-app-card {
-    height: calc(100% + 40px);
+    height: calc(100% + 20px);
   }
 }
 
@@ -8434,7 +8434,7 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-resolution-drag-indicator {
   position: absolute;
   z-index: 50;
-  top: 26px;
+  top: 16px;
   left: calc(50% + var(--bf-resolution-offset-x, 250px) - 50px);
   width: max-content;
   padding: 6px 10px;
@@ -8447,6 +8447,12 @@ body:has(.bf-battle-app) {
   pointer-events: none;
   font-size: 14px;
   font-weight: 950;
+}
+
+/* Board card selection uses the highlighted frame without a check badge. */
+.bf-zone .bf-card-button.is-selected::after {
+  display: none !important;
+  content: none !important;
 }
 
 .bf-player-board:has(> .bf-zone-resolution.is-drop-target) > .bf-resolution-drag-indicator {
