@@ -31,6 +31,7 @@ type DeckBrowserPopupProps = {
   title?: string;
   description?: string;
   mode?: DeckBrowserMode;
+  className?: string;
   allowedDestinations?: ReadonlyArray<BattleDestination>;
   onExecute: (requests: DeckBrowserRequest[]) => void;
   onClose: () => void;
@@ -53,6 +54,7 @@ export function DeckBrowserPopup({
   title = "Deck Browser",
   description = "山札上から下の順に表示しています。カードを選び、下側で移動先を設定します。",
   mode = "move",
+  className,
   allowedDestinations = DEFAULT_DECK_BROWSER_DESTINATIONS,
   onExecute,
   onClose,
@@ -184,7 +186,7 @@ export function DeckBrowserPopup({
       onClose={onClose}
       lightBackdrop
       closeOnBackdrop={false}
-      className={`bf-deck-browser-popup${mode === "browse" ? " is-browse-mode" : ""}`}
+      className={`bf-deck-browser-popup${mode === "browse" ? " is-browse-mode" : ""}${className ? ` ${className}` : ""}`}
       contentClassName="bf-deck-browser-content"
       footer={
         <>

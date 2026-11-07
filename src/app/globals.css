@@ -1452,12 +1452,6 @@ select {
   color: var(--dm-muted);
 }
 
-.dm-deck-buddy-drop-target.is-active-drop-target {
-  border: 2px dashed #22c55e;
-  background: rgba(220, 252, 231, 0.92);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
-}
-
 .dm-deck-linked-card.is-mini > article {
   flex: 0 0 86px;
   width: 86px;
@@ -7096,7 +7090,7 @@ body:has(.bf-battle-app) {
   grid-area: set;
   width: calc(100% + 100px) !important;
   margin-left: -100px !important;
-  transform: translate(50px, -53px) !important;
+  transform: translate(calc(50px - var(--bf-battle-card-w) * 0.6), -53px) !important;
 }
 .bf-player-board > .bf-zone-flag {
   grid-area: flag;
@@ -8197,6 +8191,21 @@ body:has(.bf-battle-app) {
   overflow-y: clip !important;
 }
 
+/* Laevateinn item rows extend above the item anchor and must remain draggable. */
+.bf-player-board > .bf-zone-item,
+.bf-player-board > .bf-zone-item .bf-area-stack-zone {
+  overflow-y: visible !important;
+}
+
+.bf-player-board > .bf-zone-item > .bf-set-area-scroll {
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+}
+
+.bf-player-board > .bf-zone-item.is-laevateinn-active {
+  z-index: 12 !important;
+}
+
 .bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card {
   box-sizing: border-box;
   min-width: 0;
@@ -8210,6 +8219,18 @@ body:has(.bf-battle-app) {
   aspect-ratio: 5 / 7;
   overflow: hidden;
   background: transparent;
+}
+
+.bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-grid {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+
+.bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-card {
+  min-height: 106.4px;
+}
+
+.bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-card .bp-board-card {
+  width: min(76px, 100%);
 }
 
 .bf-player-board > .bf-zone-set > .bf-set-area-scroll {

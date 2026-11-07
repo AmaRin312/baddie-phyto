@@ -183,7 +183,6 @@ type PendingBattleActionPopup = {
 };
 
 type PendingDeckCountPopup = {
-  mode: "look" | "reveal";
   x: number;
   y: number;
 };
@@ -2233,9 +2232,16 @@ export function BattleController() {
       setDeckViewerOpen(true);
       return;
     }
+    if (action === "reveal") {
+      executeCommand({
+        type: "REVEAL_DECK_CARD",
+        payload: { playerId: "self", count: 1 },
+        source: "context_menu"
+      });
+      return;
+    }
     if (!position) return;
     setPendingDeckCountPopup({
-      mode: action,
       x: position.x,
       y: position.y
     });
@@ -2411,6 +2417,14 @@ export function BattleController() {
     }
 
     if (!dragSelection) return;
+
+    if (
+      input.targetInstanceId &&
+      dragSelection.instanceIds.includes(input.targetInstanceId)
+    ) {
+      setDragSelection(null);
+      return;
+    }
 
     if (
       dragSelection.instanceIds.length > 1 &&
@@ -2751,23 +2765,13 @@ export function BattleController() {
   function handleDeckCountSubmit(count: number) {
     if (!pendingDeckCountPopup) return;
 
-    executeCommand(
-      pendingDeckCountPopup.mode === "look"
-        ? {
-            type: "LOOK_TOP_DECK",
-            payload: {
-              playerId: "self",
-              count
-            }
-          }
-        : {
-            type: "REVEAL_DECK_CARD",
-            payload: {
-              playerId: "self",
-              count
-            }
-          }
-    );
+    executeCommand({
+      type: "LOOK_TOP_DECK",
+      payload: {
+        playerId: "self",
+        count
+      }
+    });
     setPendingDeckCountPopup(null);
   }
 
@@ -3579,7 +3583,7 @@ export function BattleController() {
 
       {pendingDeckCountPopup && (
         <DeckCountPopup
-          title={pendingDeckCountPopup.mode === "look" ? "上を見る" : "公開する"}
+          title="上を見る"
           maxCount={battleState.players.self.zones.deck.cards.length}
           x={pendingDeckCountPopup.x}
           y={pendingDeckCountPopup.y}
@@ -3635,6 +3639,10 @@ export function BattleController() {
           title="デッキ一覧"
           description="山札にあるカードの一覧です。"
           mode="browse"
+          className="is-deck-viewer"
+          canDragCards
+          onDragStartCard={handlePopupDragStartCard}
+          onDragEndCard={handleDragEndCard}
           onExecute={() => undefined}
           onClose={() => setDeckViewerOpen(false)}
         />

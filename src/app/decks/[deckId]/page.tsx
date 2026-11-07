@@ -22,7 +22,8 @@ import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
-  loadBattleSupplies
+  loadBattleSupplies,
+  loadSiteSupplySettings
 } from "@/lib/supplies/supplyActions";
 import {
   EMPTY_DECK_CARD_SEARCH_FILTERS,
@@ -88,6 +89,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
+  const [siteDefaultSleeveSupplyId, setSiteDefaultSleeveSupplyId] = useState("");
   const [savedDeckCards, setSavedDeckCards] = useState<DeckCardRecord[]>([]);
   const [draftDeckCards, setDraftDeckCards] = useState<DeckCardDraft[]>([]);
   const [searchFilters, setSearchFilters] = useState<DeckCardSearchFilters>(
@@ -118,13 +120,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckCardsResult,
       flagResult,
       searchOptionsResult,
-      supplyResult
+      supplyResult,
+      siteSupplySettingsResult
     ] = await Promise.all([
       loadDeck(currentDeckId),
       loadDeckCards(currentDeckId),
       loadFlagsLite({ selectableOnly: true, activeOnly: true }),
       loadDeckCardSearchOptions(),
-      loadBattleSupplies()
+      loadBattleSupplies(),
+      loadSiteSupplySettings()
     ]);
 
     if (
@@ -187,7 +191,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
     setSelectedBuddyImageId(nextDeck.selected_buddy_image_id ?? "");
-    setSelectedSleeveSupplyId(nextDeck.sleeve_supply_id ?? "");
+    const defaultSleeveId = siteSupplySettingsResult.data?.sleeve_supply_id ?? "";
+    setSiteDefaultSleeveSupplyId(defaultSleeveId);
+    setSelectedSleeveSupplyId(
+      nextDeck.sleeve_supply_id === defaultSleeveId
+        ? ""
+        : nextDeck.sleeve_supply_id ?? ""
+    );
     setSelectedPlaymatSupplyId(nextDeck.playmat_supply_id ?? "");
     setSaveVisibilities([nextDeck.deck_visibility ?? "private"]);
     setDeckEra(nextDeck.era_key ?? "");
@@ -231,11 +241,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
       setCurrentUserId(profile.id);
       if (resolvedDeckId === "new") {
-        const [flagResult, searchOptionsResult, supplyResult] =
+        const [flagResult, searchOptionsResult, supplyResult, siteSupplySettingsResult] =
           await Promise.all([
             loadFlagsLite({ selectableOnly: true, activeOnly: true }),
             loadDeckCardSearchOptions(),
-            loadBattleSupplies()
+            loadBattleSupplies(),
+            loadSiteSupplySettings()
           ]);
 
         if (
@@ -282,6 +293,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setSelectedFlagImageId("");
         setSelectedBuddyCardId("");
         setSelectedBuddyImageId("");
+        const defaultSleeveId = siteSupplySettingsResult.data?.sleeve_supply_id ?? "";
+        setSiteDefaultSleeveSupplyId(defaultSleeveId);
         setSelectedSleeveSupplyId("");
         setSelectedPlaymatSupplyId("");
         setSaveVisibilities(["private"]);
@@ -513,13 +526,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     currentUserId && (isNewDeckDraft || (deck && deck.owner_id === currentUserId))
   );
   const draggedDeckCard = draggedDeckCardId ? cardMap.get(draggedDeckCardId) : null;
-  const isDraggedBuddyCandidate = Boolean(
-    canEditDeck &&
-      draggedDeckCard &&
-      draftDeckCardMap.has(draggedDeckCard.id) &&
-      draggedDeckCard.is_active &&
-      draggedDeckCard.card_type !== "flag_card"
-  );
   const shouldCreateAdditionalCopies = saveVisibilities.length > 1;
   const hasUnsavedChanges = isNewDeckDraft
     ? Boolean(
@@ -540,7 +546,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
         effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
         selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
-        selectedSleeveSupplyId !== (deck.sleeve_supply_id ?? "") ||
+        (selectedSleeveSupplyId || siteDefaultSleeveSupplyId) !==
+          (deck.sleeve_supply_id ?? "") ||
         selectedPlaymatSupplyId !== (deck.playmat_supply_id ?? "") ||
         saveVisibilities.length !== 1 || saveVisibilities[0] !== (deck.deck_visibility ?? "private") ||
         deckEra !== (deck.era_key ?? "") ||
@@ -881,10 +888,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     value: string;
     supplies: BattleSupplyRecord[];
     fallbackText: string;
+    defaultSupplyId?: string;
+    defaultLabel?: string;
     onChange: (value: string) => void;
   }) {
     const selectedSupply =
-      input.supplies.find((supply) => supply.id === input.value) ?? null;
+      input.supplies.find((supply) => supply.id === input.value) ??
+      (input.value === "" && input.defaultSupplyId
+        ? input.supplies.find((supply) => supply.id === input.defaultSupplyId) ?? null
+        : null);
     const imageUrl = getPublicSupplyImageUrl(selectedSupply?.image_path);
 
     return (
@@ -896,12 +908,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
             onChange={(event) => input.onChange(event.target.value)}
             disabled={!canEditDeck}
           >
-            <option value="">{input.fallbackText}</option>
-            {input.supplies.map((supply) => (
+            <option value="">{input.defaultLabel ?? input.fallbackText}</option>
+            {input.supplies
+              .filter(
+                (supply) =>
+                  supply.id !== input.defaultSupplyId
+              )
+              .map((supply) => (
               <option key={supply.id} value={supply.id}>
                 {supply.name}
               </option>
-            ))}
+              ))}
           </select>
           {selectedSupply && imageUrl && (
             <div
@@ -959,7 +976,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                   <button
                     type="button"
-                    className={`dm-deck-linked-card is-mini dm-deck-buddy-drop-target${isDraggedBuddyCandidate ? " is-active-drop-target" : ""}`}
+                    className="dm-deck-linked-card is-mini dm-deck-buddy-drop-target"
                     title={selectedBuddyCard ? `バディ: ${selectedBuddyCard.name}` : "デッキ内カードをドロップしてバディに設定"}
                     aria-label={selectedBuddyCard ? `バディ画像: ${selectedBuddyCard.name}` : "バディカードのドロップ先"}
                     onClick={() => {
@@ -1000,6 +1017,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   value: selectedSleeveSupplyId,
                   supplies: sleeveSupplies,
                   fallbackText: "サイト共通のデフォルトを使う",
+                  defaultSupplyId: siteDefaultSleeveSupplyId,
+                  defaultLabel: "カード",
                   onChange: setSelectedSleeveSupplyId
                 })}
 

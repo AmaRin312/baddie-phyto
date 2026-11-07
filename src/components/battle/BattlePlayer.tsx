@@ -91,6 +91,8 @@ function BattlePlayerComponent({
   onClearDice
 }: BattlePlayerProps) {
   const isOpponent = side === "opponent";
+  const laevateinnActive =
+    !isOpponent && activePersistentEffects.includes("レヴァンティン");
   const boardHalfStyle = playmatImageUrl
     ? ({
         "--bf-player-playmat-image": `url("${playmatImageUrl}")`
@@ -383,6 +385,7 @@ function BattlePlayerComponent({
             draggedSoulInstanceCount={draggedSoulInstanceCount}
             selectedInstanceIds={selectedInstanceIds}
             stack
+            laevateinnActive={laevateinnActive}
             onSelectCard={onSelectCard}
             onDoubleClickCard={onDoubleClickCard}
             onContextMenuCard={onContextMenuCard}

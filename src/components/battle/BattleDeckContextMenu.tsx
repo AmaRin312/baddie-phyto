@@ -34,7 +34,7 @@ export function BattleDeckContextMenu({
           x枚見る
         </button>
         <button type="button" role="menuitem" onClick={() => onSelect("reveal")}>
-          x枚公開する
+          1枚公開する
         </button>
         <button type="button" role="menuitem" onClick={() => onSelect("view")}>
           デッキを見る

@@ -18,6 +18,8 @@ import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import type { BattleCard, BattleDropInput, BattleZoneId } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
+const SET_AREA_CARDS_PER_COLUMN = 2;
+
 type BattleZoneProps = {
   zoneId: BattleZoneId;
   label: string;
@@ -29,6 +31,7 @@ type BattleZoneProps = {
   stack?: boolean;
   showCount?: boolean;
   activeEffects?: string[];
+  laevateinnActive?: boolean;
   playerId: "self" | "opponent";
   draggedCard: BattleCard | null;
   draggedInstanceCount: number;
@@ -86,16 +89,23 @@ function isBattleCardRested(card: BattleCard) {
   return false;
 }
 
-function getItemSlotStyle(slot: number, totalSlots: number): CSSProperties {
-  const spacing = 179;
-  if (slot === 0 || slot === 1) {
+function getItemSlotStyle(
+  slot: number,
+  totalSlots: number,
+  laevateinnActive: boolean
+): CSSProperties {
+  if (!laevateinnActive) {
     return {
       "--bf-item-slot-x": `${slot === 0 && totalSlots === 1 ? 0 : slot === 0 ? -66.5 : 66.5}px`,
       "--bf-item-slot-y": "0px"
     } as CSSProperties;
   }
+
+  // Keep each slot fixed as cards are added; later rows grow upward in groups of seven.
+  const spacing = 179;
+  const firstRowColumns = [0, 1, -1, 2, -2];
   if (slot < 5) {
-    const column = [-1, 2, -2][slot - 2] ?? 0;
+    const column = firstRowColumns[slot] ?? 0;
     return {
       "--bf-item-slot-x": `${column * spacing}px`,
       "--bf-item-slot-y": "0px"
@@ -123,6 +133,7 @@ export function BattleZone({
   stack = false,
   showCount = false,
   activeEffects = [],
+  laevateinnActive = false,
   playerId,
   draggedCard,
   draggedInstanceCount,
@@ -156,10 +167,10 @@ export function BattleZone({
       : [];
   const areaStacks = isAreaStackZone(zoneId) ? getAreaStacks(cards) : [];
   const setColumnCount = zoneId === "set"
-    ? Math.max(1, Math.ceil((Math.max(-1, ...areaStacks.map((areaStack) => areaStack.areaSlot)) + 1) / 4))
+    ? Math.max(1, Math.ceil((Math.max(-1, ...areaStacks.map((areaStack) => areaStack.areaSlot)) + 1) / SET_AREA_CARDS_PER_COLUMN))
     : 1;
   const visibleAreaStacks = zoneId === "set"
-    ? areaStacks.filter((areaStack) => Math.floor(areaStack.areaSlot / 4) === selectedSetColumn)
+    ? areaStacks.filter((areaStack) => Math.floor(areaStack.areaSlot / SET_AREA_CARDS_PER_COLUMN) === selectedSetColumn)
     : areaStacks;
   const isPlacementTarget =
     (placementTargetZones?.has(zoneId) ?? false) &&
@@ -200,6 +211,17 @@ export function BattleZone({
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
   const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
   const preserveBattleOrientation = shouldPreserveBattleOrientation(zoneId);
+  const isLaevateinnItemZone =
+    zoneId === "item" && playerId === "self" && laevateinnActive;
+
+  function isDisabledSetDropHalf(event: DragEvent<HTMLElement>) {
+    if (zoneId !== "set") return false;
+    const zone = event.currentTarget.closest(".bf-zone-set") as HTMLElement | null;
+    const activeArea = zone?.querySelector(".bf-set-area-scroll") as HTMLElement | null;
+    if (!activeArea) return false;
+    const bounds = activeArea.getBoundingClientRect();
+    return event.clientX >= bounds.left + bounds.width / 2;
+  }
 
   useEffect(() => {
     if (zoneId !== "set") return;
@@ -211,7 +233,7 @@ export function BattleZone({
     previousSetStackIdsRef.current = currentIds;
     setSelectedSetColumn((column) =>
       addedStack
-        ? Math.floor(addedStack.areaSlot / 4)
+        ? Math.floor(addedStack.areaSlot / SET_AREA_CARDS_PER_COLUMN)
         : Math.min(column, setColumnCount - 1)
     );
   }, [zoneId, areaStacks, setColumnCount]);
@@ -276,6 +298,12 @@ export function BattleZone({
 
   function handleZoneDrop(event: DragEvent<HTMLDivElement>) {
     if (!canDrop) return;
+    if (isDisabledSetDropHalf(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDragOverZone(false);
+      return;
+    }
     if (isGaugeOverSetArea(event)) {
       event.preventDefault();
       event.stopPropagation();
@@ -301,6 +329,13 @@ export function BattleZone({
     }
   ) {
     if (!canDrop) return;
+    if (isDisabledSetDropHalf(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDragOverZone(false);
+      setDropTargetStackId(null);
+      return;
+    }
     if (isGaugeOverSetArea(event)) {
       event.preventDefault();
       event.stopPropagation();
@@ -321,7 +356,7 @@ export function BattleZone({
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${isDraggingCard ? " is-dragging-over-board" : ""}${showOwnDragZoneLabel ? " is-own-drag-label" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${isLaevateinnItemZone ? " is-laevateinn-active" : ""}${isDraggingCard ? " is-dragging-over-board" : ""}${showOwnDragZoneLabel ? " is-own-drag-label" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         if ((event.target as Element).closest(".bf-set-column-controls")) return;
@@ -331,6 +366,11 @@ export function BattleZone({
       }}
       onDragOver={(event) => {
         if (!canDrop) return;
+        if (isDisabledSetDropHalf(event)) {
+          event.stopPropagation();
+          setIsDragOverZone(false);
+          return;
+        }
         if (isGaugeOverSetArea(event)) {
           setIsDragOverZone(false);
           return;
@@ -454,7 +494,7 @@ export function BattleZone({
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
             const isWideSetCard =
               (areaIsNativeHorizontal && !isHyakuganComposite) || isHyakuganComposite;
-            const setSlotIndex = areaStack.areaSlot % 4;
+            const setSlotIndex = areaStack.areaSlot % SET_AREA_CARDS_PER_COLUMN;
             const visibleSoulCards =
               areaTopCard.soul.length > 5
                 ? areaTopCard.soul.slice(0, 1)
@@ -471,16 +511,20 @@ export function BattleZone({
                 key={areaStack.stackId}
                 style={
                   zoneId === "item"
-                    ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length)
+                    ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length, isLaevateinnItemZone)
                     : zoneId === "set"
                       ? ({
-                          right: `calc(50% - ${(3 / 2) - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
+                          right: `calc(75% - ${(0.5) - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
                           "--bf-set-soul-layers": attachedCards.length
                         } as CSSProperties)
                       : undefined
                 }
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
-                onDragEnter={() => {
+                onDragEnter={(event) => {
+                  if (isDisabledSetDropHalf(event)) {
+                    setDropTargetStackId(null);
+                    return;
+                  }
                   if (canDrop && draggedItemCount <= 1) {
                     setDropTargetStackId(areaStack.stackId);
                   }
@@ -494,6 +538,12 @@ export function BattleZone({
                 }}
                 onDragOver={(event) => {
                   if (!canDrop || draggedItemCount > 1) return;
+                  if (isDisabledSetDropHalf(event)) {
+                    event.stopPropagation();
+                    setIsDragOverZone(false);
+                    setDropTargetStackId(null);
+                    return;
+                  }
                   event.preventDefault();
                   event.stopPropagation();
                   event.dataTransfer.dropEffect = "move";
@@ -688,7 +738,9 @@ export function BattleZone({
                     event.dataTransfer.dropEffect = "move";
                     if (zoneId === "gauge") setIsDragOverZone(true);
                   }}
-                  onDrop={handleCardDrop}
+                  onDrop={(event) =>
+                    handleCardDrop(event, { targetInstanceId: gaugeCard.instanceId })
+                  }
                 >
                   <BoardCard
                     card={gaugeCardRecord}
@@ -749,7 +801,9 @@ export function BattleZone({
                 event.stopPropagation();
                 event.dataTransfer.dropEffect = "move";
               }}
-              onDrop={handleCardDrop}
+              onDrop={(event) =>
+                handleCardDrop(event, { targetInstanceId: topCard.instanceId })
+              }
             >
               <BoardCard
                 card={cardRecord}
