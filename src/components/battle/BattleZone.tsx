@@ -435,7 +435,7 @@ export function BattleZone({
           <div
             className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}
           >
-          {visibleAreaStacks.map((areaStack) => {
+          {visibleAreaStacks.map((areaStack, visibleIndex) => {
             const areaTopCard = areaStack.topCard;
             const areaCardRecord = cardMap.get(areaTopCard.cardId);
             const compositeCards = getCompositeGroupCards(
@@ -452,6 +452,16 @@ export function BattleZone({
             const areaIsRested = isBattleCardRested(areaTopCard);
             const areaIsNativeHorizontal =
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
+            const precedingSetStacks = visibleAreaStacks.slice(0, visibleIndex);
+            const precedingWideCards = precedingSetStacks.filter((stack) => {
+              const precedingRecord = cardMap.get(stack.topCard.cardId);
+              return (
+                (preserveBattleOrientation && precedingRecord?.orientation === "horizontal") ||
+                isBattleCardRested(stack.topCard) ||
+                getCompositeGroupCards(stack.cards, stack.topCard).length > 1
+              );
+            }).length;
+            const precedingNarrowCards = precedingSetStacks.length - precedingWideCards;
             const visibleSoulCards =
               areaTopCard.soul.length > 5
                 ? areaTopCard.soul.slice(0, 1)
@@ -471,7 +481,7 @@ export function BattleZone({
                     ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length)
                     : zoneId === "set"
                       ? ({
-                          right: `calc(${areaStack.areaSlot % 4} * (var(--bf-battle-card-w) * 0.85 - 20px))`,
+                          right: `calc(${precedingNarrowCards} * var(--bf-battle-card-w) * 0.85 + ${precedingWideCards} * var(--bf-battle-card-h) * 0.85 + ${visibleIndex * 3}px)`,
                           "--bf-set-soul-layers": attachedCards.length
                         } as CSSProperties)
                       : undefined

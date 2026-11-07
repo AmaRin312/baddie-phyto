@@ -8393,7 +8393,7 @@ body:has(.bf-battle-app) {
 
 /* Shift the local gauge as a group and allow its top card to clear the zone edge. */
 .bf-player-board:not(.is-mirrored) > .bf-zone-gauge {
-  transform: translate(-48px, 30px) !important;
+  transform: translate(-48px, 10px) !important;
   overflow-y: visible !important;
 }
 
@@ -8450,7 +8450,7 @@ body:has(.bf-battle-app) {
   position: absolute;
   z-index: 30;
   top: 50%;
-  right: -44px;
+  right: -24px;
   display: flex;
   flex-direction: column;
   gap: 3px;
