@@ -7337,21 +7337,21 @@ body:has(.bf-battle-app) {
   height: calc(var(--bf-battle-card-h) * 0.8);
   top: calc(18px + (var(--bf-gauge-row) * 33px) - 50px) !important;
   transform:
-    translate(calc(var(--bf-gauge-column) * -77px), 0)
+    translate(calc(var(--bf-gauge-column) * 50px), 0)
     rotate(-90deg) !important;
 }
 
 .bf-player-board.is-mirrored > .bf-zone-gauge .bf-card-button.is-gauge-card {
   top: calc(18px + (var(--bf-gauge-row) * 33px) + 50px) !important;
   transform:
-    translate(calc(var(--bf-gauge-column) * -77px), 0)
+    translate(calc(var(--bf-gauge-column) * -50px), 0)
     rotate(90deg) !important;
 }
 
 .bf-player-board > .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   top: calc(18px + (var(--bf-gauge-row) * 33px) - 50px) !important;
   transform:
-    translate(calc(var(--bf-gauge-column) * -77px), 0)
+    translate(calc(var(--bf-gauge-column) * 50px), 0)
     rotate(-90deg)
     scale(1.04) !important;
 }
@@ -7359,7 +7359,7 @@ body:has(.bf-battle-app) {
 .bf-player-board.is-mirrored > .bf-zone-gauge .bf-card-button.is-gauge-card.is-selected {
   top: calc(18px + (var(--bf-gauge-row) * 33px) + 50px) !important;
   transform:
-    translate(calc(var(--bf-gauge-column) * -77px), 0)
+    translate(calc(var(--bf-gauge-column) * -50px), 0)
     rotate(90deg)
     scale(1.04) !important;
 }
@@ -7770,7 +7770,7 @@ body:has(.bf-battle-app) {
   content: "";
   position: absolute;
   z-index: 0;
-  left: calc(10px - var(--bf-gauge-drop-col-offset, 0px) + (var(--bf-battle-card-w) - var(--bf-battle-card-h)) * 0.4);
+  left: calc(10px + (var(--bf-battle-card-w) - var(--bf-battle-card-h)) * 0.4);
   top: calc(18px + (var(--bf-battle-card-h) - var(--bf-battle-card-w)) * 0.4);
   width: calc(var(--bf-battle-card-h) * 0.8 + var(--bf-gauge-drop-col-offset, 0px));
   height: calc(var(--bf-battle-card-w) * 0.8 + var(--bf-gauge-drop-row-offset, 0px));
@@ -7778,6 +7778,11 @@ body:has(.bf-battle-app) {
   border-radius: 9px;
   background: rgba(220, 252, 231, 0.13);
   pointer-events: none;
+}
+
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-stack-zone.is-gauge-drop-has-cards::before,
+.bf-player-board.is-mirrored .bf-zone-gauge .bf-stack-zone.is-gauge-drop-empty::before {
+  left: calc(10px - var(--bf-gauge-drop-col-offset, 0px) + (var(--bf-battle-card-w) - var(--bf-battle-card-h)) * 0.4);
 }
 
 /* Keep gauge cards 20% smaller while highlighting their full group as a target. */

@@ -186,6 +186,7 @@ export function BattleZone({
   const showOwnDragZoneLabel =
     isDraggingCard &&
     playerId === "self" &&
+    cards.length === 0 &&
     ["center", "left", "right", "item", "set", "drop", "resolution"].includes(zoneId);
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
@@ -584,8 +585,8 @@ export function BattleZone({
           style={
             zoneId === "gauge"
               ? ({
-                  "--bf-gauge-drop-col-offset": `${Math.max(0, Math.ceil(cards.length / 10) - 1) * 77}px`,
-                  "--bf-gauge-drop-row-offset": `${Math.max(0, Math.min(cards.length, 10) - 1) * 33}px`
+                  "--bf-gauge-drop-col-offset": `${Math.max(0, Math.ceil(cards.length / 6) - 1) * 50}px`,
+                  "--bf-gauge-drop-row-offset": `${Math.max(0, Math.min(cards.length, 6) - 1) * 33}px`
                 } as CSSProperties)
               : undefined
           }
@@ -598,8 +599,8 @@ export function BattleZone({
               const gaugeIsDragging =
                 draggedSingleCard?.instanceId === gaugeCard.instanceId;
               const gaugeStyle = {
-                "--bf-gauge-row": String(gaugeIndex % 10),
-                "--bf-gauge-column": String(Math.floor(gaugeIndex / 10))
+                "--bf-gauge-row": String(gaugeIndex % 6),
+                "--bf-gauge-column": String(Math.floor(gaugeIndex / 6))
               } as CSSProperties;
 
               return (

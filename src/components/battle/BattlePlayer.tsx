@@ -448,11 +448,13 @@ function BattlePlayerComponent({
             placementTargetPlayerId={placementTargetPlayerId}
             onPlacementZoneClick={onPlacementZoneClick}
           />
-          {!isOpponent && (draggedCard != null || draggedSoulCard != null) && (
-            <div className="bf-resolution-drag-indicator" aria-hidden="true">
-              どこでもないゾーン
-            </div>
-          )}
+          {!isOpponent &&
+            player.zones.resolution.cards.length === 0 &&
+            (draggedCard != null || draggedSoulCard != null) && (
+              <div className="bf-resolution-drag-indicator" aria-hidden="true">
+                どこでもないゾーン
+              </div>
+            )}
         </div>
       </div>
     </section>
