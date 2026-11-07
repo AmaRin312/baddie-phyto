@@ -6927,6 +6927,16 @@ body:has(.bf-battle-app) {
   box-shadow: none;
 }
 
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-grid {
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 4px;
+  padding: 2px;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card img {
+  object-fit: contain;
+}
+
 .bf-area-stack-card.has-soul-preview > .bp-board-card,
 .bf-area-stack-card.has-soul-preview > .bf-composite-card-view {
   z-index: 100;
@@ -7728,16 +7738,20 @@ body:has(.bf-battle-app) {
   font-weight: 1000;
 }
 
-.bf-zone-set.is-drop-target:has(.bf-area-stack-card) > .bf-zone-title,
 .bf-zone-gauge.is-drop-target > .bf-zone-title {
   display: none !important;
 }
 
-.bf-zone-set .bf-area-stack-card.is-drop-target {
+.bf-zone .bf-area-stack-card.is-drop-target {
   outline: 3px solid #22c55e;
   outline-offset: 3px;
   box-shadow: 0 0 0 7px rgba(34, 197, 94, 0.24), 0 12px 28px rgba(22, 101, 52, 0.32);
   z-index: 20;
+}
+
+.bf-zone.has-multiple-drop-cards {
+  outline: none;
+  background: transparent;
 }
 
 /* Gauge cards stay 20% smaller and do not receive destination highlighting. */
@@ -7912,12 +7926,17 @@ body:has(.bf-battle-app) {
 .bf-zone-drop .bf-card-button {
   width: calc(var(--bf-battle-card-w) * 0.7);
   height: calc(var(--bf-battle-card-h) * 0.7);
-  overflow: hidden;
+  overflow: visible;
   border: 0;
   padding: 0;
-  border-radius: 0;
+  border-radius: 8px;
   background: transparent;
   box-shadow: none;
+}
+
+.bf-zone-drop .bf-card-button > .bp-board-card {
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .bf-player-board > .bf-zone-gauge .bf-card-button.is-gauge-card {
@@ -7929,18 +7948,20 @@ body:has(.bf-battle-app) {
 @media (min-width: 981px) {
   .dm-deck-editor-layout.is-three-column {
     height: calc(100dvh - 140px);
-    grid-template-columns: minmax(210px, 240px) minmax(360px, 0.55fr) minmax(600px, 1fr);
+    grid-template-columns: minmax(210px, 240px) minmax(340px, 0.45fr) minmax(600px, 1.1fr);
   }
 }
 
 @media (max-width: 1240px) and (min-width: 981px) {
   .dm-deck-editor-layout.is-three-column {
-    grid-template-columns: minmax(180px, 210px) minmax(280px, 0.55fr) minmax(440px, 1fr);
+    grid-template-columns: minmax(180px, 210px) minmax(260px, 0.45fr) minmax(440px, 1.1fr);
   }
 }
 
 .dm-deck-editor-deck .dm-deck-visual-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
 }
 
 .dm-deck-search-grid > .dm-deck-search-card {
@@ -7949,8 +7970,33 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-grid > .dm-deck-search-card > article {
-  width: 90%;
-  height: 90%;
+  width: 67.5%;
+  height: 67.5%;
+}
+
+.dm-deck-search-grid {
+  gap: 0.5px;
+}
+
+.dm-deck-search-selected-preview {
+  flex-basis: 72%;
+  max-height: 600px;
+}
+
+.dm-deck-search-preview-main > .dm-deck-search-preview-image {
+  max-width: min(100%, 360px);
+}
+
+.dm-deck-search-side-controls {
+  margin-top: 8px;
+}
+
+@media (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column > .dm-deck-editor-search {
+    min-height: 0;
+    align-content: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
 }
 
 /* Final battle-board position adjustments. */

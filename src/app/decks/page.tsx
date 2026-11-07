@@ -341,13 +341,13 @@ export default function DecksPage() {
           <button
             type="button"
             className="dm-deck-management-card dm-deck-management-click-card"
-            onClick={() => setSelectedDeckForAction(deck)}
+            onDoubleClick={() => setSelectedDeckForAction(deck)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 setSelectedDeckForAction(deck);
               }
             }}
-            title="クリックしてデッキ内容を表示"
+            title="ダブルクリックしてデッキ内容を表示"
           >
             <div className="dm-deck-management-images">
               <div className="is-flag">

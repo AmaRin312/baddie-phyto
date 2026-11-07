@@ -179,9 +179,9 @@ function DeckCardSearchPanelComponent({
   return (
     <div className="dm-deck-search-panel">
       <label className="dm-deck-search-name">
-        カード名
         <input
           value={filters.name}
+          aria-label="カード名検索"
           placeholder="カード名を入力"
           onChange={(event) => setFilters({ ...filters, name: event.target.value })}
         />

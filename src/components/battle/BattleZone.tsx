@@ -137,6 +137,7 @@ export function BattleZone({
 }: BattleZoneProps) {
   const holdTimerRef = useRef<number | null>(null);
   const [heldStackId, setHeldStackId] = useState<string | null>(null);
+  const [dropTargetStackId, setDropTargetStackId] = useState<string | null>(null);
   const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
   const cardRecord = topCard ? cardMap.get(topCard.cardId) : null;
   const isSelected = topCard ? selectedInstanceIds.has(topCard.instanceId) : false;
@@ -176,6 +177,7 @@ export function BattleZone({
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
+  const hasMultipleAreaStacks = isAreaStackZone(zoneId) && areaStacks.length >= 2;
   const preserveBattleOrientation = shouldPreserveBattleOrientation(zoneId);
 
   useEffect(() => {
@@ -183,6 +185,7 @@ export function BattleZone({
       draggedCard == null
         ? window.setTimeout(() => {
             setHeldStackId(null);
+            setDropTargetStackId(null);
           }, 0)
         : null;
 
@@ -230,6 +233,7 @@ export function BattleZone({
       clientY: event.clientY
     });
     setHeldStackId(null);
+    setDropTargetStackId(null);
   }
 
   function handleCardDrop(
@@ -248,11 +252,12 @@ export function BattleZone({
       clientY: event.clientY
     });
     setHeldStackId(null);
+    setDropTargetStackId(null);
   }
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${canDrop ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${canDrop && !hasMultipleAreaStacks ? " is-drop-target" : ""}${hasMultipleAreaStacks && canDrop ? " has-multiple-drop-cards" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
@@ -377,7 +382,7 @@ export function BattleZone({
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${zoneId === "set" && canDrop ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${hasMultipleAreaStacks && canDrop && dropTargetStackId === areaStack.stackId ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
                 style={
                   zoneId === "item"
@@ -387,13 +392,24 @@ export function BattleZone({
                       : undefined
                 }
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
-                onDragEnter={() => handleAreaStackDragEnter(areaStack.stackId)}
-                onDragLeave={() => handleAreaStackDragLeave(areaStack.stackId)}
+                onDragEnter={() => {
+                  if (canDrop && draggedItemCount <= 1) {
+                    setDropTargetStackId(areaStack.stackId);
+                  }
+                  handleAreaStackDragEnter(areaStack.stackId);
+                }}
+                onDragLeave={() => {
+                  setDropTargetStackId((current) =>
+                    current === areaStack.stackId ? null : current
+                  );
+                  handleAreaStackDragLeave(areaStack.stackId);
+                }}
                 onDragOver={(event) => {
                   if (!canDrop || draggedItemCount > 1) return;
                   event.preventDefault();
                   event.stopPropagation();
                   event.dataTransfer.dropEffect = "move";
+                  setDropTargetStackId(areaStack.stackId);
                 }}
                 onDrop={(event) => {
                   if (!canDrop || draggedItemCount > 1) return;
@@ -416,6 +432,7 @@ export function BattleZone({
                 onDragEnd={() => {
                   clearHoldTimer();
                   setHeldStackId(null);
+                  setDropTargetStackId(null);
                   onDragEndCard();
                 }}
                 onClick={(event) => {

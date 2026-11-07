@@ -187,12 +187,13 @@ export async function searchDeckCards(input: {
 
 export function resolveDeckSearchWorlds(availableWorlds: string[], preferredWorlds: string[]) {
   function normalize(world: string) {
-    const value = world.trim().normalize("NFC");
-    const lowerCaseW = value.endsWith("w") ? `${value.slice(0, -1)}W` : value;
-    const shortName = lowerCaseW.endsWith("ワールド")
-      ? `${lowerCaseW.slice(0, -4)}W`
-      : lowerCaseW;
-    return shortName;
+    const value = world
+      .trim()
+      .normalize("NFC")
+      .replace(/[\s　]+/g, "")
+      .replace(/ワールド$/u, "W")
+      .replace(/world$/iu, "W");
+    return value.toLocaleLowerCase("ja");
   }
 
   const preferredKeys = new Set(preferredWorlds.map(normalize));
