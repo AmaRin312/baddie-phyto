@@ -7440,7 +7440,7 @@ body:has(.bf-battle-app) {
 
 .bf-player-board > .bf-zone-left,
 .bf-player-board > .bf-zone-right {
-  transform: translateY(60px) !important;
+  transform: translateY(70px) !important;
 }
 
 .bf-player-board > .bf-zone-resolution {
@@ -8077,6 +8077,12 @@ body:has(.bf-battle-app) {
 
   .dm-deck-search-side-controls .dm-deck-search-chips {
     margin-top: auto;
+    transform: translateY(-35px);
+  }
+
+  .dm-deck-search-side-controls .dm-deck-search-name,
+  .dm-deck-search-side-controls .dm-deck-search-panel > button {
+    transform: translateY(-20px);
   }
 }
 
