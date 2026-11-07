@@ -8060,6 +8060,26 @@ body:has(.bf-battle-app) {
   }
 }
 
+@media (min-width: 1241px) {
+  .dm-deck-search-side-controls {
+    display: flex !important;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 10px !important;
+  }
+
+  .dm-deck-search-side-controls .dm-deck-search-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .dm-deck-search-side-controls .dm-deck-search-chips {
+    margin-top: auto;
+  }
+}
+
 @media (min-width: 981px) and (max-width: 1240px) {
   .dm-deck-search-grid {
     justify-content: flex-start;
@@ -8279,7 +8299,7 @@ body:has(.bf-battle-app) {
 
   .dm-deck-editor-search,
   .dm-deck-editor-search > .dm-app-card {
-    height: calc(100% + 90px);
+    height: calc(100% - 10px);
   }
 }
 
@@ -8450,7 +8470,7 @@ body:has(.bf-battle-app) {
   position: absolute;
   z-index: 30;
   top: 50%;
-  right: -24px;
+  right: 26px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -8486,7 +8506,7 @@ body:has(.bf-battle-app) {
 
 .bf-player-board.is-mirrored > .bf-zone-set > .bf-set-column-controls {
   right: auto;
-  left: -44px;
+  left: 6px;
   transform: translateY(-50%) rotate(180deg);
 }
 
