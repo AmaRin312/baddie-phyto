@@ -322,6 +322,10 @@ export function BattleSidebar({
                       card={viewerCardRecord}
                       images={imagesByCard.get(viewerCardRecord.id) ?? []}
                       selectedImageId={viewerCard.selectedImageId}
+                      horizontalRotation="counterclockwise"
+                      forcePortraitZoomPercent={
+                        viewerCardRecord.orientation === "horizontal" ? 112 : undefined
+                      }
                     />
                   )}
                 </div>

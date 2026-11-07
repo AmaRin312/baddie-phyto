@@ -136,9 +136,9 @@ export function BattleZone({
   onPlacementZoneClick
 }: BattleZoneProps) {
   const holdTimerRef = useRef<number | null>(null);
-  const setAreaScrollRef = useRef<HTMLDivElement | null>(null);
   const [heldStackId, setHeldStackId] = useState<string | null>(null);
   const [dropTargetStackId, setDropTargetStackId] = useState<string | null>(null);
+  const [isDragOverZone, setIsDragOverZone] = useState(false);
   const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
   const cardRecord = topCard ? cardMap.get(topCard.cardId) : null;
   const isSelected = topCard ? selectedInstanceIds.has(topCard.instanceId) : false;
@@ -187,6 +187,7 @@ export function BattleZone({
         ? window.setTimeout(() => {
             setHeldStackId(null);
             setDropTargetStackId(null);
+            setIsDragOverZone(false);
           }, 0)
         : null;
 
@@ -200,12 +201,6 @@ export function BattleZone({
       holdTimerRef.current = null;
     };
   }, [draggedCard]);
-
-  useEffect(() => {
-    if (zoneId !== "set" || areaStacks.length < 5) return;
-    const scrollArea = setAreaScrollRef.current;
-    if (scrollArea) scrollArea.scrollLeft = scrollArea.scrollWidth;
-  }, [areaStacks.length, zoneId]);
 
   function clearHoldTimer() {
     if (holdTimerRef.current == null) return;
@@ -241,6 +236,7 @@ export function BattleZone({
     });
     setHeldStackId(null);
     setDropTargetStackId(null);
+    setIsDragOverZone(false);
   }
 
   function handleCardDrop(
@@ -260,11 +256,12 @@ export function BattleZone({
     });
     setHeldStackId(null);
     setDropTargetStackId(null);
+    setIsDragOverZone(false);
   }
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${canDrop && !hasAreaStackCards && zoneId !== "gauge" ? " is-drop-target" : ""}${hasAreaStackCards && canDrop ? " has-area-card-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${canDrop && isDragOverZone && !hasAreaStackCards && zoneId !== "gauge" ? " is-drop-target" : ""}${hasAreaStackCards && canDrop && isDragOverZone ? " has-area-card-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
@@ -275,6 +272,14 @@ export function BattleZone({
         if (!canDrop) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
+        setIsDragOverZone(true);
+      }}
+      onDragLeave={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+          return;
+        }
+        setIsDragOverZone(false);
       }}
       onDrop={handleZoneDrop}
       onDoubleClick={(event) => {
@@ -355,7 +360,6 @@ export function BattleZone({
         </div>
       ) : isAreaStackZone(zoneId) ? (
         <div
-          ref={zoneId === "set" && areaStacks.length >= 5 ? setAreaScrollRef : undefined}
           className={`bf-set-area-scroll${zoneId === "set" && areaStacks.length >= 5 ? " is-scrollable" : ""}`}
         >
           <div

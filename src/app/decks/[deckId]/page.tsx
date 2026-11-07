@@ -1262,6 +1262,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                             images={searchPreviewImages}
                             selectedImageId={activeSearchPreviewImageId || null}
                             className="dm-deck-search-preview-image"
+                            horizontalRotation="counterclockwise"
                           />
                         </div>
                         <div className="dm-deck-search-preview-thumbnails" aria-label="登録画像">

@@ -12,6 +12,7 @@ type CardViewerProps = {
   faceDown?: boolean;
   forcePortrait?: boolean;
   forcePortraitZoomPercent?: number;
+  horizontalRotation?: "clockwise" | "counterclockwise";
   faceDownImageUrl?: string | null;
   preserveOrientation?: boolean;
 };
@@ -27,6 +28,7 @@ function CardViewerComponent({
   className = "",
   variant = "viewer",
   faceDown = false,
+  horizontalRotation = "clockwise",
   forcePortraitZoomPercent,
   faceDownImageUrl = null,
   preserveOrientation = false
@@ -70,7 +72,11 @@ function CardViewerComponent({
     !preserveOrientation;
   const imageClassName = [
     styles.image,
-    shouldForcePortraitImage ? styles.forcePortraitImage : ""
+    shouldForcePortraitImage
+      ? horizontalRotation === "counterclockwise"
+        ? styles.forcePortraitImageCounterClockwise
+        : styles.forcePortraitImage
+      : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -161,6 +167,7 @@ export const CardViewer = memo(CardViewerComponent, (prevProps, nextProps) => {
     prevProps.faceDown === nextProps.faceDown &&
     prevProps.forcePortrait === nextProps.forcePortrait &&
     prevProps.forcePortraitZoomPercent === nextProps.forcePortraitZoomPercent &&
+    prevProps.horizontalRotation === nextProps.horizontalRotation &&
     prevProps.faceDownImageUrl === nextProps.faceDownImageUrl &&
     prevProps.preserveOrientation === nextProps.preserveOrientation &&
     areImagesEqual(prevProps.images, nextProps.images)
