@@ -7982,6 +7982,10 @@ body:has(.bf-battle-app) {
   padding: 4px;
 }
 
+.dm-deck-editor-deck .dm-deck-visual-card > article {
+  transform: scale(1.15);
+}
+
 .dm-deck-search-grid > .dm-deck-search-card {
   display: grid;
   place-items: center;
@@ -8019,12 +8023,17 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  justify-content: flex-start;
   gap: 5px;
 }
 
 .dm-deck-search-count {
-  right: 16.25%;
-  top: 16.25%;
+  right: 0;
+  top: 0;
   min-width: 24px;
   border: 2px solid #fff;
   border-radius: 999px;
@@ -8034,6 +8043,23 @@ body:has(.bf-battle-app) {
   line-height: 1;
   text-align: center;
   transform: translate(50%, -20%);
+}
+
+.dm-deck-search-grid > .dm-deck-search-card {
+  flex: 0 0 calc((100% - 23px) * 0.16875);
+  width: auto;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dm-deck-search-grid > .dm-deck-search-card > article {
+  width: 100%;
+  height: 100%;
 }
 
 @media (min-width: 981px) {
