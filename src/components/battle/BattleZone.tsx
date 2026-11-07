@@ -182,6 +182,7 @@ export function BattleZone({
             })))
     );
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
+  const isDraggingCard = draggedCard != null || draggedSoulCard != null;
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
   const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
@@ -189,7 +190,7 @@ export function BattleZone({
 
   useEffect(() => {
     const resetTimerId =
-      draggedCard == null
+      draggedCard == null && draggedSoulCard == null
         ? window.setTimeout(() => {
             setHeldStackId(null);
             setDropTargetStackId(null);
@@ -206,7 +207,7 @@ export function BattleZone({
       window.clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     };
-  }, [draggedCard]);
+  }, [draggedCard, draggedSoulCard]);
 
   function clearHoldTimer() {
     if (holdTimerRef.current == null) return;
@@ -267,7 +268,7 @@ export function BattleZone({
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${canDrop && isDragOverZone && dropTargetStackId == null && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${isDraggingCard ? " is-dragging-over-board" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
@@ -443,6 +444,7 @@ export function BattleZone({
                   event.preventDefault();
                   event.stopPropagation();
                   event.dataTransfer.dropEffect = "move";
+                  setIsDragOverZone(true);
                   setDropTargetStackId(areaStack.stackId);
                 }}
                 onDrop={(event) => {

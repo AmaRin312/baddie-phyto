@@ -269,7 +269,7 @@ export function DeckBrowserPopup({
                   selectedImageId={battleCard.selectedImageId}
                   isPublic
                   variant="board"
-                  forcePortraitZoomPercent={140}
+                  forcePortraitZoomPercent={mode === "browse" ? 130 : 140}
                 />
                 <strong>{card.name}</strong>
               </button>

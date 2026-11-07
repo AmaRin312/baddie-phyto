@@ -8089,7 +8089,7 @@ body:has(.bf-battle-app) {
 
 .bf-player-board > .bf-zone-item,
 .bf-player-board.is-mirrored > .bf-zone-item {
-  top: calc(50% - 197px) !important;
+  top: calc(50% - 167px) !important;
 }
 
 /* Keep full-size battle cards visible in the five battle zones. */
@@ -8232,4 +8232,99 @@ body:has(.bf-battle-app) {
   color: #166534;
   background: #dcfce7;
   outline: none;
+}
+
+/* Deck editor frame sizing: expand the deck panel while trimming only the search frame. */
+@media (min-width: 981px) {
+  .dm-deck-editor-deck > .dm-app-card {
+    width: calc(100% + 50px);
+  }
+
+  .dm-deck-editor-search {
+    width: calc(100% - 50px);
+    margin-left: 50px;
+  }
+
+  .dm-deck-editor-search,
+  .dm-deck-editor-search > .dm-app-card {
+    height: calc(100% + 60px);
+  }
+}
+
+/* Keep set cards fully visible; only the fixed-width viewport scrolls at five or more. */
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll:not(.is-scrollable) {
+  width: 100% !important;
+  overflow-x: visible !important;
+  overflow-y: clip !important;
+}
+
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll.is-scrollable {
+  width: 100% !important;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: clip !important;
+  direction: rtl;
+}
+
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll.is-scrollable > .bf-area-stack-zone.is-set-area {
+  width: max(100%, calc(var(--bf-set-card-count) * (var(--bf-battle-card-w) - 20px) + var(--bf-battle-card-w)));
+}
+
+/* During a drag, keep zone names visible and emphasize only the active target. */
+.bf-zone.is-dragging-over-board > .bf-zone-title {
+  display: block !important;
+  position: absolute;
+  z-index: 80;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  width: max-content;
+  max-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.bf-zone.is-drop-target > .bf-zone-title {
+  border-color: rgba(34, 197, 94, 0.95);
+  color: #166534;
+  background: rgba(220, 252, 231, 0.96);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2), 0 8px 18px rgba(15, 23, 42, 0.16);
+}
+
+/* Battle zones never use vertical scrolling; set zones retain horizontal scrolling. */
+.bf-player-board .bf-zone,
+.bf-player-board .bf-area-stack-zone,
+.bf-player-board .bf-set-area-scroll,
+.bf-player-board .bf-battle-slot,
+.bf-player-board .bf-stack-zone {
+  overflow-y: clip !important;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-grid {
+  padding: 14px;
+  scroll-padding: 14px;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: visible;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card {
+  flex: 0 0 auto;
+  width: min(95px, 100%);
+  height: auto;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+}
+
+.bf-deck-browser-popup.is-browse-mode .bf-deck-browser-card .bp-board-card img {
+  object-fit: contain;
 }
