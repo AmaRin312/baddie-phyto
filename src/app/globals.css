@@ -8244,20 +8244,32 @@ body:has(.bf-battle-app) {
   outline: none;
 }
 
-/* Deck editor frame sizing: expand the deck panel while trimming only the search frame. */
+/* Deck editor frame sizing: widen the deck track and move the search frame right. */
 @media (min-width: 981px) {
-  .dm-deck-editor-deck > .dm-app-card {
-    width: calc(100% + 60px);
+  .dm-deck-editor-layout.is-three-column {
+    overflow: visible !important;
+    grid-template-columns:
+      minmax(210px, 240px)
+      minmax(320px, calc(25.2% + 60px))
+      minmax(0, 1fr);
   }
 
   .dm-deck-editor-search {
-    width: calc(100% - 60px);
-    margin-left: 60px;
+    overflow: visible !important;
   }
 
   .dm-deck-editor-search,
   .dm-deck-editor-search > .dm-app-card {
     height: calc(100% + 90px);
+  }
+}
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .dm-deck-editor-layout.is-three-column {
+    grid-template-columns:
+      minmax(180px, 210px)
+      minmax(300px, calc(25.2% + 60px))
+      minmax(0, 1fr);
   }
 }
 
@@ -8339,14 +8351,32 @@ body:has(.bf-battle-app) {
   object-fit: contain;
 }
 
-/* Final set hitbox override: leftward drop area, unchanged card viewport. */
+/* Set zone drop area extends left while the card viewport stays in place. */
 .bf-player-board > .bf-zone-set {
-  width: calc(100% + 60px) !important;
-  margin-left: -60px !important;
+  width: calc(100% + 100px) !important;
+  margin-left: -100px !important;
 }
 
 .bf-player-board > .bf-zone-set > .bf-set-area-scroll:not(.is-scrollable),
 .bf-player-board > .bf-zone-set > .bf-set-area-scroll.is-scrollable {
-  width: calc(100% - 60px) !important;
-  margin-left: 60px !important;
+  width: calc(100% - 100px) !important;
+  margin-left: 100px !important;
+}
+
+/* Cards in these zones can extend beyond their single-card width. */
+.bf-player-board > .bf-zone-left > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-center > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-right > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-item > .bf-set-area-scroll {
+  overflow-x: visible !important;
+}
+
+/* Shift the local gauge as a group and allow its top card to clear the zone edge. */
+.bf-player-board:not(.is-mirrored) > .bf-zone-gauge {
+  transform: translate(-48px, 30px) !important;
+  overflow-y: visible !important;
+}
+
+.bf-player-board:not(.is-mirrored) > .bf-zone-gauge > .bf-stack-zone {
+  overflow-y: visible !important;
 }

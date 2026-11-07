@@ -186,7 +186,7 @@ export function BattleZone({
   const showOwnDragZoneLabel =
     isDraggingCard &&
     playerId === "self" &&
-    ["center", "left", "right", "item", "set", "drop"].includes(zoneId);
+    ["center", "left", "right", "item", "set", "drop", "resolution"].includes(zoneId);
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
   const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
