@@ -557,7 +557,7 @@ function getAreaStackLimit(
   zoneId: BattleZoneId,
   playerId: BattlePlayerId = "self"
 ) {
-  if (zoneId === "set") return 5;
+  if (zoneId === "set") return Infinity;
   const laevateinnActive = state.ruleState.appliedRuleEffectIds.includes(
     "text-command:laevateinn"
   );
