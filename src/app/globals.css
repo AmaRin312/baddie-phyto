@@ -8299,7 +8299,7 @@ body:has(.bf-battle-app) {
 
   .dm-deck-editor-search,
   .dm-deck-editor-search > .dm-app-card {
-    height: calc(100% - 10px);
+    height: calc(100% + 40px);
   }
 }
 
@@ -8470,7 +8470,7 @@ body:has(.bf-battle-app) {
   position: absolute;
   z-index: 30;
   top: 50%;
-  right: 26px;
+  right: 6px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -8506,7 +8506,7 @@ body:has(.bf-battle-app) {
 
 .bf-player-board.is-mirrored > .bf-zone-set > .bf-set-column-controls {
   right: auto;
-  left: 6px;
+  left: 26px;
   transform: translateY(-50%) rotate(180deg);
 }
 

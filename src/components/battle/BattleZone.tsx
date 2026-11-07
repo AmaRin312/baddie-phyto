@@ -605,7 +605,7 @@ export function BattleZone({
           )}
           </div>
         </div>
-        {zoneId === "set" && (
+        {zoneId === "set" && setColumnCount >= 2 && (
           <div className="bf-set-column-controls" aria-label="設置エリアの列切り替え">
             {Array.from({ length: setColumnCount }, (_, column) => (
               <button
