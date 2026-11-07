@@ -8489,3 +8489,36 @@ body:has(.bf-battle-app) {
   left: -44px;
   transform: translateY(-50%) rotate(180deg);
 }
+
+/* Scale only set cards, including their attached soul previews. */
+.bf-player-board > .bf-zone-set .bf-area-stack-card {
+  width: calc(var(--bf-battle-card-w) * 0.85);
+  height: calc(var(--bf-battle-card-h) * 0.85);
+}
+
+.bf-player-board > .bf-zone-set .bf-area-stack-card.is-native-horizontal {
+  width: calc(var(--bf-battle-card-h) * 0.85);
+  height: calc(var(--bf-battle-card-w) * 0.85);
+}
+
+.bf-player-board > .bf-zone-set .bf-area-stack-card.is-hyakugan-composite {
+  width: calc(var(--bf-battle-card-h) * 0.85);
+  height: calc(var(--bf-battle-card-w) * 1.7);
+}
+
+.bf-player-board > .bf-zone-set .bf-area-stack-card.has-soul-preview > .bf-attached-soul-card {
+  top: calc(10% * var(--bf-soul-layer));
+  left: calc(10% * var(--bf-soul-layer));
+  width: 100%;
+  height: 100%;
+}
+
+.bf-player-board > .bf-zone-set,
+.bf-player-board > .bf-zone-set > .bf-set-area-scroll,
+.bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area {
+  overflow-y: visible !important;
+}
+
+.bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area .bf-area-stack-card {
+  top: calc(-1 * var(--bf-set-soul-layers, 0) * var(--bf-battle-card-h) * 0.085);
+}

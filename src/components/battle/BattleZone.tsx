@@ -470,7 +470,10 @@ export function BattleZone({
                   zoneId === "item"
                     ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length)
                     : zoneId === "set"
-                      ? ({ right: `calc(${areaStack.areaSlot % 4} * (var(--bf-battle-card-w) - 20px))` } as CSSProperties)
+                      ? ({
+                          right: `calc(${areaStack.areaSlot % 4} * (var(--bf-battle-card-w) * 0.85 - 20px))`,
+                          "--bf-set-soul-layers": attachedCards.length
+                        } as CSSProperties)
                       : undefined
                 }
                 draggable={canDragBattleCard({ card: areaTopCard, playerId })}
