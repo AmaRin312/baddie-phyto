@@ -341,6 +341,9 @@ export default function DecksPage() {
           <button
             type="button"
             className="dm-deck-management-card dm-deck-management-click-card"
+            onClick={(event) => {
+              if (event.detail >= 2) setSelectedDeckForAction(deck);
+            }}
             onDoubleClick={() => setSelectedDeckForAction(deck)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {

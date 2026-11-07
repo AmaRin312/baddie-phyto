@@ -136,6 +136,7 @@ export function BattleZone({
   onPlacementZoneClick
 }: BattleZoneProps) {
   const holdTimerRef = useRef<number | null>(null);
+  const setAreaScrollRef = useRef<HTMLDivElement | null>(null);
   const [heldStackId, setHeldStackId] = useState<string | null>(null);
   const [dropTargetStackId, setDropTargetStackId] = useState<string | null>(null);
   const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
@@ -177,7 +178,7 @@ export function BattleZone({
   const draggedSingleCard = draggedCard ?? draggedSoulCard;
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
-  const hasMultipleAreaStacks = isAreaStackZone(zoneId) && areaStacks.length >= 2;
+  const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
   const preserveBattleOrientation = shouldPreserveBattleOrientation(zoneId);
 
   useEffect(() => {
@@ -199,6 +200,12 @@ export function BattleZone({
       holdTimerRef.current = null;
     };
   }, [draggedCard]);
+
+  useEffect(() => {
+    if (zoneId !== "set" || areaStacks.length < 5) return;
+    const scrollArea = setAreaScrollRef.current;
+    if (scrollArea) scrollArea.scrollLeft = scrollArea.scrollWidth;
+  }, [areaStacks.length, zoneId]);
 
   function clearHoldTimer() {
     if (holdTimerRef.current == null) return;
@@ -257,7 +264,7 @@ export function BattleZone({
 
   return (
     <div
-      className={`bf-zone bf-zone-${zoneId}${canDrop && !hasMultipleAreaStacks ? " is-drop-target" : ""}${hasMultipleAreaStacks && canDrop ? " has-multiple-drop-cards" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
+      className={`bf-zone bf-zone-${zoneId}${canDrop && !hasAreaStackCards && zoneId !== "gauge" ? " is-drop-target" : ""}${hasAreaStackCards && canDrop ? " has-area-card-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
         event.preventDefault();
@@ -272,6 +279,7 @@ export function BattleZone({
       onDrop={handleZoneDrop}
       onDoubleClick={(event) => {
         if (event.defaultPrevented) return;
+        if (zoneId === "deck") return;
         onDoubleClickZone?.(zoneId, event, playerId);
       }}
     >
@@ -347,13 +355,19 @@ export function BattleZone({
         </div>
       ) : isAreaStackZone(zoneId) ? (
         <div
+          ref={zoneId === "set" && areaStacks.length >= 5 ? setAreaScrollRef : undefined}
           className={`bf-set-area-scroll${zoneId === "set" && areaStacks.length >= 5 ? " is-scrollable" : ""}`}
         >
           <div
             className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}
             style={
               zoneId === "set" && areaStacks.length >= 5
-                ? ({ "--bf-set-card-count": areaStacks.length } as CSSProperties)
+                ? ({
+                    "--bf-set-card-count": Math.max(
+                      areaStacks.length,
+                      ...areaStacks.map((stack) => stack.areaSlot + 1)
+                    )
+                  } as CSSProperties)
                 : undefined
             }
           >
@@ -378,11 +392,15 @@ export function BattleZone({
               areaTopCard.soul.length > 5
                 ? areaTopCard.soul.slice(0, 1)
                 : areaTopCard.soul;
+            const attachedCards = [
+              ...areaStack.cards.slice(0, -1),
+              ...visibleSoulCards
+            ];
 
             return (
               <button
                 type="button"
-                className={`bf-card-button bf-area-stack-card${areaTopCard.soul.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${hasMultipleAreaStacks && canDrop && dropTargetStackId === areaStack.stackId ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                className={`bf-card-button bf-area-stack-card${attachedCards.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${hasAreaStackCards && canDrop && dropTargetStackId === areaStack.stackId ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
                 key={areaStack.stackId}
                 style={
                   zoneId === "item"
@@ -452,9 +470,9 @@ export function BattleZone({
                   onContextMenuCard(areaTopCard, event, playerId)
                 }
               >
-                {visibleSoulCards.map((soulCard, soulIndex) => {
-                  const soulRecord = cardMap.get(soulCard.cardId);
-                  if (!soulRecord) return null;
+                {attachedCards.map((soulCard, soulIndex) => {
+                  const attachedCardRecord = cardMap.get(soulCard.cardId);
+                  if (!attachedCardRecord) return null;
 
                   return (
                     <span
@@ -464,13 +482,13 @@ export function BattleZone({
                       style={
                         {
                           "--bf-soul-layer": soulIndex + 1,
-                          zIndex: areaTopCard.soul.length - soulIndex
+                          zIndex: attachedCards.length - soulIndex
                         } as CSSProperties
                       }
                     >
                       <BoardCard
-                        card={soulRecord}
-                        images={imagesByCard.get(soulRecord.id) ?? []}
+                        card={attachedCardRecord}
+                        images={imagesByCard.get(attachedCardRecord.id) ?? []}
                         selectedImageId={soulCard.selectedImageId}
                         isPublic={shouldShowFace(soulCard)}
                         variant="board"
@@ -510,7 +528,17 @@ export function BattleZone({
           </div>
         </div>
       ) : (
-        <div className={stack ? "bf-stack-zone" : "bf-battle-slot"}>
+        <div
+          className={`${stack ? "bf-stack-zone" : "bf-battle-slot"}${zoneId === "gauge" && canDrop ? cards.length > 0 ? " is-gauge-drop-has-cards" : " is-gauge-drop-empty" : ""}`}
+          style={
+            zoneId === "gauge"
+              ? ({
+                  "--bf-gauge-drop-col-offset": `${Math.max(0, Math.ceil(cards.length / 10) - 1) * 58}px`,
+                  "--bf-gauge-drop-row-offset": `${Math.max(0, Math.min(cards.length, 10) - 1) * 41}px`
+                } as CSSProperties)
+              : undefined
+          }
+        >
           {zoneId === "gauge" && cards.length > 0 ? (
             cards.map((gaugeCard, gaugeIndex) => {
               const gaugeCardRecord = cardMap.get(gaugeCard.cardId);
@@ -615,6 +643,7 @@ export function BattleZone({
                   onDoubleClickZone?.(zoneId, event, playerId);
                   return;
                 }
+                if (zoneId === "deck") return;
                 onDoubleClickCard(topCard, { playerId });
               }}
               onContextMenu={(event) => onContextMenuCard(topCard, event, playerId)}

@@ -109,6 +109,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
   const searchResultsRef = useRef<HTMLDivElement | null>(null);
+  const worldPresetDeckIdRef = useRef<string | null>(null);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
   const reload = useCallback(async (currentDeckId: string) => {
@@ -374,6 +375,37 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     () => new Set([...(selectedFlag?.usable_worlds ?? []), ...(selectedFlagCard?.worlds ?? [])]),
     [selectedFlag, selectedFlagCard]
   );
+
+  useEffect(() => {
+    if (
+      loading ||
+      !deck ||
+      searchWorlds.length === 0 ||
+      worldPresetDeckIdRef.current === deck.id
+    ) {
+      return;
+    }
+
+    const flag = flags.find((item) => item.id === selectedFlagId);
+    const flagCard = flag?.card_id ? cardMap.get(flag.card_id) : null;
+    const preferredFlagWorlds = [
+      ...(flagCard?.worlds ?? []),
+      ...(flag?.usable_worlds ?? [])
+    ];
+    const resolvedWorlds = resolveDeckSearchWorlds(
+      searchWorlds,
+      preferredFlagWorlds
+    );
+
+    // Run once per loaded deck so clearing the filter remains the user's choice.
+    worldPresetDeckIdRef.current = deck.id;
+    if (resolvedWorlds.length === 0) return;
+    setSearchFilters((current) =>
+      current.worlds.length > 0
+        ? current
+        : { ...current, worlds: resolvedWorlds }
+    );
+  }, [cardMap, deck, flags, loading, searchWorlds, selectedFlagId]);
 
   const buddyCandidates = useMemo(
     () =>
@@ -1065,9 +1097,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         } else if (event.key === "Delete" || event.key === "Backspace") {
                           event.preventDefault();
                           setLocalCardQuantity(card, 0);
-                        } else if (event.key.toLowerCase() === "b") {
-                          event.preventDefault();
-                          setAsBuddy(card.id);
                         }
                       }}
                       onDragStart={(event) => {
@@ -1125,7 +1154,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     {selectedDeckCard.name} / ×{selectedDeckDraft.quantity}
                   </b>
                   {effectiveSelectedBuddyCardId === selectedDeckCard.id && <span>バディ</span>}
-                  <p className="dm-muted-text">矢印キーで枚数変更、Deleteで削除、Bでバディに設定</p>
+                  <p className="dm-muted-text">矢印キーで枚数変更、Deleteで削除</p>
                 </div>
               )}
             </AppCard>
@@ -1542,7 +1571,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         <span className="dm-card-detail-quantity">
                           {detailDeckDraft.quantity}枚
                         </span>
-                        <span className="dm-muted-text">矢印キーで枚数変更、Deleteで削除、Bでバディに設定</span>
+                        <span className="dm-muted-text">矢印キーで枚数変更、Deleteで削除</span>
                       </div>
                     ) : (
                       <p className="dm-muted-text">

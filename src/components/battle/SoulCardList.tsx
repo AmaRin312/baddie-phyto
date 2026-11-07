@@ -11,6 +11,7 @@ type SoulCardListProps = {
   position?: { left: number; top: number } | null;
   cardMap: Map<string, CardRecord>;
   imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrl?: string | null;
   selectedSoulInstanceIds: ReadonlySet<string>;
   onSelectSoulCard: (
     parentCard: BattleCard,
@@ -32,6 +33,7 @@ export function SoulCardList({
   position,
   cardMap,
   imagesByCard,
+  sleeveImageUrl,
   selectedSoulInstanceIds,
   onSelectSoulCard,
   onDragStartSoulCard,
@@ -96,9 +98,10 @@ export function SoulCardList({
                 selectedImageId={soulCard.selectedImageId}
                 isPublic={soulCard.visibility !== "face_down"}
                 variant="board"
+                sleeveImageUrl={sleeveImageUrl}
               />
               <span>
-                {soulCard.visibility === "face_down" ? "裏向きカード" : card.name}
+                {soulCard.visibility === "face_down" ? "裏向き" : card.name}
               </span>
             </button>
           );

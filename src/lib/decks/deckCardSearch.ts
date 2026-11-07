@@ -189,8 +189,9 @@ export function resolveDeckSearchWorlds(availableWorlds: string[], preferredWorl
   function normalize(world: string) {
     const value = world
       .trim()
-      .normalize("NFC")
+      .normalize("NFKC")
       .replace(/[\s　]+/g, "")
+      .replace(/[・･]/g, "")
       .replace(/ワールド$/u, "W")
       .replace(/world$/iu, "W");
     return value.toLocaleLowerCase("ja");

@@ -26,6 +26,7 @@ export const DRAGGABLE_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "hand",
   "gauge",
   "drop",
+  "deck",
   "item",
   "set",
   "center",

@@ -19,6 +19,7 @@ import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
 import { DeckCountPopup } from "@/components/battle/DeckCountPopup";
 import { useEscapeToClose } from "@/hooks/useEscapeToClose";
 import {
+  findBattleCard,
   getAreaStacks,
   isAreaStackZone
 } from "@/lib/battle/battleActions";
@@ -908,6 +909,9 @@ export function BattleController() {
     battleState,
     battleState?.activeViewerCardInstanceId ?? null
   );
+  const activeCardPlayerId = battleState?.activeViewerCardInstanceId
+    ? findBattleCard(battleState, battleState.activeViewerCardInstanceId)?.playerId ?? "self"
+    : "self";
   const viewerCards = useMemo(() => {
     if (!battleState) return [];
     const activeInstanceId = battleState.activeViewerCardInstanceId;
@@ -3274,6 +3278,7 @@ export function BattleController() {
       <BattleSidebar
         battleState={battleState}
         activeCard={activeCard}
+        activeCardPlayerId={activeCardPlayerId}
         soulListPosition={soulListPosition}
         viewerCards={viewerCards}
         cardMap={cardMap}

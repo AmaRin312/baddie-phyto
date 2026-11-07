@@ -25,6 +25,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 type BattleSidebarProps = {
   battleState: BattleState;
   activeCard: BattleCard | null;
+  activeCardPlayerId?: "self" | "opponent";
   soulListPosition?: { left: number; top: number } | null;
   viewerCards: BattleCard[];
   cardMap: Map<string, CardRecord>;
@@ -224,6 +225,7 @@ function HandCards({
 export function BattleSidebar({
   battleState,
   activeCard,
+  activeCardPlayerId = "self",
   soulListPosition,
   viewerCards,
   cardMap,
@@ -339,6 +341,7 @@ export function BattleSidebar({
           position={soulListPosition}
           cardMap={cardMap}
           imagesByCard={imagesByCard}
+          sleeveImageUrl={sleeveImageUrls?.[activeCardPlayerId]}
           selectedSoulInstanceIds={selectedSoulInstanceIds}
           onSelectSoulCard={onSelectSoulCard}
           onDragStartSoulCard={onDragStartSoulCard}
