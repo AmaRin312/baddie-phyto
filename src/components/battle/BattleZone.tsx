@@ -435,7 +435,7 @@ export function BattleZone({
           <div
             className={`bf-area-stack-zone${zoneId === "set" ? " is-set-area" : ""}`}
           >
-          {visibleAreaStacks.map((areaStack, visibleIndex) => {
+          {visibleAreaStacks.map((areaStack) => {
             const areaTopCard = areaStack.topCard;
             const areaCardRecord = cardMap.get(areaTopCard.cardId);
             const compositeCards = getCompositeGroupCards(
@@ -452,16 +452,9 @@ export function BattleZone({
             const areaIsRested = isBattleCardRested(areaTopCard);
             const areaIsNativeHorizontal =
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
-            const precedingSetStacks = visibleAreaStacks.slice(0, visibleIndex);
-            const precedingWideCards = precedingSetStacks.filter((stack) => {
-              const precedingRecord = cardMap.get(stack.topCard.cardId);
-              return (
-                (preserveBattleOrientation && precedingRecord?.orientation === "horizontal") ||
-                isBattleCardRested(stack.topCard) ||
-                getCompositeGroupCards(stack.cards, stack.topCard).length > 1
-              );
-            }).length;
-            const precedingNarrowCards = precedingSetStacks.length - precedingWideCards;
+            const isWideSetCard =
+              (areaIsNativeHorizontal && !isHyakuganComposite) || isHyakuganComposite;
+            const setSlotIndex = areaStack.areaSlot % 4;
             const visibleSoulCards =
               areaTopCard.soul.length > 5
                 ? areaTopCard.soul.slice(0, 1)
@@ -481,7 +474,7 @@ export function BattleZone({
                     ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length)
                     : zoneId === "set"
                       ? ({
-                          right: `calc(${precedingNarrowCards} * var(--bf-battle-card-w) * 0.85 + ${precedingWideCards} * var(--bf-battle-card-h) * 0.85 + ${visibleIndex * 3}px)`,
+                          right: `calc(50% - ${(3 / 2) - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
                           "--bf-set-soul-layers": attachedCards.length
                         } as CSSProperties)
                       : undefined

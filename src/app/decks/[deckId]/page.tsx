@@ -720,7 +720,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     router.push("/decks");
   }
 
-  function setLocalCardQuantity(card: CardRecord, quantity: number) {
+  function setLocalCardQuantity(
+    card: CardRecord,
+    quantity: number,
+    options: { preserveBuddy?: boolean } = {}
+  ) {
     if (!canEditDeck) {
       setMessage("このデッキは所有者だけが編集できます。");
       return;
@@ -736,7 +740,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     );
     setMessage("");
     if (quantity <= 0) {
-      if (selectedBuddyCardId === card.id) {
+      if (!options.preserveBuddy && selectedBuddyCardId === card.id) {
         setSelectedBuddyCardId("");
         setSelectedBuddyImageId("");
       }
@@ -860,6 +864,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
 
     setDraggedSearchCardId(null);
+  }
+
+  function handleDeckCardDropToSearch() {
+    if (!canEditDeck || !draggedDeckCardId) return;
+    const card = cardMap.get(draggedDeckCardId);
+    const existing = draftDeckCardMap.get(draggedDeckCardId);
+    if (card && existing) {
+      setLocalCardQuantity(card, existing.quantity - 1, { preserveBuddy: true });
+    }
+    setDraggedDeckCardId(null);
   }
 
   function renderSupplySelect(input: {
@@ -1162,7 +1176,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
           <aside className="dm-deck-editor-column dm-deck-editor-search">
             <AppCard title="">
-              <div className="dm-deck-search-layout">
+              <div
+                className={`dm-deck-search-layout${draggedDeckCardId ? " is-drop-target" : ""}`}
+                onDragOver={(event) => {
+                  if (!canEditDeck || !draggedDeckCardId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  if (!canEditDeck || !draggedDeckCardId) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleDeckCardDropToSearch();
+                }}
+              >
                 <div className="dm-deck-search-card-column">
                   <div
                     className="dm-deck-list dm-deck-search-results"
