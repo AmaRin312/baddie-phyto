@@ -1447,6 +1447,12 @@ select {
   min-height: 126px;
 }
 
+.dm-deck-flag-picker:not(:has(article)) {
+  min-height: 126px;
+  border-style: dashed;
+  color: var(--dm-muted);
+}
+
 .dm-deck-buddy-drop-target:not(:has(article)) {
   border-style: dashed;
   color: var(--dm-muted);
@@ -7486,7 +7492,7 @@ body:has(.bf-battle-app) {
 .dm-deck-search-side {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -7517,11 +7523,11 @@ body:has(.bf-battle-app) {
   min-width: 0;
   min-height: 220px;
   overflow: auto;
-  padding: 8px !important;
+  padding: 0 8px 8px !important;
 }
 
 .dm-deck-search-side-controls .dm-deck-search-panel {
-  gap: 8px;
+  gap: 0;
 }
 
 .dm-deck-search-card.is-selected {
@@ -7914,7 +7920,7 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-side-controls {
-  margin-top: 28px;
+  margin-top: 0;
 }
 
 @media (min-width: 1241px) {
@@ -7933,8 +7939,7 @@ body:has(.bf-battle-app) {
   }
 
   .dm-deck-search-side-controls .dm-deck-search-chips {
-    margin-top: auto;
-    transform: translateY(-65px);
+    margin-top: 0;
   }
 
 }

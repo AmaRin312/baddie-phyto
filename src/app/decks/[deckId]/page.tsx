@@ -958,15 +958,22 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 </label>
 
                 <div className="dm-deck-linked-card-strip">
-                  {selectedFlagCard && (
-                    <button
-                      type="button"
-                      className="dm-deck-linked-card is-mini"
-                      title={`フラッグ: ${selectedFlagCard.name}`}
-                      aria-label={`フラッグ画像: ${selectedFlagCard.name}`}
-                      onClick={() => openCardDetail(selectedFlagCard.id, "flag")}
-                      onDoubleClick={() => setFlagPickerOpen(true)}
-                    >
+                  <button
+                    type="button"
+                    className="dm-deck-linked-card is-mini dm-deck-flag-picker"
+                    title={selectedFlagCard ? `フラッグ: ${selectedFlagCard.name}` : "フラッグを選択"}
+                    aria-label={selectedFlagCard ? `フラッグ画像: ${selectedFlagCard.name}` : "フラッグを選択"}
+                    disabled={!selectedFlagCard && !canEditDeck}
+                    onClick={() => {
+                      if (selectedFlagCard) {
+                        openCardDetail(selectedFlagCard.id, "flag");
+                      } else {
+                        setFlagPickerOpen(true);
+                      }
+                    }}
+                    onDoubleClick={() => setFlagPickerOpen(true)}
+                  >
+                    {selectedFlagCard ? (
                       <CardViewer
                         card={selectedFlagCard}
                         images={imagesByCard.get(selectedFlagCard.id) ?? []}
@@ -974,8 +981,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         variant="compact"
                         forcePortrait
                       />
-                    </button>
-                  )}
+                    ) : (
+                      <span>フラッグを選択</span>
+                    )}
+                  </button>
 
                   <button
                     type="button"
