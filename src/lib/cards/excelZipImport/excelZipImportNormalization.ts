@@ -47,6 +47,7 @@ const CARD_TYPE_ALIASES: Record<string, CardType> = {
   impact_monster: "impact_monster",
   必殺モンスター: "impact_monster",
   flag_card: "flag_card",
+  frag_card: "flag_card",
   フラッグ: "flag_card",
   フラッグカード: "flag_card",
   other: "other",
@@ -174,14 +175,14 @@ function parseIntegerValue(
   return Number.parseInt(normalized, 10);
 }
 
-function normalizeWorlds(row: RawRow, issues: ExcelZipImportIssue[]) {
+function normalizeWorlds(row: RawRow, issues: ExcelZipImportIssue[], requireWorld: boolean) {
   const worlds = ["world1", "world2", "world3"]
     .map((column) => normalizeImportText(row.values[column as ExcelZipImportColumn]))
     .filter(Boolean)
     .map((world) => WORLD_ALIASES[normalizeLookupKey(world)] ?? world);
   const duplicate = worlds.find((world, index) => worlds.indexOf(world) !== index);
 
-  if (worlds.length === 0) {
+  if (requireWorld && worlds.length === 0) {
     pushIssue(issues, row.rowNumber, "world1", "ワールドを1つ以上入力してください。");
   }
 
@@ -232,7 +233,7 @@ export function normalizeExcelZipRow(row: RawRow): {
     pushIssue(issues, row.rowNumber, "orientation", `向きを認識できません: ${orientationInput}`);
   }
 
-  const worlds = normalizeWorlds(row, issues);
+  const worlds = normalizeWorlds(row, issues, cardType !== "flag_card");
   const races = normalizeRaces(row, issues);
   const size = parseIntegerValue(row.rowNumber, "size", value("size"), issues);
   const power = parseIntegerValue(row.rowNumber, "power", value("power"), issues);

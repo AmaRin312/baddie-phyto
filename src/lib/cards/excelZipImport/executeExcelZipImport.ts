@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { ensureFlagForFlagCard } from "@/lib/cards/cardActions";
 import {
   isSameExcelZipCardRecord,
   normalizeImportText
@@ -342,6 +343,11 @@ export async function executeExcelZipCardImport(
       const abilityLinked = await ensureAbilityLink({ cardId: card.id, ability });
       if (abilityLinked) {
         result.abilityLinkedCount += 1;
+      }
+
+      if (card.card_type === "flag_card" && card.is_active) {
+        const flagResult = await ensureFlagForFlagCard(card);
+        if (flagResult.error) throw new Error(`フラッグ設定の登録に失敗しました: ${flagResult.error.message}`);
       }
 
       result.groupResults.push({

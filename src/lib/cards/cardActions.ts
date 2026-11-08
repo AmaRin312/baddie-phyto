@@ -91,7 +91,7 @@ export type CreateCardInput = {
   autoCreateFlag?: boolean;
 };
 
-async function ensureFlagForFlagCard(card: CardRecord) {
+export async function ensureFlagForFlagCard(card: CardRecord) {
   if (card.card_type !== "flag_card") return { error: null };
 
   const { data: existingFlag, error: loadError } = await supabase
