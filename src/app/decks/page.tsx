@@ -139,10 +139,12 @@ export default function DecksPage() {
 
       if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
         console.error(decksResponse?.error ?? deckCardsResponse?.error);
-        setMessage("デッキ一覧の読み込みに失敗しました。");
+        setMessage("デッキ一覧の読み込みに失敗しました。商品表示条件のSQL適用状況を確認してください。");
       } else {
         const nextDecks = (decksResponse.data ?? []) as unknown as DeckRecord[];
-        const nextDeckCards = deckCardsResponse.data ?? [];
+        const nextDeckIds = new Set(nextDecks.map((deck) => deck.id));
+        const nextDeckCards = (deckCardsResponse.data ?? [])
+          .filter((deckCard) => nextDeckIds.has(deckCard.deck_id));
         const nextFlags = ((flagsResponse?.error ? [] : flagsResponse?.data ?? []) ??
           []) as FlagRecord[];
 

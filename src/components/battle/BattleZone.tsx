@@ -18,7 +18,8 @@ import { setBattleCardDragImage } from "@/lib/battle/setBattleCardDragImage";
 import type { BattleCard, BattleDropInput, BattleZoneId } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
-const SET_AREA_CARDS_PER_COLUMN = 2;
+const SET_AREA_CARDS_PER_COLUMN = 4;
+const LAEVATEINN_SET_AREA_CARDS_PER_COLUMN = 2;
 
 type BattleZoneProps = {
   zoneId: BattleZoneId;
@@ -161,16 +162,15 @@ export function BattleZone({
   const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
   const cardRecord = topCard ? cardMap.get(topCard.cardId) : null;
   const isSelected = topCard ? selectedInstanceIds.has(topCard.instanceId) : false;
-  const revealedDeckCards =
-    zoneId === "deck"
-      ? cards.filter((card) => card.meta.deckRevealed === true)
-      : [];
   const areaStacks = isAreaStackZone(zoneId) ? getAreaStacks(cards) : [];
+  const setCardsPerColumn = laevateinnActive
+    ? LAEVATEINN_SET_AREA_CARDS_PER_COLUMN
+    : SET_AREA_CARDS_PER_COLUMN;
   const setColumnCount = zoneId === "set"
-    ? Math.max(1, Math.ceil((Math.max(-1, ...areaStacks.map((areaStack) => areaStack.areaSlot)) + 1) / SET_AREA_CARDS_PER_COLUMN))
+    ? Math.max(1, Math.ceil((Math.max(-1, ...areaStacks.map((areaStack) => areaStack.areaSlot)) + 1) / setCardsPerColumn))
     : 1;
   const visibleAreaStacks = zoneId === "set"
-    ? areaStacks.filter((areaStack) => Math.floor(areaStack.areaSlot / SET_AREA_CARDS_PER_COLUMN) === selectedSetColumn)
+    ? areaStacks.filter((areaStack) => Math.floor(areaStack.areaSlot / setCardsPerColumn) === selectedSetColumn)
     : areaStacks;
   const isPlacementTarget =
     (placementTargetZones?.has(zoneId) ?? false) &&
@@ -215,7 +215,7 @@ export function BattleZone({
     zoneId === "item" && playerId === "self" && laevateinnActive;
 
   function isDisabledSetDropHalf(event: DragEvent<HTMLElement>) {
-    if (zoneId !== "set") return false;
+    if (zoneId !== "set" || !laevateinnActive) return false;
     const zone = event.currentTarget.closest(".bf-zone-set") as HTMLElement | null;
     const activeArea = zone?.querySelector(".bf-set-area-scroll") as HTMLElement | null;
     if (!activeArea) return false;
@@ -233,10 +233,10 @@ export function BattleZone({
     previousSetStackIdsRef.current = currentIds;
     setSelectedSetColumn((column) =>
       addedStack
-        ? Math.floor(addedStack.areaSlot / SET_AREA_CARDS_PER_COLUMN)
+        ? Math.floor(addedStack.areaSlot / setCardsPerColumn)
         : Math.min(column, setColumnCount - 1)
     );
-  }, [zoneId, areaStacks, setColumnCount]);
+  }, [zoneId, areaStacks, setCardsPerColumn, setColumnCount]);
 
   useEffect(() => {
     const resetTimerId =
@@ -494,7 +494,7 @@ export function BattleZone({
               preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
             const isWideSetCard =
               (areaIsNativeHorizontal && !isHyakuganComposite) || isHyakuganComposite;
-            const setSlotIndex = areaStack.areaSlot % SET_AREA_CARDS_PER_COLUMN;
+            const setSlotIndex = areaStack.areaSlot % setCardsPerColumn;
             const visibleSoulCards =
               areaTopCard.soul.length > 5
                 ? areaTopCard.soul.slice(0, 1)
@@ -514,7 +514,9 @@ export function BattleZone({
                     ? getItemSlotStyle(areaStack.areaSlot, areaStacks.length, isLaevateinnItemZone)
                     : zoneId === "set"
                       ? ({
-                          right: `calc(75% - ${(0.5) - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
+                          right: laevateinnActive
+                            ? `calc(75% - ${0.5 - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`
+                            : `calc(50% - ${1.5 - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
                           "--bf-set-soul-layers": attachedCards.length
                         } as CSSProperties)
                       : undefined
@@ -821,52 +823,6 @@ export function BattleZone({
             <div className="bf-empty-zone">空</div>
           )}
           {showCount && <span className="bf-count-badge">{cards.length}枚</span>}
-          {revealedDeckCards.length > 0 && (
-            <div className="bf-revealed-deck-cards">
-              {revealedDeckCards.map((revealedCard) => {
-                const revealedCardRecord = cardMap.get(revealedCard.cardId);
-                if (!revealedCardRecord) return null;
-
-                return (
-                  <button
-                    type="button"
-                    className="bf-revealed-deck-card"
-                    key={revealedCard.instanceId}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelectCard(revealedCard, {
-                        shiftKey: event.shiftKey,
-                        playerId
-                      });
-                    }}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation();
-                      onDoubleClickCard(revealedCard, { playerId });
-                    }}
-                    onContextMenu={(event) =>
-                      onContextMenuCard(revealedCard, event, playerId)
-                    }
-                    onDragOver={(event) => {
-                      if (!canDrop) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      event.dataTransfer.dropEffect = "move";
-                    }}
-                    onDrop={handleCardDrop}
-                  >
-                    <BoardCard
-                      card={revealedCardRecord}
-                      images={imagesByCard.get(revealedCardRecord.id) ?? []}
-                      selectedImageId={revealedCard.selectedImageId}
-                      isPublic
-                      variant="board"
-                      sleeveImageUrl={sleeveImageUrl}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
     </div>

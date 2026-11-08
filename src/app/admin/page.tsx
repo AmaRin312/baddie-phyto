@@ -20,6 +20,13 @@ import {
   saveSiteDefaultSleeveSupply
 } from "@/lib/supplies/supplyActions";
 import type { BattleSupplyRecord } from "@/types/baddiePhyto";
+import {
+  announceSiteUpdate,
+  endSiteUpdateAnnouncement,
+  loadSiteUpdateAnnouncement,
+  SITE_UPDATE_NOTICE_DURATION_MS,
+  type SiteUpdateAnnouncement
+} from "@/lib/siteUpdates";
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -32,6 +39,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [updateAnnouncement, setUpdateAnnouncement] = useState<SiteUpdateAnnouncement | null>(null);
+  const [savingUpdateAnnouncement, setSavingUpdateAnnouncement] = useState(false);
 
   useEffect(() => {
     async function loadPage() {
@@ -68,6 +77,41 @@ export default function AdminPage() {
     void loadPage();
   }, []);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    async function refreshAnnouncement() {
+      try {
+        const { data, error } = await loadSiteUpdateAnnouncement();
+        if (!active) return;
+        if (error) {
+          setMessage("更新通知の設定を読み込めませんでした。SQLの適用状況を確認してください。");
+          return;
+        }
+        setUpdateAnnouncement(data);
+      } catch {
+        // Keep the last known announcement until the connection recovers.
+      }
+    }
+    void refreshAnnouncement();
+    const timer = window.setInterval(() => void refreshAnnouncement(), 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [isAdmin]);
+
+  async function handleAnnouncement(end: boolean) {
+    setSavingUpdateAnnouncement(true);
+    const { data, error } = end
+      ? await endSiteUpdateAnnouncement()
+      : await announceSiteUpdate();
+    setSavingUpdateAnnouncement(false);
+    if (error || !data) {
+      setMessage("更新通知の設定を保存できませんでした。SQLの適用状況を確認してください。");
+      return;
+    }
+    setUpdateAnnouncement(data);
+    setMessage(end ? "更新案内を終了しました。" : "更新案内を3時間表示します。");
+  }
+
   async function handleSave() {
     setSaving(true);
     setMessage("");
@@ -103,6 +147,11 @@ export default function AdminPage() {
   const selectedEraCardSets = cardSets.filter(
     (cardSet) => (cardSet.era_key ?? "first") === selectedProductEra
   );
+  const announcementActive = Boolean(
+    updateAnnouncement?.announcement_id &&
+    updateAnnouncement.announced_at &&
+    Date.parse(updateAnnouncement.announced_at) + SITE_UPDATE_NOTICE_DURATION_MS > Date.now()
+  );
 
   return (
     <AppShell>
@@ -113,6 +162,28 @@ export default function AdminPage() {
       ) : (
         <>
           {message && <p className="dm-form-message">{message}</p>}
+          <AppCard
+            title="サイト更新の通知"
+            description="デプロイや商品表示の変更をまとめ、任意のタイミングで更新案内を配信できます。配信から3時間で自動終了します。"
+          >
+            <p className="dm-muted-text">
+              {announcementActive ? "更新案内を配信中です。" : "現在、更新案内は配信していません。"}
+            </p>
+            <div className="dm-admin-update-actions">
+              <button type="button" className="dm-button primary"
+                disabled={savingUpdateAnnouncement}
+                onClick={() => void handleAnnouncement(false)}>
+                更新案内を出す
+              </button>
+              {announcementActive && (
+                <button type="button" className="dm-button"
+                  disabled={savingUpdateAnnouncement}
+                  onClick={() => void handleAnnouncement(true)}>
+                  通知を終了する
+                </button>
+              )}
+            </div>
+          </AppCard>
           <AppCard
             title="サイト共通設定"
             description="デッキに個別設定がない場合に使用するスリーブを設定します。"

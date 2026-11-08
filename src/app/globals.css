@@ -4223,43 +4223,6 @@ select {
   font-weight: 900;
 }
 
-.bf-revealed-deck-cards {
-  position: absolute;
-  right: -8px;
-  bottom: -8px;
-  display: flex;
-  gap: 4px;
-  max-width: 160px;
-  overflow: auto;
-}
-
-.bf-revealed-deck-card {
-  position: relative;
-  width: 42px;
-  height: 60px;
-  flex: 0 0 auto;
-  border: 2px solid #facc15;
-  border-radius: 7px;
-  padding: 0;
-  background: white;
-  box-shadow: 0 0 10px rgba(250, 204, 21, 0.52);
-  cursor: pointer;
-}
-
-.bf-revealed-deck-card::after {
-  content: "👁";
-  position: absolute;
-  right: -8px;
-  top: -8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: #facc15;
-  font-size: 11px;
-}
-
 .bf-battle-danger-actions {
   margin-top: auto;
   display: grid;
@@ -8373,3 +8336,21 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area .bf-area-stack-card {
   top: calc(-1 * var(--bf-set-soul-layers, 0) * var(--bf-battle-card-h) * 0.085);
 }
+.dm-site-update-notice {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 3000;
+  width: min(390px, calc(100vw - 40px));
+  padding: 18px;
+  border: 1px solid #93c5fd;
+  border-radius: 16px;
+  color: #172554;
+  background: white;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.24);
+}
+.dm-site-update-notice p { margin: 8px 0 14px; }
+.dm-site-update-notice > div,
+.dm-admin-update-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dm-site-update-notice button { padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 9px; background: white; cursor: pointer; }
+.dm-site-update-notice button:first-child { color: white; background: #2563eb; }

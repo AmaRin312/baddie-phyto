@@ -332,6 +332,7 @@ function BattlePlayerComponent({
             selectedInstanceIds={selectedInstanceIds}
             stack
             showCount
+            laevateinnActive={laevateinnActive}
             onSelectCard={onSelectCard}
             onDoubleClickCard={onDoubleClickCard}
             onContextMenuCard={onContextMenuCard}

@@ -115,10 +115,21 @@ export async function loadDecks() {
           .order("updated_at", { ascending: false })
           .returns<DeckRecord[]>();
       }
-      if (!result.error) {
-        setTimedCache(decksCache, "all", result);
+      if (result.error) return result;
+
+      const unavailableResult = await loadDeckIdsWithUnavailableCards();
+      if (unavailableResult.error) {
+        return { data: null, error: unavailableResult.error };
       }
-      return result;
+      const unavailableIds = new Set(
+        (unavailableResult.data ?? []).map((item) => item.deck_id)
+      );
+      const visibleResult = {
+        data: (result.data ?? []).filter((deck) => !unavailableIds.has(deck.id)),
+        error: null
+      };
+      setTimedCache(decksCache, "all", visibleResult);
+      return visibleResult;
     } finally {
       decksInFlight.delete("all");
     }
@@ -126,6 +137,14 @@ export async function loadDecks() {
 
   decksInFlight.set("all", request);
   return request;
+}
+
+export async function loadDeckIdsWithUnavailableCards() {
+  const result = await supabase.rpc("list_decks_with_unavailable_cards");
+  return {
+    data: result.data as { deck_id: string }[] | null,
+    error: result.error
+  };
 }
 
 export async function loadDeck(deckId: string) {

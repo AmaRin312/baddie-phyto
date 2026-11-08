@@ -9,8 +9,8 @@ export function setBattleCardDragImage(
   const dragImage = cardImage.cloneNode(true) as HTMLElement;
   Object.assign(dragImage.style, {
     position: "fixed",
-    left: "-10000px",
-    top: "0",
+    left: `${bounds.left}px`,
+    top: `${bounds.top}px`,
     width: `${bounds.width}px`,
     height: `${bounds.height}px`,
     borderRadius: computedStyle.borderRadius,
