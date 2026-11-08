@@ -163,11 +163,13 @@ async function uploadImagesForCard(input: {
       continue;
     }
 
+    const contentType = getImageContentType(image.extension);
+    const uploadBlob = new Blob([image.blob], { type: contentType });
     const { error } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(path, image.blob, {
+      .upload(path, uploadBlob, {
         upsert: false,
-        contentType: getImageContentType(image.extension)
+        contentType
       });
 
     if (error) {
