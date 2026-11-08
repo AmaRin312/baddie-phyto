@@ -468,6 +468,9 @@ export default function CardCsvImportPage() {
             </div>
           )}
 
+          <p className="dm-muted-text">
+            既存カードは新しいカードテキストに更新します。Ability欄の値が異なっても、現在のAbilityを維持します。
+          </p>
           <div className="dm-import-preview-table">
             <div className="dm-import-preview-row dm-import-preview-head">
               <span>行</span>

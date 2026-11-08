@@ -341,20 +341,6 @@ function groupRows(
       );
     }
 
-    const abilityBehaviorKey = firstRow.ability
-      ? abilityLookup.get(firstRow.ability.toLowerCase())?.behavior_key ?? null
-      : null;
-    if (firstRow.ability && !abilityBehaviorKey) {
-      groupIssues.push(
-        issue(
-          "error",
-          "ability",
-          `Abilityが見つかりません: ${firstRow.ability}`,
-          firstRow.rowNumber
-        )
-      );
-    }
-
     const matchedCards = existingCards.filter(
       (card) => normalizeImportText(card.name) === name
     );
@@ -379,6 +365,15 @@ function groupRows(
           }`,
           firstRow.rowNumber
         )
+      );
+    }
+
+    const abilityBehaviorKey = firstRow.ability && !matchedCard
+      ? abilityLookup.get(firstRow.ability.toLowerCase())?.behavior_key ?? null
+      : null;
+    if (firstRow.ability && !matchedCard && !abilityBehaviorKey) {
+      groupIssues.push(
+        issue("error", "ability", `Abilityが見つかりません: ${firstRow.ability}`, firstRow.rowNumber)
       );
     }
 

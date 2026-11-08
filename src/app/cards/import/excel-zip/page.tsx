@@ -393,6 +393,9 @@ export default function ExcelZipCardImportPage() {
         {preview && (
           <AppCard title="事前確認">
             <div className="dm-stack">
+              <p className="dm-muted-text">
+                既存カードは新しいカードテキストに更新し、現在のAbilityを維持します。
+              </p>
               <div className="dm-grid dm-grid-4">
                 <div>
                   <b>Excel行数</b>
@@ -500,7 +503,11 @@ export default function ExcelZipCardImportPage() {
                             ? group.skippedExistingImageFiles.join(", ")
                             : "-"}
                         </td>
-                        <td>{group.abilityBehaviorKey ?? group.rows[0]?.ability ?? "-"}</td>
+                        <td>
+                          {group.status === "existing_card_add_images"
+                            ? "既存のAbilityを維持"
+                            : group.abilityBehaviorKey ?? group.rows[0]?.ability ?? "-"}
+                        </td>
                         <td>
                           {group.issues.length > 0
                             ? group.issues.map(formatIssue).join(" / ")

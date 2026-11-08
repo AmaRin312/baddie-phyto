@@ -307,7 +307,7 @@ export async function executeExcelZipCardImport(
 
     try {
       let card: CardRecord | null = await resolveCardAtExecutionTime({ group, firstRow });
-      const ability = resolveAbilityAtExecutionTime({ abilities, row: firstRow });
+      const ability = card ? null : resolveAbilityAtExecutionTime({ abilities, row: firstRow });
       const cardId = card?.id ?? crypto.randomUUID();
       cardIdForCleanup = cardId;
       const existingImageCount = card ? await countExistingImages(cardId) : 0;
@@ -348,6 +348,14 @@ export async function executeExcelZipCardImport(
       if (card.card_type === "flag_card" && card.is_active) {
         const flagResult = await ensureFlagForFlagCard(card);
         if (flagResult.error) throw new Error(`フラッグ設定の登録に失敗しました: ${flagResult.error.message}`);
+      }
+
+      if (!createdNewCard && card.card_text !== firstRow.card_text) {
+        const { error: updateError } = await supabase
+          .from("cards")
+          .update({ card_text: firstRow.card_text })
+          .eq("id", card.id);
+        if (updateError) throw new Error(`カードテキストの更新に失敗しました: ${updateError.message}`);
       }
 
       result.groupResults.push({

@@ -286,8 +286,6 @@ export function createExcelZipCardIdentity(row: NormalizedExcelZipCardRow) {
     power: row.power,
     defense: row.defense,
     critical: row.critical,
-    card_text: row.card_text,
-    ability: row.ability,
     card_type: row.card_type,
     is_dragon: row.is_dragon,
     is_hyakki: row.is_hyakki,
@@ -317,10 +315,6 @@ function normalizeRacesForCompare(value: unknown) {
   return Array.isArray(value) ? value.map(String) : [];
 }
 
-function normalizeNullableTextForCompare(value: unknown) {
-  return value == null ? null : normalizeImportCardText(value) || null;
-}
-
 const COMPARABLE_FIELDS: ComparableField[] = [
   {
     label: "world1",
@@ -339,13 +333,6 @@ const COMPARABLE_FIELDS: ComparableField[] = [
   { label: "power", getRowValue: (row) => row.power },
   { label: "defense", getRowValue: (row) => row.defense },
   { label: "critical", getRowValue: (row) => row.critical },
-  {
-    label: "card_text",
-    getRowValue: (row) => row.card_text,
-    getCardValue: (card) => card.card_text,
-    normalize: normalizeNullableTextForCompare
-  },
-  { label: "ability", getRowValue: (row) => row.ability },
   { label: "card_type", getRowValue: (row) => row.card_type },
   { label: "is_dragon", getRowValue: (row) => row.is_dragon },
   { label: "is_hyakki", getRowValue: (row) => row.is_hyakki },
@@ -417,7 +404,6 @@ export function isSameExcelZipCardRecord(
     card.power === row.power &&
     card.defense === row.defense &&
     card.critical === row.critical &&
-    (card.card_text ?? null) === row.card_text &&
     card.is_dragon === row.is_dragon &&
     card.is_hyakki === row.is_hyakki &&
     card.is_corner_king === row.is_corner_king &&

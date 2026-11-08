@@ -6,7 +6,6 @@ import {
 } from "@/lib/cards/import/cardCsvConstants";
 import {
   createCardIdentityKey,
-  normalizeCardTextValue,
   normalizeListForComparison,
   normalizeTextValue
 } from "@/lib/cards/import/cardCsvNormalization";
@@ -27,10 +26,6 @@ function arraysEqual(left: string[], right: string[]) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
-function nullableText(value: string | null) {
-  return value == null ? null : normalizeCardTextValue(value) || null;
-}
-
 export function isSameCard(card: CardRecord, row: NormalizedCardCsvRow) {
   return (
     normalizeTextValue(card.name) === row.name &&
@@ -41,7 +36,6 @@ export function isSameCard(card: CardRecord, row: NormalizedCardCsvRow) {
     card.power === row.power &&
     card.defense === row.defense &&
     card.critical === row.critical &&
-    nullableText(card.card_text) === row.card_text &&
     card.orientation === row.orientation &&
     card.is_dragon === row.is_dragon &&
     card.is_hyakki === row.is_hyakki &&
@@ -187,14 +181,6 @@ export async function previewCardCsvImport(input: {
     const rowErrors: CardCsvError[] = [...row.errors];
     const isExcluded = excludedRowNumberSet.has(row.rawRow.rowNumber);
 
-    if (row.normalized?.ability && !activeAbilityKeys.has(row.normalized.ability)) {
-      rowErrors.push({
-        rowNumber: row.normalized.rowNumber,
-        column: "ability",
-        message: `behavior_key "${row.normalized.ability}" が見つかりません`
-      });
-    }
-
     if (isExcluded) {
       return {
         rowNumber: row.rawRow.rowNumber,
@@ -218,6 +204,19 @@ export async function previewCardCsvImport(input: {
 
     const normalized = row.normalized;
     const matchedCard = existingCards.find((card) => isSameCard(card, normalized));
+    if (!matchedCard && normalized.ability && !activeAbilityKeys.has(normalized.ability)) {
+      return {
+        rowNumber: row.rawRow.rowNumber,
+        normalized,
+        status: "error" as const,
+        errors: [{
+          rowNumber: row.rawRow.rowNumber,
+          column: "ability" as const,
+          message: `behavior_key "${normalized.ability}" が見つかりません`
+        }],
+        matchedCard: null
+      };
+    }
     if (!matchedCard) {
       return {
         rowNumber: row.rawRow.rowNumber,
@@ -253,42 +252,8 @@ export async function previewCardCsvImport(input: {
           ]
         }))
       : rowMetadata;
-  const abilityConflictMap = new Map<string, Map<string, number[]>>();
-  versionCheckedRows.forEach((row) => {
-    if (!row.normalized || row.errors.length > 0 || row.excluded) return;
-    const key = createCardIdentityKey(row.normalized, { includeAbility: false });
-    const abilityKey = row.normalized.ability ?? "";
-    const abilityRows = abilityConflictMap.get(key) ?? new Map<string, number[]>();
-    abilityRows.set(abilityKey, [...(abilityRows.get(abilityKey) ?? []), row.rowNumber]);
-    abilityConflictMap.set(key, abilityRows);
-  });
-  const abilityConflictRows = new Map<number, number[]>();
-  abilityConflictMap.forEach((abilityRows) => {
-    if (abilityRows.size <= 1) return;
-    const rowNumbers = Array.from(abilityRows.values()).flat().sort((left, right) => left - right);
-    rowNumbers.forEach((rowNumber) => abilityConflictRows.set(rowNumber, rowNumbers));
-  });
-
-  const conflictCheckedRows = rowMetadata.map((row) => {
-    const conflictRows = abilityConflictRows.get(row.rowNumber);
-    if (!conflictRows || !row.normalized || row.excluded) return row;
-
-    return {
-      ...row,
-      status: "error" as const,
-      errors: [
-        ...row.errors,
-        {
-          rowNumber: row.rowNumber,
-          column: "ability" as const,
-          message: `${conflictRows.join("行目 / ")}行目は同一カード内容でAbilityだけが異なります。`
-        }
-      ]
-    };
-  });
-
   const duplicateMap = new Map<string, number[]>();
-  conflictCheckedRows.forEach((row) => {
+  versionCheckedRows.forEach((row) => {
     if (!row.normalized || row.errors.length > 0 || row.excluded) return;
     const key = createCardIdentityKey(row.normalized, { includeAbility: true });
     duplicateMap.set(key, [...(duplicateMap.get(key) ?? []), row.rowNumber]);
@@ -301,7 +266,7 @@ export async function previewCardCsvImport(input: {
       group.rowNumbers.slice(1).map((rowNumber) => [rowNumber, group] as const)
     )
   );
-  const rows = conflictCheckedRows.map((row) => {
+  const rows = versionCheckedRows.map((row) => {
     const duplicateGroup = duplicateFirstRows.get(row.rowNumber);
     if (!duplicateGroup || row.status === "error" || row.status === "excluded") {
       return row;
