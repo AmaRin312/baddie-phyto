@@ -187,12 +187,15 @@ function DeckCardSearchPanelComponent({
         />
       </label>
 
-      <Button type="button" variant="secondary" onClick={() => setDetailsOpen(true)}>
-        詳細検索を開く
-      </Button>
-
       <div className="dm-deck-search-chips">
-        <b>検索条件</b>
+        <Button
+          type="button"
+          variant="secondary"
+          className="dm-deck-search-open-details"
+          onClick={() => setDetailsOpen(true)}
+        >
+          詳細検索を開く
+        </Button>
         {chips.length === 0 ? (
           <span className="dm-muted-text">指定なし</span>
         ) : (

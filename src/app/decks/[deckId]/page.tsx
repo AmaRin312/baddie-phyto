@@ -212,11 +212,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const preferredFlagWorlds = deckFlagCard?.worlds?.length
       ? deckFlagCard.worlds
       : deckFlag?.usable_worlds ?? [];
+    const requestedWorld = new URLSearchParams(window.location.search).get("world");
     setSearchFilters({
       ...EMPTY_DECK_CARD_SEARCH_FILTERS,
       worlds: resolveDeckSearchWorlds(
         searchOptionsResult.worlds,
-        preferredFlagWorlds
+        nextDeck.flag_id
+          ? preferredFlagWorlds
+          : requestedWorld ? [requestedWorld] : []
       ),
       races: deckFlag?.usable_race_keywords ?? []
     });

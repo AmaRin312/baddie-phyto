@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, MouseEvent } from "react";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
@@ -158,6 +158,8 @@ export function BattleZone({
   const [dropTargetStackId, setDropTargetStackId] = useState<string | null>(null);
   const [isDragOverZone, setIsDragOverZone] = useState(false);
   const [selectedSetColumn, setSelectedSetColumn] = useState(0);
+  const setZoneRef = useRef<HTMLDivElement | null>(null);
+  const [setColumnCenterX, setSetColumnCenterX] = useState<number | null>(null);
   const previousSetStackIdsRef = useRef<Set<string>>(new Set());
   const topCard = (zoneId === "drop" ? cards[cards.length - 1] : cards[0]) ?? null;
   const cardRecord = topCard ? cardMap.get(topCard.cardId) : null;
@@ -172,6 +174,7 @@ export function BattleZone({
   const visibleAreaStacks = zoneId === "set"
     ? areaStacks.filter((areaStack) => Math.floor(areaStack.areaSlot / setCardsPerColumn) === selectedSetColumn)
     : areaStacks;
+  const visibleSetStackIds = visibleAreaStacks.map((areaStack) => areaStack.stackId).join(",");
   const isPlacementTarget =
     (placementTargetZones?.has(zoneId) ?? false) &&
     (placementTargetPlayerId == null || placementTargetPlayerId === playerId);
@@ -237,6 +240,51 @@ export function BattleZone({
         : Math.min(column, setColumnCount - 1)
     );
   }, [zoneId, areaStacks, setCardsPerColumn, setColumnCount]);
+
+  useLayoutEffect(() => {
+    if (zoneId !== "set" || setColumnCount < 2) return;
+    const setZone = setZoneRef.current;
+    const board = setZone?.closest(".bf-player-board");
+    const flagZone = board?.querySelector(".bf-zone-flag");
+    if (!setZone || !board || !flagZone) return;
+
+    const measure = () => {
+      const setBounds = setZone.getBoundingClientRect();
+      const flagCard = flagZone.querySelector(".bf-card-button") ?? flagZone;
+      const flagBounds = flagCard.getBoundingClientRect();
+      const setCards = Array.from(
+        setZone.querySelectorAll(".bf-area-stack-zone.is-set-area > .bf-area-stack-card")
+      );
+      const cardCenters = setCards.map((card) => {
+        const bounds = card.getBoundingClientRect();
+        return bounds.left + bounds.width / 2;
+      });
+      if (cardCenters.length === 0) return;
+      const rightmostCardCenter = Math.max(...cardCenters);
+      const flagCenter = flagBounds.left + flagBounds.width / 2;
+      const midpoint = (rightmostCardCenter + flagCenter) / 2;
+      const x = board.classList.contains("is-mirrored")
+        ? setBounds.right - midpoint
+        : midpoint - setBounds.left;
+      setSetColumnCenterX(x);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(setZone);
+    observer.observe(board);
+    observer.observe(flagZone);
+    setZone.querySelectorAll(".bf-area-stack-zone.is-set-area > .bf-area-stack-card")
+      .forEach((card) => observer.observe(card));
+    const flagObserver = new MutationObserver(measure);
+    flagObserver.observe(flagZone, { childList: true, subtree: true });
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      flagObserver.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [zoneId, setColumnCount, selectedSetColumn, visibleSetStackIds]);
 
   useEffect(() => {
     const resetTimerId =
@@ -356,6 +404,7 @@ export function BattleZone({
 
   return (
     <div
+      ref={setZoneRef}
       className={`bf-zone bf-zone-${zoneId}${isLaevateinnItemZone ? " is-laevateinn-active" : ""}${isDraggingCard ? " is-dragging-over-board" : ""}${showOwnDragZoneLabel ? " is-own-drag-label" : ""}${canDrop && isDragOverZone && zoneId !== "gauge" ? " is-drop-target" : ""}${heldStackId ? " is-second-slot-armed" : ""}${isPlacementTarget ? " is-placement-target" : ""}`}
       onClickCapture={(event) => {
         if (!isPlacementTarget || event.button !== 0) return;
@@ -651,7 +700,13 @@ export function BattleZone({
           </div>
         </div>
         {zoneId === "set" && setColumnCount >= 2 && (
-          <div className="bf-set-column-controls" aria-label="設置エリアの列切り替え">
+          <div
+            className="bf-set-column-controls"
+            aria-label="設置エリアの列切り替え"
+            style={setColumnCenterX == null ? undefined : {
+              "--bf-set-column-center-x": `${setColumnCenterX}px`
+            } as CSSProperties}
+          >
             {Array.from({ length: setColumnCount }, (_, column) => (
               <button
                 type="button"

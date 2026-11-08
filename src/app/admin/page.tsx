@@ -244,6 +244,7 @@ export default function AdminPage() {
                     <span>
                       <strong>{cardSet.name ?? cardSet.set_code}</strong>
                       <small>{cardSet.set_code}</small>
+                      <small>シリーズ: {DECK_CARD_ERA_OPTIONS.find((era) => era.value === (cardSet.era_key ?? "first"))?.label ?? cardSet.era_key}</small>
                     </span>
                     <span className="dm-admin-product-toggle">
                       <input

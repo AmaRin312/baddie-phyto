@@ -4563,22 +4563,27 @@ select {
 .dm-deck-search-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px 8px;
   align-items: center;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 10px;
+  padding: 9px 10px;
   background: white;
 }
 
 .dm-deck-search-chips button {
   border: 1px solid #bfdbfe;
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 4.5px 10px;
   background: #eff6ff;
   color: #1e3a8a;
   cursor: pointer;
   font-weight: 800;
+}
+
+.dm-deck-search-chips .dm-deck-search-open-details {
+  width: 100%;
+  text-align: center;
 }
 
 .dm-deck-search-chips button.is-clear {
@@ -7909,7 +7914,7 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-side-controls {
-  margin-top: 58px;
+  margin-top: 28px;
 }
 
 @media (min-width: 1241px) {
@@ -7929,7 +7934,7 @@ body:has(.bf-battle-app) {
 
   .dm-deck-search-side-controls .dm-deck-search-chips {
     margin-top: auto;
-    transform: translateY(-35px);
+    transform: translateY(-65px);
   }
 
 }
@@ -8264,13 +8269,14 @@ body:has(.bf-battle-app) {
   position: absolute;
   z-index: 30;
   top: 50%;
-  right: 6px;
+  left: var(--bf-set-column-center-x, 50%);
+  right: auto;
   display: flex;
   flex-direction: column;
   gap: 3px;
   max-height: 190px;
   overflow-y: auto;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .bf-set-column-button {
@@ -8300,8 +8306,7 @@ body:has(.bf-battle-app) {
 
 .bf-player-board.is-mirrored > .bf-zone-set > .bf-set-column-controls {
   right: auto;
-  left: 26px;
-  transform: translateY(-50%) rotate(180deg);
+  transform: translate(-50%, -50%) rotate(180deg);
 }
 
 /* Scale only set cards, including their attached soul previews. */

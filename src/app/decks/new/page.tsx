@@ -8,6 +8,7 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { createDraftDeck } from "@/lib/decks/deckActions";
+import { loadDeckCardSearchOptions } from "@/lib/decks/deckCardSearch";
 import { loadBattleSupplies } from "@/lib/supplies/supplyActions";
 import type { BattleSupplyRecord } from "@/types/baddiePhyto";
 
@@ -17,13 +18,16 @@ export default function NewDeckPage() {
   const [message, setMessage] = useState("");
   const [sleeveSupplies, setSleeveSupplies] = useState<BattleSupplyRecord[]>([]);
   const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
-  const [loadingSupplies, setLoadingSupplies] = useState(true);
+  const [worlds, setWorlds] = useState<string[]>([]);
+  const [selectedWorld, setSelectedWorld] = useState("");
+  const [loadingOptions, setLoadingOptions] = useState(true);
 
   useEffect(() => {
     async function loadPage() {
-      const [profile, supplyResult] = await Promise.all([
+      const [profile, supplyResult, searchOptions] = await Promise.all([
         getOrCreateProfile(),
-        loadBattleSupplies("sleeve")
+        loadBattleSupplies("sleeve"),
+        loadDeckCardSearchOptions()
       ]);
 
       if (!profile) {
@@ -37,12 +41,21 @@ export default function NewDeckPage() {
       } else {
         setSleeveSupplies(supplyResult.data ?? []);
       }
-      setLoadingSupplies(false);
+      if (searchOptions.error) {
+        setMessage("ワールド一覧を読み込めませんでした。画面を更新して再度お試しください。");
+      } else {
+        setWorlds(searchOptions.worlds);
+      }
+      setLoadingOptions(false);
     }
     void loadPage();
   }, [router]);
 
   async function handleStartDeckCreation() {
+    if (!selectedWorld) {
+      setMessage("ワールドを選択してください。");
+      return;
+    }
     setCreating(true);
     setMessage("");
 
@@ -58,7 +71,7 @@ export default function NewDeckPage() {
       return;
     }
 
-    router.replace(`/decks/${data.id}`);
+    router.replace(`/decks/${data.id}?world=${encodeURIComponent(selectedWorld)}`);
   }
 
   return (
@@ -69,14 +82,27 @@ export default function NewDeckPage() {
 
       <AppCard
         title="デッキ作成を開始"
-        description="デッキ名・フラッグ・バディが未定でも、先に編集画面へ進めます。設定は編集画面で保存してください。"
+        description="ワールドを選択して編集画面へ進みます。デッキ名・フラッグ・バディは編集画面で設定できます。"
       >
+        <label className="dm-new-deck-supply-field">
+          ワールド
+          <select
+            value={selectedWorld}
+            onChange={(event) => setSelectedWorld(event.target.value)}
+            disabled={creating || loadingOptions}
+          >
+            <option value="">ワールドを選択</option>
+            {worlds.map((world) => (
+              <option key={world} value={world}>{world}</option>
+            ))}
+          </select>
+        </label>
         <label className="dm-new-deck-supply-field">
           スリーブ
           <select
             value={selectedSleeveSupplyId}
             onChange={(event) => setSelectedSleeveSupplyId(event.target.value)}
-            disabled={creating || loadingSupplies}
+            disabled={creating || loadingOptions}
           >
             <option value="">サイト共通のデフォルトを使う</option>
             {sleeveSupplies.map((supply) => (
@@ -90,6 +116,7 @@ export default function NewDeckPage() {
           type="button"
           variant="primary"
           loading={creating}
+          disabled={loadingOptions || !selectedWorld}
           onClick={handleStartDeckCreation}
           fullWidth
         >
