@@ -15,6 +15,12 @@ import type { AbilityRecord, CardImageRecord, CardRecord } from "@/types/baddieP
 
 const BUCKET_NAME = "card-images";
 
+function getImageContentType(extension: ExcelZipImageEntry["extension"]) {
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  return "image/jpeg";
+}
+
 function getFirstRow(group: ExcelZipCardGroup) {
   const firstRow = group.rows[0];
   if (!firstRow) throw new Error(`カード行がありません: ${group.name}`);
@@ -159,7 +165,10 @@ async function uploadImagesForCard(input: {
 
     const { error } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(path, image.blob, { upsert: false, contentType: image.blob.type || undefined });
+      .upload(path, image.blob, {
+        upsert: false,
+        contentType: getImageContentType(image.extension)
+      });
 
     if (error) {
       if (uploadedPaths.length > 0) {
