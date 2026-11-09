@@ -16,6 +16,7 @@ import {
 } from "@/lib/cards/excelZipImport/excelZipImportNormalization";
 import {
   EXCEL_ZIP_IMPORT_COLUMNS,
+  EXCEL_ZIP_REQUIRED_COLUMNS,
   EXCEL_ZIP_IMPORT_LIMITS,
   type ExcelZipCardGroup,
   type ExcelZipImageEntry,
@@ -138,7 +139,7 @@ function buildRawRows(rows: unknown[][], issues: ExcelZipImportIssue[]) {
     columnIndex.set(header, index);
   });
 
-  EXCEL_ZIP_IMPORT_COLUMNS.forEach((column) => {
+  EXCEL_ZIP_REQUIRED_COLUMNS.forEach((column) => {
     if (!columnIndex.has(column)) {
       issues.push(issue("error", "header", `必須列がありません: ${column}`, 2));
     }
@@ -447,6 +448,27 @@ export async function previewExcelZipCardImport(file: File): Promise<{
       .map((row) => row.row)
       .filter((row): row is NormalizedExcelZipCardRow => row != null);
     normalizedRows.forEach((row) => issues.push(...row.issues));
+
+    const products = new Map<string, { name: string | null; era: NormalizedExcelZipCardRow["era_key"] }>();
+    rows.forEach((row) => {
+      if (!row.set_code) return;
+      const previous = products.get(row.set_code);
+      if (previous &&
+        ((previous.name && row.set_name && previous.name !== row.set_name) ||
+          (previous.era && row.era_key && previous.era !== row.era_key))) {
+        issues.push(issue(
+          "error",
+          "set_code",
+          `同じ商品の名前または年代キーが一致しません: ${row.set_code}`,
+          row.rowNumber
+        ));
+      } else {
+        products.set(row.set_code, {
+          name: previous?.name ?? row.set_name,
+          era: previous?.era ?? row.era_key
+        });
+      }
+    });
 
     const imagesByName = new Map(images.map((image) => [image.fileName, image]));
     const referencedImages = new Set(rows.map((row) => row.image_file));

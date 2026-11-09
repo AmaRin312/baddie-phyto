@@ -1,4 +1,4 @@
-import type { CardOrientation, CardRecord, CardType } from "@/types/baddiePhyto";
+import type { CardOrientation, CardRecord, CardType, DeckEraKey } from "@/types/baddiePhyto";
 import type {
   ExcelZipImportColumn,
   ExcelZipImportIssue,
@@ -22,6 +22,7 @@ type BooleanColumn =
 
 const TRUE_VALUES = new Set(["true", "t", "1", "yes", "y"]);
 const FALSE_VALUES = new Set(["false", "f", "0", "no", "n"]);
+const ERA_KEYS = new Set<DeckEraKey>(["first", "hundred", "ddd", "x", "god"]);
 
 const COLUMN_TRUE_ALIASES: Record<BooleanColumn, Set<string>> = {
   is_dragon: new Set(["dragon", "ドラゴン"]),
@@ -240,6 +241,18 @@ export function normalizeExcelZipRow(row: RawRow): {
   const defense = parseIntegerValue(row.rowNumber, "defense", value("defense"), issues);
   const critical = parseIntegerValue(row.rowNumber, "critical", value("critical"), issues);
   const ability = normalizeImportText(value("ability")) || null;
+  const setCode = normalizeImportText(value("set_code")) || null;
+  const setName = normalizeImportText(value("set_name")) || null;
+  const eraInput = normalizeImportText(value("era_key")).toLowerCase();
+  const eraKey = eraInput && ERA_KEYS.has(eraInput as DeckEraKey)
+    ? eraInput as DeckEraKey
+    : null;
+  if (eraInput && !eraKey) {
+    pushIssue(issues, row.rowNumber, "era_key", `年代キーを認識できません: ${eraInput}`);
+  }
+  if (!setCode && (setName || eraKey)) {
+    pushIssue(issues, row.rowNumber, "set_code", "商品情報を指定する場合はset_codeも入力してください。");
+  }
 
   const booleans = {
     is_dragon: parseBooleanValue(row.rowNumber, "is_dragon", value("is_dragon"), issues),
@@ -271,6 +284,9 @@ export function normalizeExcelZipRow(row: RawRow): {
       ability,
       image_file: imageFile,
       card_type: cardType,
+      set_code: setCode,
+      set_name: setName,
+      era_key: eraKey,
       ...booleans
     },
     issues

@@ -235,6 +235,60 @@ async function countExistingImages(cardId: string) {
   return (data ?? []).length;
 }
 
+async function ensureProductPrinting(cardId: string, row: NormalizedExcelZipCardRow) {
+  if (!row.set_code) return;
+
+  const { data: existingSet, error: lookupError } = await supabase
+    .from("card_sets")
+    .select("id,name,era_key")
+    .eq("set_code", row.set_code)
+    .maybeSingle<{ id: string; name: string | null; era_key: string }>();
+  if (lookupError) throw new Error(`商品 ${row.set_code} の確認に失敗しました: ${lookupError.message}`);
+
+  let setId = existingSet?.id;
+  let savedEra = existingSet?.era_key;
+  if (!setId) {
+    const { data, error } = await supabase
+      .from("card_sets")
+      .insert({
+        set_code: row.set_code,
+        name: row.set_name ?? row.set_code,
+        era_key: row.era_key ?? "first"
+      })
+      .select("id,era_key")
+      .single<{ id: string; era_key: string }>();
+    if (error || !data) throw new Error(`商品 ${row.set_code} の登録に失敗しました: ${error?.message ?? "結果がありません"}`);
+    setId = data.id;
+    savedEra = data.era_key;
+  }
+
+  const updates: { name?: string; era_key?: string } = {};
+  if (existingSet && row.set_name && existingSet.name !== row.set_name) updates.name = row.set_name;
+  // The database infers an era from set_code on insert; an explicit Excel value takes priority.
+  if (row.era_key && savedEra !== row.era_key) updates.era_key = row.era_key;
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase.from("card_sets").update(updates).eq("id", setId);
+    if (error) throw new Error(`商品 ${row.set_code} の年代・名前の更新に失敗しました: ${error.message}`);
+  }
+
+  const { data: printing, error: printingError } = await supabase
+    .from("card_printings")
+    .select("id")
+    .eq("card_id", cardId)
+    .eq("set_id", setId)
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (printingError) throw new Error(`商品 ${row.set_code} の収録確認に失敗しました: ${printingError.message}`);
+  if (printing) return;
+  const { error } = await supabase.from("card_printings").insert({
+    card_id: cardId,
+    set_id: setId,
+    card_number: null,
+    rarity: null
+  });
+  if (error) throw new Error(`商品 ${row.set_code} への収録登録に失敗しました: ${error.message}`);
+}
+
 async function resolveCardAtExecutionTime(input: {
   group: ExcelZipCardGroup;
   firstRow: NormalizedExcelZipCardRow;
@@ -356,6 +410,10 @@ export async function executeExcelZipCardImport(
           .update({ card_text: firstRow.card_text })
           .eq("id", card.id);
         if (updateError) throw new Error(`カードテキストの更新に失敗しました: ${updateError.message}`);
+      }
+
+      for (const row of group.rows) {
+        await ensureProductPrinting(card.id, row);
       }
 
       result.groupResults.push({

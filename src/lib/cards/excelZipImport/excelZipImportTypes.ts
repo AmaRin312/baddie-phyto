@@ -1,4 +1,4 @@
-import type { CardOrientation, CardRecord, CardType } from "@/types/baddiePhyto";
+import type { CardOrientation, CardRecord, CardType, DeckEraKey } from "@/types/baddiePhyto";
 
 export const EXCEL_ZIP_IMPORT_COLUMNS = [
   "name",
@@ -26,8 +26,15 @@ export const EXCEL_ZIP_IMPORT_COLUMNS = [
   "critical",
   "card_text",
   "ability",
-  "is_active"
+  "is_active",
+  "set_code",
+  "set_name",
+  "era_key"
 ] as const;
+
+export const EXCEL_ZIP_REQUIRED_COLUMNS = EXCEL_ZIP_IMPORT_COLUMNS.filter(
+  (column) => !["set_code", "set_name", "era_key"].includes(column)
+);
 
 export const EXCEL_ZIP_IMPORT_LIMITS = {
   maxZipSizeBytes: 100 * 1024 * 1024,
@@ -70,6 +77,9 @@ export type NormalizedExcelZipCardRow = {
   is_heaven: boolean;
   is_hell: boolean;
   is_active: boolean;
+  set_code: string | null;
+  set_name: string | null;
+  era_key: DeckEraKey | null;
 };
 
 export type ExcelZipImageEntry = {

@@ -10,6 +10,7 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { executeExcelZipCardImport } from "@/lib/cards/excelZipImport/executeExcelZipImport";
 import { previewExcelZipCardImport } from "@/lib/cards/excelZipImport/parseExcelZipImport";
+import { DECK_CARD_ERA_OPTIONS } from "@/lib/decks/deckCardSearch";
 import {
   EXCEL_ZIP_IMPORT_COLUMNS,
   EXCEL_ZIP_IMPORT_LIMITS
@@ -36,6 +37,17 @@ function formatBytes(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)}KB`;
   return `${bytes}B`;
+}
+
+function productLabel(group: ExcelZipImportPreview["cardGroups"][number]) {
+  const products = group.rows.filter((row) => row.set_code);
+  if (products.length === 0) return "未設定";
+  return [...new Map(products.map((row) => [row.set_code, row])).values()]
+    .map((row) => {
+      const era = DECK_CARD_ERA_OPTIONS.find((option) => option.value === (row.era_key ?? "first"))?.label;
+      return `${row.set_name ?? row.set_code} (${era ?? "無印"})`;
+    })
+    .join(" / ");
 }
 
 function createTemplateWorkbook() {
@@ -70,7 +82,10 @@ function createTemplateWorkbook() {
       "2",
       "カードテキストを入力します。",
       "",
-      "true"
+      "true",
+      "SAMPLE",
+      "サンプル商品",
+      "first"
     ]
   ]);
   const workbook = XLSX.utils.book_new();
@@ -143,6 +158,9 @@ function downloadPreviewCsv(preview: ExcelZipImportPreview) {
       "status",
       "row_numbers",
       "card_name",
+      "set_code",
+      "set_name",
+      "era_key",
       "image_files",
       "image_hashes",
       "skipped_existing_image_files",
@@ -153,6 +171,9 @@ function downloadPreviewCsv(preview: ExcelZipImportPreview) {
       STATUS_LABELS[group.status],
       group.rows.map((row) => row.rowNumber).join(" / "),
       group.name,
+      [...new Set(group.rows.map((row) => row.set_code).filter(Boolean))].join(" / "),
+      [...new Set(group.rows.map((row) => row.set_name).filter(Boolean))].join(" / "),
+      [...new Set(group.rows.map((row) => row.era_key).filter(Boolean))].join(" / "),
       group.imageFiles.join(" / "),
       group.imageFiles
         .map((imageFile) => preview.imageHashesByFileName[imageFile]?.slice(0, 12) ?? "")
@@ -165,6 +186,9 @@ function downloadPreviewCsv(preview: ExcelZipImportPreview) {
       .filter((issue) => issue.rowNumber == null)
       .map((issue) => [
         issue.level,
+        "",
+        "",
+        "",
         "",
         "",
         "",
@@ -284,6 +308,7 @@ export default function ExcelZipCardImportPage() {
         `新規カード: ${preview.cardGroups.filter((group) => group.status === "new_card").length}件`,
         `既存カードへ画像追加: ${preview.cardGroups.filter((group) => group.status === "existing_card_add_images").length}件`,
         `画像: ${preview.cardGroups.reduce((total, group) => total + group.imageFiles.length, 0)}件`,
+        `商品: ${[...new Set(preview.cardGroups.map(productLabel))].join(" / ")}`,
         `同一画像スキップ予定: ${skippedExistingImageCount}件`,
         "",
         "途中失敗時は、今回アップロードしたStorage画像を可能な範囲で削除します。"
@@ -371,6 +396,7 @@ export default function ExcelZipCardImportPage() {
             <li>同じカード名でカード基本情報が違う場合はエラーにします。</li>
             <li>画像は Storage の card-images bucket にアップロードします。</li>
             <li>最初の画像は、既存画像がない場合だけDefault画像にします。</li>
+            <li>set_code・set_name・era_keyを指定すると商品に収録されます。firstは「無印」です。登録直後の商品は管理者が表示に切り替えるまで非表示です。</li>
           </ul>
         </AppCard>
 
@@ -484,6 +510,7 @@ export default function ExcelZipCardImportPage() {
                     <tr>
                       <th>状態</th>
                       <th>カード名</th>
+                      <th>商品・シリーズ</th>
                       <th>行</th>
                       <th>画像</th>
                       <th>スキップ予定</th>
@@ -496,6 +523,7 @@ export default function ExcelZipCardImportPage() {
                       <tr key={group.groupKey}>
                         <td>{STATUS_LABELS[group.status]}</td>
                         <td>{group.name}</td>
+                        <td>{productLabel(group)}</td>
                         <td>{group.rows.map((row) => row.rowNumber).join(", ")}</td>
                         <td>{group.imageFiles.join(", ")}</td>
                         <td>
