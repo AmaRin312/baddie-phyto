@@ -125,7 +125,7 @@ export default function DecksPage() {
       setCurrentUserId(profile.id);
 
       const [deckResult, deckCardResult, flagResult, supplyResult] = await Promise.allSettled([
-        loadDecks(),
+        loadDecks({ fresh: true }),
         loadAllDeckCards(),
         loadFlagsLite(),
         loadBattleSupplies()
@@ -195,6 +195,34 @@ export default function DecksPage() {
 
     void loadPage();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    let checking = false;
+    async function refreshVisibleDecks() {
+      if (checking || document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const result = await loadDecks({ fresh: true });
+        if (result.error) return;
+        const visibleDecks = result.data ?? [];
+        const visibleIds = new Set(visibleDecks.map((deck) => deck.id));
+        setDecks(visibleDecks);
+        setSelectedDeckForAction((current) =>
+          current && !visibleIds.has(current.id) ? null : current
+        );
+      } finally {
+        checking = false;
+      }
+    }
+
+    window.addEventListener("focus", refreshVisibleDecks);
+    document.addEventListener("visibilitychange", refreshVisibleDecks);
+    return () => {
+      window.removeEventListener("focus", refreshVisibleDecks);
+      document.removeEventListener("visibilitychange", refreshVisibleDecks);
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (!selectedDeckForAction) return;

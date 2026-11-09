@@ -91,14 +91,18 @@ function clearDeckCaches() {
   deckCardsCache.clear();
 }
 
+export function invalidateDeckListCache() {
+  decksCache.clear();
+}
+
 function isMissingColumnError(error: { code?: string; message: string }, columnName: string) {
   return error.code === "PGRST204" || error.message.includes(columnName);
 }
 
-export async function loadDecks() {
-  const cached = getTimedCache(decksCache, "all");
+export async function loadDecks(options?: { fresh?: boolean }) {
+  const cached = options?.fresh ? null : getTimedCache(decksCache, "all");
   if (cached) return cached;
-  const inFlight = decksInFlight.get("all");
+  const inFlight = options?.fresh ? null : decksInFlight.get("all");
   if (inFlight) return inFlight;
 
   const request: Promise<CachedDeckListResponse> = (async () => {
@@ -131,11 +135,11 @@ export async function loadDecks() {
       setTimedCache(decksCache, "all", visibleResult);
       return visibleResult;
     } finally {
-      decksInFlight.delete("all");
+      if (!options?.fresh) decksInFlight.delete("all");
     }
   })();
 
-  decksInFlight.set("all", request);
+  if (!options?.fresh) decksInFlight.set("all", request);
   return request;
 }
 
@@ -254,6 +258,7 @@ export async function createDeck(input: {
 
 export async function createDraftDeck(input?: {
   name?: string;
+  flagId?: string | null;
   deckVisibility?: DeckVisibility;
   eraKey?: DeckEraKey | null;
   sleeveSupplyId?: string | null;
@@ -269,7 +274,7 @@ export async function createDraftDeck(input?: {
   const baseInsert = {
     owner_id: userData.user.id,
     name: input?.name?.trim() || "無題のデッキ",
-    flag_id: null,
+    flag_id: input?.flagId ?? null,
     buddy_card_id: null,
     selected_flag_image_id: null,
     sleeve_supply_id: input?.sleeveSupplyId ?? null,

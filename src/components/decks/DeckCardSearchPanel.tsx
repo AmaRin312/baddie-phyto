@@ -6,6 +6,8 @@ import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
   DECK_CARD_ERA_OPTIONS,
   EMPTY_DECK_CARD_SEARCH_FILTERS,
+  deckSearchWorldLabel,
+  sortDeckSearchWorlds,
   type DeckCardAttributeKey,
   type DeckCardEraKey,
   type DeckCardSearchFilters,
@@ -141,7 +143,7 @@ function DeckCardSearchPanelComponent({
     })),
     ...filters.worlds.map((world) => ({
       key: `world:${world}`,
-      label: world,
+      label: deckSearchWorldLabel(world),
       onRemove: () => setArray("worlds", filters.worlds.filter((value) => value !== world))
     })),
     ...filters.cardTypes.map((cardType) => ({
@@ -282,14 +284,14 @@ function DeckCardSearchPanelComponent({
                 onToggle={() => toggleSection("worlds")}
               >
                 <div className="dm-checkbox-grid">
-                  {worlds.map((world) => (
+                  {sortDeckSearchWorlds(worlds).map((world) => (
                     <label key={world}>
                       <input
                         type="checkbox"
                         checked={filters.worlds.includes(world)}
                         onChange={() => setArray("worlds", toggleValue(filters.worlds, world))}
                       />
-                      {world}
+                      {deckSearchWorldLabel(world)}
                     </label>
                   ))}
                 </div>

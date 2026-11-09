@@ -19,6 +19,7 @@ import {
   updateDeckSettings
 } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
+import { compareDeckCardsFixed } from "@/lib/decks/deckCardOrder";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
@@ -64,6 +65,22 @@ function getFlagName(flag?: FlagRecord | null, card?: CardRecord | null) {
   return flag?.name || card?.name || "未選択";
 }
 
+function getFlagSearchWorlds(
+  availableWorlds: string[],
+  flag?: FlagRecord | null,
+  card?: CardRecord | null
+) {
+  for (const candidates of [
+    flag?.usable_worlds ?? [],
+    card?.worlds ?? [],
+    [flag?.name ?? "", card?.name ?? ""]
+  ]) {
+    const matched = resolveDeckSearchWorlds(availableWorlds, candidates);
+    if (matched.length > 0) return matched;
+  }
+  return [];
+}
+
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const router = useRouter();
   const [deck, setDeck] = useState<DeckRecord | null>(null);
@@ -104,6 +121,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [searchPreviewCardId, setSearchPreviewCardId] = useState("");
   const [searchPreviewImageId, setSearchPreviewImageId] = useState("");
   const [selectedDeckCardId, setSelectedDeckCardId] = useState("");
+  const [deckCardOrder, setDeckCardOrder] = useState<"free" | "fixed">("free");
   const [draggedDeckCardId, setDraggedDeckCardId] = useState<string | null>(null);
   const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
   const [flagPickerOpen, setFlagPickerOpen] = useState(false);
@@ -209,18 +227,12 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const deckFlagCard = deckFlag?.card_id
       ? nextCardMap.get(deckFlag.card_id) ?? null
       : null;
-    const preferredFlagWorlds = deckFlagCard?.worlds?.length
-      ? deckFlagCard.worlds
-      : deckFlag?.usable_worlds ?? [];
     const requestedWorld = new URLSearchParams(window.location.search).get("world");
     setSearchFilters({
       ...EMPTY_DECK_CARD_SEARCH_FILTERS,
-      worlds: resolveDeckSearchWorlds(
-        searchOptionsResult.worlds,
-        nextDeck.flag_id
-          ? preferredFlagWorlds
-          : requestedWorld ? [requestedWorld] : []
-      ),
+      worlds: nextDeck.flag_id
+        ? getFlagSearchWorlds(searchOptionsResult.worlds, deckFlag, deckFlagCard)
+        : resolveDeckSearchWorlds(searchOptionsResult.worlds, requestedWorld ? [requestedWorld] : []),
       races: deckFlag?.usable_race_keywords ?? []
     });
     setSearchPage(0);
@@ -404,14 +416,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
     const flag = flags.find((item) => item.id === selectedFlagId);
     const flagCard = flag?.card_id ? cardMap.get(flag.card_id) : null;
-    const preferredFlagWorlds = [
-      ...(flagCard?.worlds ?? []),
-      ...(flag?.usable_worlds ?? [])
-    ];
-    const resolvedWorlds = resolveDeckSearchWorlds(
-      searchWorlds,
-      preferredFlagWorlds
-    );
+    const resolvedWorlds = getFlagSearchWorlds(searchWorlds, flag, flagCard);
 
     // Run once per loaded deck so clearing the filter remains the user's choice.
     worldPresetDeckIdRef.current = deck.id;
@@ -501,6 +506,14 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const activeDraftDeckCards = useMemo(
     () => draftDeckCards.filter((item) => cardMap.get(item.cardId)?.is_active),
     [cardMap, draftDeckCards]
+  );
+  const displayedDeckCards = useMemo(() =>
+    deckCardOrder === "fixed"
+      ? [...activeDraftDeckCards].sort((left, right) =>
+          compareDeckCardsFixed(cardMap.get(left.cardId)!, cardMap.get(right.cardId)!)
+        )
+      : activeDraftDeckCards,
+    [activeDraftDeckCards, cardMap, deckCardOrder]
   );
   const visibleImageCardIds = useMemo(() => {
     return [
@@ -847,7 +860,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   function handleDeckCardDrop(targetCardId: string) {
-    if (!canEditDeck || !draggedDeckCardId) return;
+    if (!canEditDeck || deckCardOrder !== "free" || !draggedDeckCardId) return;
     setDraftDeckCards((current) =>
       reorderDeckCardDrafts(current, {
         draggedCardId: draggedDeckCardId,
@@ -864,7 +877,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const existing = draftDeckCardMap.get(card.id);
     setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
 
-    if (targetCardId && targetCardId !== card.id && !existing) {
+    if (deckCardOrder === "free" && targetCardId && targetCardId !== card.id && !existing) {
       setDraftDeckCards((current) =>
         reorderDeckCardDrafts(current, {
           draggedCardId: card.id,
@@ -1096,6 +1109,15 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
             <AppCard title="">
               <div className="dm-deck-list-header">
                 <span>デッキ内カード</span>
+                <select
+                  className="dm-deck-order-select"
+                  aria-label="デッキ内カードの表示順"
+                  value={deckCardOrder}
+                  onChange={(event) => setDeckCardOrder(event.target.value as "free" | "fixed")}
+                >
+                  <option value="free">自由順</option>
+                  <option value="fixed">固定順</option>
+                </select>
                 <div className="dm-deck-total-panel is-compact" aria-label="デッキ総枚数">
                   <b>デッキ枚数</b>
                   <span>{mainDeckTotal}枚</span>
@@ -1117,7 +1139,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   handleSearchCardDropToDeck();
                 }}
               >
-                {activeDraftDeckCards.map((item) => {
+                {displayedDeckCards.map((item) => {
                   const card = cardMap.get(item.cardId);
                   if (!card) return null;
                   return (
@@ -1127,7 +1149,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       className={`dm-deck-visual-card${
                         draggedDeckCardId === item.cardId ? " is-dragging" : ""
                       }${selectedDeckCardId === item.cardId ? " is-selected" : ""}`}
-                      draggable={canEditDeck}
+                      draggable={canEditDeck && deckCardOrder === "free"}
                       title={`${card.name} / ${getCardTypeLabel(card.card_type)} ×${item.quantity}`}
                       onClick={() => selectDeckCard(card.id)}
                       onDoubleClick={() => showSearchPreview(card.id)}
@@ -1245,6 +1267,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         onClick={() => setSelectedSearchCardId(card.id)}
                         onDoubleClick={() => showSearchPreview(card.id)}
                         onKeyDown={(event) => {
+                          if (event.key === "ArrowLeft" && canEditDeck) {
+                            event.preventDefault();
+                            setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+                            return;
+                          }
                           if ((event.key === "Enter" || event.key === " ") && canEditDeck) {
                             event.preventDefault();
                             setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
@@ -1452,12 +1479,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     onClick={() => {
                       setSelectedFlagId(flag.id);
                       setSelectedFlagImageId("");
-                      const flagWorlds = flagCard?.worlds?.length
-                        ? flagCard.worlds
-                        : flag.usable_worlds ?? [];
                       setSearchFilters((current) => ({
                         ...current,
-                        worlds: resolveDeckSearchWorlds(searchWorlds, flagWorlds),
+                        worlds: getFlagSearchWorlds(searchWorlds, flag, flagCard),
                         races: flag.usable_race_keywords ?? []
                       }));
                       setSearchPage(0);

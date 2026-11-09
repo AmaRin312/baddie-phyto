@@ -1383,6 +1383,17 @@ select {
   font-weight: 950;
 }
 
+.dm-deck-order-select {
+  min-width: 88px;
+  padding: 6px 8px;
+  border: 1px solid var(--dm-border, #b5d0ff);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--dm-blue-dark);
+  font: inherit;
+  font-size: 12px;
+}
+
 .dm-deck-total-panel.is-compact {
   flex: 0 0 auto;
   min-width: 132px;

@@ -1,5 +1,26 @@
 import { supabase } from "@/lib/supabase/client";
+import { invalidateDeckListCache } from "@/lib/decks/deckActions";
+import { CARD_CSV_OFFICIAL_WORLDS } from "@/lib/cards/import/cardCsvSchema";
 import type { CardRecord, CardType } from "@/types/baddiePhyto";
+
+const WORLD_ORDER = new Map(
+  CARD_CSV_OFFICIAL_WORLDS.map((world, index) => [world.replace(/ワールド$/u, ""), index])
+);
+
+function worldOrder(world: string) {
+  return WORLD_ORDER.get(world.replace(/(?:ワールド|W)$/u, "")) ?? Number.MAX_SAFE_INTEGER;
+}
+
+export function deckSearchWorldLabel(world: string) {
+  const index = worldOrder(world);
+  return index === Number.MAX_SAFE_INTEGER ? world : CARD_CSV_OFFICIAL_WORLDS[index];
+}
+
+export function sortDeckSearchWorlds(worlds: readonly string[]) {
+  return [...new Set(worlds)].sort((left, right) =>
+    worldOrder(left) - worldOrder(right) || left.localeCompare(right, "ja")
+  );
+}
 
 export type DeckCardEraKey = "first" | "hundred" | "ddd" | "x" | "god";
 
@@ -112,9 +133,7 @@ export async function loadDeckCardSearchOptions() {
 
       const worlds = (worldResult.data as unknown as string[] | null) ?? [];
       const value = {
-        worlds: [...new Set(worlds)].sort((left, right) =>
-          left.localeCompare(right, "ja")
-        ),
+        worlds: sortDeckSearchWorlds(worlds),
         sets: (setResult.data ?? []).map((set) => ({
           id: set.id,
           setCode: set.set_code,
@@ -148,7 +167,10 @@ export async function setCardSetVisibility(id: string, isVisible: boolean) {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (!result.error && result.data) optionsCache = null;
+  if (!result.error && result.data) {
+    optionsCache = null;
+    invalidateDeckListCache();
+  }
   return result;
 }
 
