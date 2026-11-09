@@ -44,6 +44,8 @@ export type DeckCardAttributeKey =
   | "heaven"
   | "hell";
 
+export type DeckCardSizeFilter = "4+" | "3" | "2" | "1" | "0";
+
 export const DECK_CARD_ATTRIBUTE_OPTIONS: ReadonlyArray<{
   value: DeckCardAttributeKey;
   label: string;
@@ -69,6 +71,7 @@ export type DeckCardSearchFilters = {
   cardText: string;
   worlds: string[];
   cardTypes: CardType[];
+  sizes: DeckCardSizeFilter[];
   races: string[];
   eras: DeckCardEraKey[];
   setIds: string[];
@@ -81,6 +84,7 @@ export const EMPTY_DECK_CARD_SEARCH_FILTERS: DeckCardSearchFilters = {
   cardText: "",
   worlds: [],
   cardTypes: [],
+  sizes: [],
   races: [],
   eras: [],
   setIds: [],
@@ -191,7 +195,10 @@ export async function searchDeckCards(input: {
       p_eras: input.filters.eras,
       p_set_ids: input.filters.setIds,
       p_original_mode: input.filters.originalMode,
-      p_attributes: input.filters.attributes,
+      p_attributes: [
+        ...input.filters.attributes,
+        ...input.filters.sizes.map((size) => `size:${size}`)
+      ],
       p_preferred_worlds: input.preferredWorlds,
       p_excluded_card_id: input.excludedCardId || null,
       p_page_size: pageSize,

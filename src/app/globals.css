@@ -1227,6 +1227,11 @@ select {
   width: 100%;
   height: auto;
   aspect-ratio: 5 / 7;
+  pointer-events: none;
+}
+
+.dm-deck-visual-card > .dm-deck-visual-count {
+  pointer-events: none;
 }
 
 .dm-deck-visual-card:focus-visible {
@@ -4556,6 +4561,13 @@ select {
   padding: 12px;
 }
 
+.dm-deck-search-sizes {
+  display: grid;
+  gap: 8px;
+  border-top: 1px dashed #bfdbfe;
+  padding-top: 12px;
+}
+
 .dm-deck-search-sets {
   display: grid;
   gap: 10px;
@@ -4894,12 +4906,15 @@ select {
 }
 
 .dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, 125px);
+  justify-content: start;
   gap: 6px;
 }
 
 .dm-deck-management-section .dm-app-card {
   min-height: 0;
+  height: 152px;
+  box-sizing: border-box;
   align-content: start;
   gap: 5px;
   border-radius: 16px;
@@ -4909,6 +4924,12 @@ select {
 .dm-deck-management-section .dm-app-card h2 {
   font-size: 14px;
   line-height: 1.2;
+  min-height: 2.4em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .dm-deck-management-section .dm-app-card p,
@@ -6363,11 +6384,6 @@ body:has(.bf-battle-app) {
 .dm-deck-management-click-card,
 .dm-deck-management-images {
   overflow: hidden;
-}
-
-.dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, 104px);
-  justify-content: start;
 }
 
 .dm-deck-management-section .dm-app-card {

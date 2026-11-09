@@ -11,6 +11,7 @@ import {
   type DeckCardAttributeKey,
   type DeckCardEraKey,
   type DeckCardSearchFilters,
+  type DeckCardSizeFilter,
   type DeckCardSetOption
 } from "@/lib/decks/deckCardSearch";
 import {
@@ -34,6 +35,8 @@ const DETAIL_SECTION_LABELS: Record<DetailSectionKey, string> = {
   eras: "年代・収録弾",
   attributes: "属性"
 };
+
+const SIZE_OPTIONS: readonly DeckCardSizeFilter[] = ["4+", "3", "2", "1", "0"];
 
 function toggleValue<T>(values: T[], value: T) {
   return values.includes(value)
@@ -113,6 +116,21 @@ function DeckCardSearchPanelComponent({
     });
   }
 
+  const hasMonsterType = filters.cardTypes.some(
+    (type) => type === "monster" || type === "impact_monster"
+  );
+
+  function toggleCardType(cardType: CardType) {
+    const cardTypes = toggleValue(filters.cardTypes, cardType);
+    setFilters({
+      ...filters,
+      cardTypes,
+      sizes: cardTypes.some((type) => type === "monster" || type === "impact_monster")
+        ? filters.sizes
+        : []
+    });
+  }
+
   const chips = [
     ...(filters.name.trim()
       ? [
@@ -149,8 +167,12 @@ function DeckCardSearchPanelComponent({
     ...filters.cardTypes.map((cardType) => ({
       key: `type:${cardType}`,
       label: getCardTypeLabel(cardType),
-      onRemove: () =>
-        setArray("cardTypes", filters.cardTypes.filter((value) => value !== cardType))
+      onRemove: () => toggleCardType(cardType)
+    })),
+    ...filters.sizes.map((size) => ({
+      key: `size:${size}`,
+      label: `サイズ: ${size === "4+" ? "4以上" : size}`,
+      onRemove: () => setArray("sizes", filters.sizes.filter((value) => value !== size))
     })),
     ...filters.eras.map((era) => ({
       key: `era:${era}`,
@@ -308,17 +330,29 @@ function DeckCardSearchPanelComponent({
                       <input
                         type="checkbox"
                         checked={filters.cardTypes.includes(option.value)}
-                        onChange={() =>
-                          setArray(
-                            "cardTypes",
-                            toggleValue<CardType>(filters.cardTypes, option.value)
-                          )
-                        }
+                        onChange={() => toggleCardType(option.value)}
                       />
                       {option.label}
                     </label>
                   ))}
                 </div>
+                {hasMonsterType && (
+                  <div className="dm-deck-search-sizes">
+                    <b>サイズ</b>
+                    <div className="dm-checkbox-grid">
+                      {SIZE_OPTIONS.map((size) => (
+                        <label key={size}>
+                          <input
+                            type="checkbox"
+                            checked={filters.sizes.includes(size)}
+                            onChange={() => setArray("sizes", toggleValue(filters.sizes, size))}
+                          />
+                          {size === "4+" ? "4以上" : size}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </SearchSection>
 
               <SearchSection

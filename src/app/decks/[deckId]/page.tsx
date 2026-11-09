@@ -60,6 +60,7 @@ import {
 type DeckDetailPageProps = { params: Promise<{ deckId: string }> };
 
 type DetailImageContext = "deck" | "flag" | "buddy";
+const DECK_CARD_DRAG_TYPE = "application/x-baddie-deck-card";
 
 function getFlagName(flag?: FlagRecord | null, card?: CardRecord | null) {
   return flag?.name || card?.name || "未選択";
@@ -173,6 +174,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const nextDeckCards = deckCardsResult.data ?? [];
     const nextCardIds = [...new Set([
       ...nextDeckCards.map((deckCard) => deckCard.card_id),
+      nextDeck.buddy_card_id,
       ...((flagResult.data ?? []) as FlagRecord[]).map((flag) => flag.card_id).filter(Boolean)
     ].filter(Boolean))] as string[];
     const cardResult = await loadCardsByIds(nextCardIds);
@@ -196,6 +198,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       ...new Set(
         [
           ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
+          nextDeck.buddy_card_id,
           nextFlags.find((flag) => flag.id === nextDeck.flag_id)?.card_id
         ].filter(Boolean)
       )
@@ -367,7 +370,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     ? cardMap.get(selectedFlag.card_id) ?? null
     : null;
   const effectiveSelectedBuddyCardId =
-    selectedBuddyCardId && draftDeckCardMap.has(selectedBuddyCardId)
+    selectedBuddyCardId && cardMap.get(selectedBuddyCardId)?.is_active
       ? selectedBuddyCardId
       : "";
   const selectedBuddyCard = effectiveSelectedBuddyCardId
@@ -439,7 +442,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     [cardMap, draftDeckCards]
   );
 
-  const filteredCards = searchResults;
+  const filteredCards = useMemo(
+    () => [...searchResults].sort(compareDeckCardsFixed),
+    [searchResults]
+  );
   const searchPreviewCard =
     cardMap.get(searchPreviewCardId) ??
     filteredCards.find((card) => card.id === searchPreviewCardId) ??
@@ -889,10 +895,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDraggedSearchCardId(null);
   }
 
-  function handleDeckCardDropToSearch() {
-    if (!canEditDeck || !draggedDeckCardId) return;
-    const card = cardMap.get(draggedDeckCardId);
-    const existing = draftDeckCardMap.get(draggedDeckCardId);
+  function handleDeckCardDropToSearch(cardId: string) {
+    if (!canEditDeck) return;
+    const card = cardMap.get(cardId);
+    const existing = draftDeckCardMap.get(cardId);
     if (card && existing) {
       setLocalCardQuantity(card, existing.quantity - 1, { preserveBuddy: true });
     }
@@ -1011,15 +1017,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       if (selectedBuddyCard) openCardDetail(selectedBuddyCard.id, "buddy");
                     }}
                     onDragOver={(event) => {
-                      if (!canEditDeck || !draggedDeckCardId) return;
+                      if (!canEditDeck || !event.dataTransfer.types.includes(DECK_CARD_DRAG_TYPE)) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
                     onDrop={(event) => {
-                      if (!canEditDeck || !draggedDeckCardId) return;
+                      const cardId = event.dataTransfer.getData(DECK_CARD_DRAG_TYPE);
+                      if (!canEditDeck || !cardId) return;
                       event.preventDefault();
                       event.stopPropagation();
-                      setAsBuddy(draggedDeckCardId);
+                      setAsBuddy(cardId);
                       setDraggedDeckCardId(null);
                     }}
                   >
@@ -1149,7 +1156,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       className={`dm-deck-visual-card${
                         draggedDeckCardId === item.cardId ? " is-dragging" : ""
                       }${selectedDeckCardId === item.cardId ? " is-selected" : ""}`}
-                      draggable={canEditDeck && deckCardOrder === "free"}
+                      draggable={canEditDeck}
                       title={`${card.name} / ${getCardTypeLabel(card.card_type)} ×${item.quantity}`}
                       onClick={() => selectDeckCard(card.id)}
                       onDoubleClick={() => showSearchPreview(card.id)}
@@ -1173,6 +1180,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         }
                         setDraggedDeckCardId(item.cardId);
                         event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData(DECK_CARD_DRAG_TYPE, item.cardId);
                         event.dataTransfer.setData("text/plain", item.cardId);
                       }}
                       onDragOver={(event) => {
@@ -1181,7 +1189,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                           event.dataTransfer.dropEffect = "copy";
                           return;
                         }
-                        if (!draggedDeckCardId || draggedDeckCardId === item.cardId) return;
+                        if (deckCardOrder !== "free" || !draggedDeckCardId || draggedDeckCardId === item.cardId) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = "move";
                       }}
@@ -1229,20 +1237,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
           <aside className="dm-deck-editor-column dm-deck-editor-search">
             <AppCard title="">
-              <div
-                className={`dm-deck-search-layout${draggedDeckCardId ? " is-drop-target" : ""}`}
-                onDragOver={(event) => {
-                  if (!canEditDeck || !draggedDeckCardId) return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                }}
-                onDrop={(event) => {
-                  if (!canEditDeck || !draggedDeckCardId) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleDeckCardDropToSearch();
-                }}
-              >
+              <div className="dm-deck-search-layout">
                 <div className="dm-deck-search-card-column">
                   <div
                     className="dm-deck-list dm-deck-search-results"
@@ -1264,6 +1259,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         }`}
                         draggable={canEditDeck}
                         aria-pressed={selectedSearchCardId === card.id}
+                        onDragOver={(event) => {
+                          if (!canEditDeck || !event.dataTransfer.types.includes(DECK_CARD_DRAG_TYPE)) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          const cardId = event.dataTransfer.getData(DECK_CARD_DRAG_TYPE);
+                          if (!canEditDeck || !cardId) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleDeckCardDropToSearch(cardId);
+                        }}
                         onClick={() => setSelectedSearchCardId(card.id)}
                         onDoubleClick={() => showSearchPreview(card.id)}
                         onKeyDown={(event) => {
