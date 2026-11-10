@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, MouseEvent } from "react";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
@@ -20,6 +20,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
 const SET_AREA_CARDS_PER_COLUMN = 4;
 const LAEVATEINN_SET_AREA_CARDS_PER_COLUMN = 2;
+const EMPTY_EFFECTS: string[] = [];
 
 type BattleZoneProps = {
   zoneId: BattleZoneId;
@@ -74,6 +75,31 @@ type BattleZoneProps = {
   ) => void;
 };
 
+function collectZoneCardIds(cards: readonly BattleCard[]) {
+  const cardIds = new Set<string>();
+  const visit = (card: BattleCard) => {
+    cardIds.add(card.cardId);
+    card.soul.forEach(visit);
+  };
+  cards.forEach(visit);
+  return cardIds;
+}
+
+function areBattleZonePropsEqual(previous: BattleZoneProps, next: BattleZoneProps) {
+  for (const key of Object.keys(previous) as Array<keyof BattleZoneProps>) {
+    if (key === "imagesByCard") continue;
+    if (!Object.is(previous[key], next[key])) return false;
+  }
+
+  const cardIds = collectZoneCardIds(previous.cards);
+  for (const cardId of cardIds) {
+    if (previous.imagesByCard.get(cardId) !== next.imagesByCard.get(cardId)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function shouldShowFace(card: BattleCard) {
   return card.visibility !== "face_down";
 }
@@ -123,7 +149,7 @@ function getItemSlotStyle(
   } as CSSProperties;
 }
 
-export function BattleZone({
+function BattleZoneComponent({
   zoneId,
   label,
   cards,
@@ -133,7 +159,7 @@ export function BattleZone({
   rotateCard = false,
   stack = false,
   showCount = false,
-  activeEffects = [],
+  activeEffects = EMPTY_EFFECTS,
   laevateinnActive = false,
   playerId,
   draggedCard,
@@ -883,3 +909,5 @@ export function BattleZone({
     </div>
   );
 }
+
+export const BattleZone = memo(BattleZoneComponent, areBattleZonePropsEqual);

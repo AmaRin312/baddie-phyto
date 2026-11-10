@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { getBattleCompositeRole } from "@/lib/battle/compositeCards";
@@ -20,7 +21,7 @@ function getRoleLabel(card: BattleCard) {
   return "";
 }
 
-export function BattleCompositeCardView({
+function BattleCompositeCardViewComponent({
   cards,
   cardMap,
   imagesByCard,
@@ -78,3 +79,42 @@ export function BattleCompositeCardView({
     </div>
   );
 }
+
+function areCompositeCardsEqual(
+  previousCards: readonly BattleCard[],
+  nextCards: readonly BattleCard[]
+) {
+  return (
+    previousCards.length === nextCards.length &&
+    previousCards.every((previous, index) => {
+      const next = nextCards[index];
+      return (
+        next != null &&
+        previous.instanceId === next.instanceId &&
+        previous.cardId === next.cardId &&
+        previous.selectedImageId === next.selectedImageId &&
+        previous.visibility === next.visibility &&
+        previous.orientation === next.orientation &&
+        previous.meta.compositeRole === next.meta.compositeRole &&
+        previous.meta.compositeKind === next.meta.compositeKind
+      );
+    })
+  );
+}
+
+export const BattleCompositeCardView = memo(
+  BattleCompositeCardViewComponent,
+  (previous, next) => {
+    if (
+      previous.variant !== next.variant ||
+      previous.cardMap !== next.cardMap ||
+      !areCompositeCardsEqual(previous.cards, next.cards)
+    ) {
+      return false;
+    }
+
+    return previous.cards.every((card) =>
+      previous.imagesByCard.get(card.cardId) === next.imagesByCard.get(card.cardId)
+    );
+  }
+);

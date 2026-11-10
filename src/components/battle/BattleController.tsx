@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -20,7 +20,6 @@ import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
 import { DeckCountPopup } from "@/components/battle/DeckCountPopup";
 import { useEscapeToClose } from "@/hooks/useEscapeToClose";
 import {
-  findBattleCard,
   getAreaStacks,
   isAreaStackZone
 } from "@/lib/battle/battleActions";
@@ -60,7 +59,6 @@ import {
   deleteSyncedPlayerBattleState,
   deleteSyncedPlayerBattleStates,
   getOpponentSeat,
-  getCurrentBattleUserId,
   loadSyncedPlayerBattleStates,
   mapSyncedSeatStatesToPlayers,
   normalizeBattlePlayerSeat,
@@ -68,7 +66,8 @@ import {
   subscribeSyncedPlayerBattleStates,
   unsubscribeSyncedPlayerBattleStates,
   type BattlePlayerSeat,
-  type RealtimeStatus
+  type RealtimeStatus,
+  type SyncedPlayerBattleState
 } from "@/lib/battle/battlePlayerStateSync";
 import { executeBattleCommand } from "@/lib/battle/commands/executeBattleCommand";
 import type { BattleCommand } from "@/lib/battle/commands/battleCommandTypes";
@@ -214,27 +213,79 @@ type BattleResetSource = {
   deckCards: Parameters<typeof createInitialBattleState>[0]["deckCards"];
 };
 
-function findBattleCardByInstanceId(
-  battleState: BattleState | null,
-  instanceId: string | null
-) {
-  if (!battleState || !instanceId) return null;
+type BattleCardLookup = Map<
+  string,
+  { card: BattleCard; playerId: BattlePlayerId; zoneId: BattleZoneId }
+> & {
+  visibleImageCardIds: Set<string>;
+  selfDeckImageCardIds: Set<string>;
+  deckLookImageCardIds: Set<string>;
+};
 
-  for (const player of Object.values(battleState.players)) {
+function buildBattleCardLookup(battleState: BattleState | null): BattleCardLookup {
+  const lookup = Object.assign(new Map(), {
+    visibleImageCardIds: new Set<string>(),
+    selfDeckImageCardIds: new Set<string>(),
+    deckLookImageCardIds: new Set<string>()
+  }) as BattleCardLookup;
+  if (!battleState) return lookup;
+  const deckLookIds = new Set(battleState.deckLook?.instanceIds ?? []);
+
+  for (const playerId of ["self", "opponent"] as const) {
+    const player = battleState.players[playerId];
     for (const zone of Object.values(player.zones)) {
-      const card = zone.cards.find((item) => item.instanceId === instanceId);
-      if (card) return card;
-
-      for (const parentCard of zone.cards) {
-        const soulCard = parentCard.soul.find(
-          (item) => item.instanceId === instanceId
+      const visit = (
+        card: BattleCard,
+        rootInstanceId: string,
+        isZoneCard: boolean,
+        ancestorsVisible: boolean,
+        isDeckLooked: boolean
+      ) => {
+        const ownImageVisible = card.visibility !== "face_down" &&
+          !(card.visibility === "private" && playerId !== "self");
+        if (!lookup.has(card.instanceId)) {
+          lookup.set(card.instanceId, { card, playerId, zoneId: zone.id });
+        }
+        const imageVisible = ancestorsVisible && ownImageVisible;
+        const isCurrentDeckLook = isDeckLooked || (isZoneCard && deckLookIds.has(card.instanceId));
+        const isDeckRoot = isZoneCard && zone.id === "deck";
+        if (zone.id === "deck") {
+          if (playerId === "self" && (isZoneCard || imageVisible)) {
+            lookup.selfDeckImageCardIds.add(card.cardId);
+          }
+        } else if (imageVisible) {
+          lookup.visibleImageCardIds.add(card.cardId);
+        }
+        if (isCurrentDeckLook && (isZoneCard || imageVisible)) {
+          lookup.deckLookImageCardIds.add(card.cardId);
+        }
+        card.soul.forEach((soulCard) =>
+          visit(
+            soulCard,
+            rootInstanceId,
+            false,
+            isDeckRoot || imageVisible,
+            isCurrentDeckLook
+          )
         );
-        if (soulCard) return soulCard;
-      }
+      };
+      zone.cards.forEach((card) => visit(card, card.instanceId, true, true, false));
     }
   }
 
-  return null;
+  for (const instanceId of deckLookIds) {
+    const card = lookup.get(instanceId);
+    if (card) lookup.deckLookImageCardIds.add(card.card.cardId);
+  }
+  return lookup;
+}
+
+function getBattleCardImageIds(lookup: BattleCardLookup, includeDeck: boolean) {
+  return [...new Set([
+    ...lookup.visibleImageCardIds,
+    ...(includeDeck ? lookup.selfDeckImageCardIds : []),
+    ...lookup.deckLookImageCardIds
+  ])];
 }
 
 function canUseBattleMultiSelection(
@@ -279,6 +330,16 @@ function getErrorMessage(error: unknown) {
   return "不明なエラーが発生しました。";
 }
 
+function useStableEvent<Args extends unknown[], Result>(
+  callback: (...args: Args) => Result
+) {
+  const callbackRef = useRef(callback);
+  useLayoutEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+  return useCallback((...args: Args) => callbackRef.current(...args), []);
+}
+
 export function BattleController() {
   const searchParams = useSearchParams();
   const deckId = searchParams.get("deckId");
@@ -291,6 +352,7 @@ export function BattleController() {
   const [battleState, setBattleState] = useState<BattleState | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const requestedImageCardIdsRef = useRef(new Set<string>());
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
   const [siteSupplySettings, setSiteSupplySettings] =
     useState<SiteSupplySettingsRecord | null>(null);
@@ -400,11 +462,50 @@ export function BattleController() {
     };
   }
 
-  function hasSelfPlayerStateChanged(current: BattleState, nextState: BattleState) {
-    return (
-      JSON.stringify(current.players.self) !==
-      JSON.stringify(nextState.players.self)
+  function areJsonValuesEqual(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) return true;
+    if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) {
+      return false;
+    }
+
+    if (Array.isArray(left) || Array.isArray(right)) {
+      if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+        return false;
+      }
+      return left.every((value, index) => {
+        const rightValue = right[index];
+        if (
+          value === undefined || typeof value === "function" || typeof value === "symbol" ||
+          (typeof value === "number" && !Number.isFinite(value))
+        ) {
+          return rightValue === null || rightValue === undefined || typeof rightValue === "function" || typeof rightValue === "symbol" ||
+            (typeof rightValue === "number" && !Number.isFinite(rightValue));
+        }
+        if (
+          rightValue === undefined || typeof rightValue === "function" || typeof rightValue === "symbol" ||
+          (typeof rightValue === "number" && !Number.isFinite(rightValue))
+        ) return false;
+        return areJsonValuesEqual(value, rightValue);
+      });
+    }
+
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const jsonKeys = (record: Record<string, unknown>) =>
+      Object.keys(record).filter((key) => {
+        const value = record[key];
+        return value !== undefined && typeof value !== "function" && typeof value !== "symbol";
+      });
+    const leftKeys = jsonKeys(leftRecord);
+    const rightKeys = jsonKeys(rightRecord);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every((key) =>
+      Object.hasOwn(rightRecord, key) && areJsonValuesEqual(leftRecord[key], rightRecord[key])
     );
+  }
+
+  function hasSelfPlayerStateChanged(current: BattleState, nextState: BattleState) {
+    return !areJsonValuesEqual(current.players.self, nextState.players.self);
   }
 
   function rememberPlayerVersion(seatKey: BattlePlayerSeat, version: number) {
@@ -488,7 +589,7 @@ export function BattleController() {
       window.location.href = "/login";
       return;
     }
-    currentUserIdRef.current = await getCurrentBattleUserId();
+    currentUserIdRef.current = profile.id;
 
     setLoading(true);
     setMessage("");
@@ -564,9 +665,15 @@ export function BattleController() {
           ].filter(Boolean)
         )
       ] as string[];
-      const [cardResponse, imageResponse] = await Promise.all([
+      const [cardResponse, savedBattleStateResult, syncedPlayersResult] = await Promise.all([
         loadCardsByIds(battleCardIds),
-        loadCardImagesByCardIds(battleCardIds)
+        loadBattleState(roomId),
+        isRealtimeBattle && selfSeat
+          ? loadSyncedPlayerBattleStates(roomId)
+          : Promise.resolve({
+              data: {} as Partial<Record<BattlePlayerSeat, SyncedPlayerBattleState>>,
+              error: null
+            })
       ]);
       const activeCardIds = new Set(
         (((cardResponse.error ? [] : cardResponse.data) ?? []) as unknown as CardRecord[])
@@ -582,11 +689,7 @@ export function BattleController() {
         deckCards: activeDeckCards
       };
       const freshBattleState = createInitialBattleState(resetSource);
-      const savedBattleStateResult = await loadBattleState(roomId);
       const baseState = savedBattleStateResult.data ?? freshBattleState;
-      const syncedPlayersResult = isRealtimeBattle && selfSeat
-        ? await loadSyncedPlayerBattleStates(roomId)
-        : { data: {}, error: null };
       const syncedSeats = syncedPlayersResult.data;
 
       if (isRealtimeBattle && !selfSeat) {
@@ -626,7 +729,8 @@ export function BattleController() {
       if (!savedBattleStateResult.data) {
         const createResult = await createBattleState({
           roomId,
-          battleState: initialState
+          battleState: initialState,
+          updatedBy: currentUserIdRef.current ?? undefined
         });
         if (createResult.error) {
           setMessage("BattleStateの初期保存に失敗しました。");
@@ -650,7 +754,6 @@ export function BattleController() {
 
       resetSourceRef.current = resetSource;
       setCards((((cardResponse?.error ? [] : cardResponse?.data) ?? []) as unknown as CardRecord[]));
-      setImages(imageResponse?.error ? [] : imageResponse?.data ?? []);
       setBattleDeck(deckResponse.data);
       if (supplyResponse?.error) {
         console.warn("Battle supplies are not available yet.", supplyResponse.error);
@@ -799,7 +902,6 @@ export function BattleController() {
         });
         if (playerId === "opponent") {
           setOpponentPresent(true);
-          void refreshOpponentSupplyMetadata();
         }
         setBattleState((current) =>
           current
@@ -817,10 +919,14 @@ export function BattleController() {
   }, [
     isBattleLoaded,
     isRealtimeBattle,
-    refreshOpponentSupplyMetadata,
     roomId,
     selfSeat
   ]);
+
+  useEffect(() => {
+    if (!opponentPresent) return;
+    void refreshOpponentSupplyMetadata();
+  }, [opponentPresent, refreshOpponentSupplyMetadata]);
 
   useEffect(() => {
     if (!isRealtimeBattle || !roomId || !isBattleLoaded || !selfSeat) return;
@@ -876,11 +982,24 @@ export function BattleController() {
     [cards]
   );
 
+  const imagesByCardRef = useRef(new Map<string, CardImageRecord[]>());
   const imagesByCard = useMemo(() => {
     const map = new Map<string, CardImageRecord[]>();
     for (const image of images) {
-      map.set(image.card_id, [...(map.get(image.card_id) ?? []), image]);
+      const cardImages = map.get(image.card_id);
+      if (cardImages) cardImages.push(image);
+      else map.set(image.card_id, [image]);
     }
+    for (const [cardId, cardImages] of map) {
+      const previousCardImages = imagesByCardRef.current.get(cardId);
+      if (
+        previousCardImages?.length === cardImages.length &&
+        previousCardImages.every((image, index) => image === cardImages[index])
+      ) {
+        map.set(cardId, previousCardImages);
+      }
+    }
+    imagesByCardRef.current = map;
     return map;
   }, [images]);
 
@@ -913,12 +1032,12 @@ export function BattleController() {
     [resolvePlayerSupplyImageUrl]
   );
 
-  const activeCard = findBattleCardByInstanceId(
-    battleState,
-    battleState?.activeViewerCardInstanceId ?? null
-  );
+  const battleCardLookup = useMemo(() => buildBattleCardLookup(battleState), [battleState]);
+  const activeCard = battleState?.activeViewerCardInstanceId
+    ? battleCardLookup.get(battleState.activeViewerCardInstanceId)?.card ?? null
+    : null;
   const activeCardPlayerId = battleState?.activeViewerCardInstanceId
-    ? findBattleCard(battleState, battleState.activeViewerCardInstanceId)?.playerId ?? "self"
+    ? battleCardLookup.get(battleState.activeViewerCardInstanceId)?.playerId ?? "self"
     : "self";
   const viewerCards = useMemo(() => {
     if (!battleState) return [];
@@ -931,9 +1050,9 @@ export function BattleController() {
           : [];
     const uniqueInstanceIds = Array.from(new Set(instanceIds)).slice(0, 2);
     return uniqueInstanceIds
-      .map((instanceId) => findBattleCardByInstanceId(battleState, instanceId))
+      .map((instanceId) => battleCardLookup.get(instanceId)?.card ?? null)
       .filter((card): card is BattleCard => card != null);
-  }, [battleState, viewerInstanceIds]);
+  }, [battleCardLookup, battleState, viewerInstanceIds]);
   const activeAbilityNotification =
     activeAbilityNotificationId == null
       ? null
@@ -944,16 +1063,10 @@ export function BattleController() {
   const hasHiddenAbilityNotification =
     pendingAbilityNotificationCount > 0 && activeAbilityNotification == null;
   const activeAbilityNotificationSourceCard = activeAbilityNotification
-    ? findBattleCardByInstanceId(
-        battleState,
-        activeAbilityNotification.sourceInstanceId
-      )
+    ? battleCardLookup.get(activeAbilityNotification.sourceInstanceId)?.card ?? null
     : null;
   const activeAbilityNotificationTargetCard = activeAbilityNotification
-    ? findBattleCardByInstanceId(
-        battleState,
-        activeAbilityNotification.targetInstanceId
-      )
+    ? battleCardLookup.get(activeAbilityNotification.targetInstanceId)?.card ?? null
     : null;
 
   const selectedInstanceIds = useMemo(
@@ -966,11 +1079,10 @@ export function BattleController() {
   );
   const lookedDeckCards = useMemo(() => {
     if (!battleState?.deckLook) return [];
-    const deckCards = battleState.players[battleState.deckLook.playerId].zones.deck.cards;
     return battleState.deckLook.instanceIds
-      .map((instanceId) => deckCards.find((card) => card.instanceId === instanceId))
+      .map((instanceId) => battleCardLookup.get(instanceId)?.card ?? null)
       .filter((card): card is BattleCard => card != null);
-  }, [battleState]);
+  }, [battleCardLookup, battleState]);
   const dropBrowserCards = useMemo(() => {
     if (!battleState || !dropBrowserPlayerId) return [];
     return battleState.players[dropBrowserPlayerId].zones.drop.cards;
@@ -979,6 +1091,31 @@ export function BattleController() {
     () => battleState?.players.self.zones.deck.cards ?? [],
     [battleState]
   );
+
+  useEffect(() => {
+    if (!battleState) return;
+    const cardIds = getBattleCardImageIds(battleCardLookup, deckViewerOpen).filter(
+      (cardId) => !requestedImageCardIdsRef.current.has(cardId)
+    );
+    if (cardIds.length === 0) return;
+
+    cardIds.forEach((cardId) => requestedImageCardIdsRef.current.add(cardId));
+    void loadCardImagesByCardIds(cardIds).then((result) => {
+      if (result.error) {
+        cardIds.forEach((cardId) => requestedImageCardIdsRef.current.delete(cardId));
+        return;
+      }
+      setImages((current) => {
+        const existingIds = new Set(current.map((image) => image.id));
+        const newImages = (result.data ?? []).filter((image) => !existingIds.has(image.id));
+        return newImages.length > 0 ? [...current, ...newImages] : current;
+      });
+    }).catch((error: unknown) => {
+      cardIds.forEach((cardId) => requestedImageCardIdsRef.current.delete(cardId));
+      console.warn("Battle card images could not be loaded.", error);
+    });
+  }, [battleCardLookup, battleState, deckViewerOpen]);
+
   const soulTargetCandidates = useMemo(() => {
     if (!battleState) return [];
     return (["center", "left", "right", "item", "set"] as const).flatMap(
@@ -1027,22 +1164,6 @@ export function BattleController() {
     };
   }
 
-  function findBattleCardLocation(state: BattleState, instanceId: string) {
-    for (const playerId of ["self", "opponent"] as const) {
-      const player = state.players[playerId];
-      for (const zone of Object.values(player.zones)) {
-        for (const card of zone.cards) {
-          if (card.instanceId === instanceId) {
-            return { card, playerId, zoneId: zone.id };
-          }
-          const soulCard = card.soul.find((item) => item.instanceId === instanceId);
-          if (soulCard) return { card: soulCard, playerId, zoneId: zone.id };
-        }
-      }
-    }
-    return null;
-  }
-
   function getMovementLogEntries(
     previousState: BattleState,
     nextState: BattleState,
@@ -1056,10 +1177,16 @@ export function BattleController() {
       actorName,
       message
     });
+    let previousCardLookup: ReturnType<typeof buildBattleCardLookup> | null = null;
+    let nextCardLookup: ReturnType<typeof buildBattleCardLookup> | null = null;
+    const getPreviousCard = (instanceId: string) =>
+      (previousCardLookup ??= buildBattleCardLookup(previousState)).get(instanceId);
+    const getNextCard = (instanceId: string) =>
+      (nextCardLookup ??= buildBattleCardLookup(nextState)).get(instanceId);
     const zoneLabel = (playerId: BattlePlayerId, zoneId: BattleZoneId) =>
       previousState.players[playerId].zones[zoneId].label;
     const cardName = (instanceId: string, publicOnly = false) => {
-      const location = findBattleCardLocation(previousState, instanceId);
+      const location = getPreviousCard(instanceId);
       if (publicOnly && location?.card.visibility !== "public") return null;
       return location ? cardMap.get(location.card.cardId)?.name ?? null : null;
     };
@@ -1131,7 +1258,7 @@ export function BattleController() {
       command.type === "ADD_SOUL_FACE_DOWN"
     ) {
       movementIds = [command.payload.instanceId];
-      const target = findBattleCardLocation(nextState, command.payload.targetInstanceId);
+      const target = getNextCard(command.payload.targetInstanceId);
       destinationZone = target?.zoneId ?? null;
       targetInstanceId = command.payload.targetInstanceId;
     } else {
@@ -1145,14 +1272,14 @@ export function BattleController() {
     const entries: BattleActivityLogEntry[] = [];
     if (
       movementIds.some((instanceId) =>
-        findBattleCardLocation(previousState, instanceId)?.zoneId === "deck"
+        getPreviousCard(instanceId)?.zoneId === "deck"
       )
     ) {
       entries.push(entry("デッキをサーチ"));
     }
     movementIds.forEach((instanceId, index) => {
-      const source = findBattleCardLocation(previousState, instanceId);
-      const destination = findBattleCardLocation(nextState, instanceId);
+      const source = getPreviousCard(instanceId);
+      const destination = getNextCard(instanceId);
       if (!source || !destination || source.zoneId === destination.zoneId) return;
       if (source.zoneId !== "deck" && destination.zoneId !== "hand") return;
 
@@ -1203,7 +1330,8 @@ export function BattleController() {
 
     void saveBattleState({
       roomId,
-      battleState: nextState
+      battleState: nextState,
+      updatedBy: currentUserIdRef.current ?? undefined
     }).then((result) => {
       if (result.error) {
         setMessage("BattleStateの保存に失敗しました。");
@@ -2947,6 +3075,69 @@ export function BattleController() {
     setPendingActionPopup(null);
   }
 
+  function handlePlacementZoneClick(
+    zoneId: BattleZoneId,
+    event: MouseEvent<HTMLDivElement>,
+    playerId: BattlePlayerId
+  ) {
+    if (selectionMode?.type !== "zone" || selectionMode.playerId !== playerId) return;
+    selectionMode.onSelect(zoneId, {
+      x: event.clientX,
+      y: event.clientY,
+      event
+    });
+  }
+
+  function handleToggleViewerPin() {
+    setViewerPinned((current) => !current);
+  }
+
+  const stableSelectCard = useStableEvent(handleSelectCard);
+  const stableDoubleClickCard = useStableEvent(handleDoubleClickCard);
+  const stableContextMenuCard = useStableEvent(handleContextMenuCard);
+  const stableDragStartCard = useStableEvent(handleDragStartCard);
+  const stableDragEndCard = useStableEvent(handleDragEndCard);
+  const stableDropCard = useStableEvent(handleDropCard);
+  const stableDoubleClickZone = useStableEvent(handleDoubleClickZone);
+  const stableContextMenuZone = useStableEvent(handleContextMenuZone);
+  const stablePlacementZoneClick = useStableEvent(handlePlacementZoneClick);
+  const stableChangeSelfLife = useStableEvent(handleChangeSelfLife);
+  const stableRollSelfDice = useStableEvent(handleRollSelfDice);
+  const stableClearSelfDice = useStableEvent(handleClearSelfDice);
+  const stableCloseViewer = useStableEvent(closeViewerCard);
+  const stableToggleViewerPin = useStableEvent(handleToggleViewerPin);
+  const stableSelectSoulCard = useStableEvent(handleSelectSoulCard);
+  const stableDragStartSoulCard = useStableEvent(handleDragStartSoulCard);
+  const stableDragEndSoulCard = useStableEvent(handleDragEndSoulCard);
+  const stableContextMenuSoulCard = useStableEvent(handleContextMenuSoulCard);
+  const stableDoubleClickFaceDownSoul = useStableEvent(handleDoubleClickFaceDownSoul);
+  const activePersistentEffects = useMemo(() => {
+    const effects: string[] = [];
+    if (battleState?.ruleState.appliedRuleEffectIds.includes("text-command:laevateinn")) {
+      effects.push("レヴァンティン");
+    }
+    if ((battleState?.players.self.activeEffectIds ?? []).includes("text-command:hand_open")) {
+      effects.push("hand_open");
+    }
+    return effects;
+  }, [
+    battleState?.players.self.activeEffectIds,
+    battleState?.ruleState.appliedRuleEffectIds
+  ]);
+  const placementTargetZones = useMemo(
+    () => selectionMode?.type === "zone" ? new Set(selectionMode.allowedZones) : undefined,
+    [selectionMode]
+  );
+  const placementTargetPlayerId =
+    selectionMode?.type === "zone" ? selectionMode.playerId : undefined;
+  const battleActivityLogs = useMemo(
+    () => Object.values(battleState?.players ?? {})
+      .flatMap((player) => player.activityLogs ?? [])
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .slice(-battleLogDisplayCount),
+    [battleLogDisplayCount, battleState]
+  );
+
   if (loading) {
     return <main className="bf-battle-loading">Battleを準備しています。</main>;
   }
@@ -3016,13 +3207,9 @@ export function BattleController() {
   const isHandOpenActive = (
     battleState.players.self.activeEffectIds ?? []
   ).includes("text-command:hand_open");
-  const battleActivityLogs = Object.values(battleState.players)
-    .flatMap((player) => player.activityLogs ?? [])
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-    .slice(-battleLogDisplayCount);
   const selectedBattleUnitCount = new Set(
     selection.instanceIds.map((instanceId) => {
-      const selectedCard = findBattleCardByInstanceId(battleState, instanceId);
+      const selectedCard = battleCardLookup.get(instanceId)?.card;
       return typeof selectedCard?.meta.compositeId === "string"
         ? `composite:${selectedCard.meta.compositeId}`
         : instanceId;
@@ -3302,45 +3489,26 @@ export function BattleController() {
         imagesByCard={imagesByCard}
         sleeveImageUrls={playerSleeveImageUrls}
         playmatImageUrls={playerPlaymatImageUrls}
-        activePersistentEffects={[
-          ...(isLaevateinnActive ? ["レヴァンティン"] : []),
-          ...(isHandOpenActive ? ["hand_open"] : [])
-        ]}
+        activePersistentEffects={activePersistentEffects}
         draggedCard={dragSelection?.sourceCard ?? null}
         draggedInstanceCount={dragSelection?.instanceIds.length ?? 0}
         draggedSoulCard={soulDragSelection?.sourceSoulCard ?? null}
         draggedSoulInstanceCount={soulDragSelection?.instanceIds.length ?? 0}
         selectedInstanceIds={selectedInstanceIds}
-        onSelectCard={handleSelectCard}
-        onDoubleClickCard={handleDoubleClickCard}
-        onContextMenuCard={handleContextMenuCard}
-        onDragStartCard={handleDragStartCard}
-        onDragEndCard={handleDragEndCard}
-        onDropCard={handleDropCard}
-        onDoubleClickZone={handleDoubleClickZone}
-        onContextMenuZone={handleContextMenuZone}
-        onChangeLife={handleChangeSelfLife}
-        onRollDice={handleRollSelfDice}
-        onClearDice={handleClearSelfDice}
-        placementTargetZones={
-          selectionMode?.type === "zone"
-            ? new Set(selectionMode.allowedZones)
-            : undefined
-        }
-        placementTargetPlayerId={
-          selectionMode?.type === "zone" ? selectionMode.playerId : undefined
-        }
-        onPlacementZoneClick={(zoneId, event, playerId) => {
-          if (selectionMode?.type !== "zone" || selectionMode.playerId !== playerId) {
-            return;
-          }
-
-          selectionMode.onSelect(zoneId, {
-            x: event.clientX,
-            y: event.clientY,
-            event
-          });
-        }}
+        onSelectCard={stableSelectCard}
+        onDoubleClickCard={stableDoubleClickCard}
+        onContextMenuCard={stableContextMenuCard}
+        onDragStartCard={stableDragStartCard}
+        onDragEndCard={stableDragEndCard}
+        onDropCard={stableDropCard}
+        onDoubleClickZone={stableDoubleClickZone}
+        onContextMenuZone={stableContextMenuZone}
+        onChangeLife={stableChangeSelfLife}
+        onRollDice={stableRollSelfDice}
+        onClearDice={stableClearSelfDice}
+        placementTargetZones={placementTargetZones}
+        placementTargetPlayerId={placementTargetPlayerId}
+        onPlacementZoneClick={stablePlacementZoneClick}
       />
 
       <BattleSidebar
@@ -3359,18 +3527,18 @@ export function BattleController() {
         selectedInstanceIds={selectedInstanceIds}
         selectedSoulInstanceIds={selectedSoulInstanceIds}
         viewerPinned={viewerPinned}
-        onCloseViewer={closeViewerCard}
-        onSelectCard={handleSelectCard}
-        onToggleViewerPin={() => setViewerPinned((current) => !current)}
-        onContextMenuCard={handleContextMenuCard}
-        onSelectSoulCard={handleSelectSoulCard}
-        onDragStartCard={handleDragStartCard}
-        onDragEndCard={handleDragEndCard}
-        onDragStartSoulCard={handleDragStartSoulCard}
-        onDragEndSoulCard={handleDragEndSoulCard}
-        onContextMenuSoulCard={handleContextMenuSoulCard}
-        onDoubleClickFaceDownSoul={handleDoubleClickFaceDownSoul}
-        onDropCard={handleDropCard}
+        onCloseViewer={stableCloseViewer}
+        onSelectCard={stableSelectCard}
+        onToggleViewerPin={stableToggleViewerPin}
+        onContextMenuCard={stableContextMenuCard}
+        onSelectSoulCard={stableSelectSoulCard}
+        onDragStartCard={stableDragStartCard}
+        onDragEndCard={stableDragEndCard}
+        onDragStartSoulCard={stableDragStartSoulCard}
+        onDragEndSoulCard={stableDragEndSoulCard}
+        onContextMenuSoulCard={stableContextMenuSoulCard}
+        onDoubleClickFaceDownSoul={stableDoubleClickFaceDownSoul}
+        onDropCard={stableDropCard}
       />
 
       {deckContextMenu && (

@@ -106,6 +106,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [searchError, setSearchError] = useState("");
   const [cardSets, setCardSets] = useState<DeckCardSetOption[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const loadedImageCardIdsRef = useRef(new Set<string>());
+  const imageDeckIdRef = useRef<string | null>(null);
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
   const [siteDefaultSleeveSupplyId, setSiteDefaultSleeveSupplyId] = useState("");
   const [savedDeckCards, setSavedDeckCards] = useState<DeckCardRecord[]>([]);
@@ -204,6 +206,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       )
     ] as string[];
     const imageResult = await loadCardImagesByCardIds(imageCardIds);
+    if (!imageResult.error) {
+      imageCardIds.forEach((cardId) => loadedImageCardIdsRef.current.add(cardId));
+    }
 
     setDeck(nextDeck);
     setIsNewDeckDraft(false);
@@ -256,6 +261,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       if (!profile) {
         window.location.href = "/login";
         return;
+      }
+      if (imageDeckIdRef.current !== resolvedDeckId) {
+        imageDeckIdRef.current = resolvedDeckId;
+        loadedImageCardIdsRef.current.clear();
       }
       setCurrentUserId(profile.id);
       if (resolvedDeckId === "new") {
@@ -351,12 +360,24 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     [draftDeckCards]
   );
 
+  const imagesByCardRef = useRef(new Map<string, CardImageRecord[]>());
   const imagesByCard = useMemo(() => {
     const map = new Map<string, CardImageRecord[]>();
     for (const image of images) {
-      const current = map.get(image.card_id) ?? [];
-      map.set(image.card_id, [...current, image]);
+      const cardImages = map.get(image.card_id);
+      if (cardImages) cardImages.push(image);
+      else map.set(image.card_id, [image]);
     }
+    for (const [cardId, cardImages] of map) {
+      const previousCardImages = imagesByCardRef.current.get(cardId);
+      if (
+        previousCardImages?.length === cardImages.length &&
+        previousCardImages.every((image, index) => image === cardImages[index])
+      ) {
+        map.set(cardId, previousCardImages);
+      }
+    }
+    imagesByCardRef.current = map;
     return map;
   }, [images]);
 
@@ -578,37 +599,71 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   useEffect(() => {
     const missingCardIds = visibleImageCardIds.filter(
-      (cardId) => !imagesByCard.has(cardId)
+      (cardId) =>
+        !loadedImageCardIdsRef.current.has(cardId) &&
+        !imagesByCard.has(cardId)
     );
 
     if (missingCardIds.length === 0) return;
 
     let cancelled = false;
+    const pendingCardIds = new Set(missingCardIds);
+    const previewCardId = searchPreviewCard?.id;
+    const priorityCardIds = previewCardId && pendingCardIds.has(previewCardId)
+      ? [previewCardId]
+      : [];
+    const backgroundCardIds = missingCardIds.filter(
+      (cardId) => cardId !== previewCardId
+    );
+    missingCardIds.forEach((cardId) => loadedImageCardIdsRef.current.add(cardId));
+
+    async function loadImageBatch(cardIds: string[]) {
+      if (cardIds.length === 0) return;
+      try {
+        const result = await loadCardImagesByCardIds(cardIds);
+        if (cancelled || result.error) {
+          cardIds.forEach((cardId) => {
+            loadedImageCardIdsRef.current.delete(cardId);
+            pendingCardIds.delete(cardId);
+          });
+          return;
+        }
+        cardIds.forEach((cardId) => pendingCardIds.delete(cardId));
+        if (!result.data?.length) return;
+
+        setImages((current) => {
+          const knownIds = new Set(current.map((image) => image.id));
+          const next = [...current];
+
+          for (const image of result.data ?? []) {
+            if (knownIds.has(image.id)) continue;
+            knownIds.add(image.id);
+            next.push(image);
+          }
+
+          return next;
+        });
+      } catch (error) {
+        console.warn("デッキ編集のカード画像を読み込めませんでした。", error);
+        cardIds.forEach((cardId) => {
+          loadedImageCardIdsRef.current.delete(cardId);
+          pendingCardIds.delete(cardId);
+        });
+      }
+    }
 
     async function loadVisibleImages() {
-      const result = await loadCardImagesByCardIds(missingCardIds);
-      if (cancelled || result.error || !result.data?.length) return;
-
-      setImages((current) => {
-        const knownIds = new Set(current.map((image) => image.id));
-        const next = [...current];
-
-        for (const image of result.data ?? []) {
-          if (knownIds.has(image.id)) continue;
-          knownIds.add(image.id);
-          next.push(image);
-        }
-
-        return next;
-      });
+      await loadImageBatch(priorityCardIds);
+      if (!cancelled) await loadImageBatch(backgroundCardIds);
     }
 
     void loadVisibleImages();
 
     return () => {
       cancelled = true;
+      pendingCardIds.forEach((cardId) => loadedImageCardIdsRef.current.delete(cardId));
     };
-  }, [imagesByCard, visibleImageCardIds]);
+  }, [imagesByCard, searchPreviewCard?.id, visibleImageCardIds]);
 
   async function handleSaveDeck() {
     if (!canEditDeck) {

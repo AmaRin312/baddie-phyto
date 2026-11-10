@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { BoardCard } from "@/components/cards/BoardCard";
 import { BattleCompositeCardView } from "@/components/battle/BattleCompositeCardView";
@@ -67,7 +68,36 @@ type BattleSidebarProps = {
   onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
 };
 
-function HandCards({
+type HandCardsProps = {
+  cards: BattleCard[];
+  self?: boolean;
+  cardMap: Map<string, CardRecord>;
+  imagesByCard: Map<string, CardImageRecord[]>;
+  sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
+  draggedCard: BattleCard | null;
+  draggedInstanceCount: number;
+  draggedSoulCard: BattleCard | null;
+  draggedSoulInstanceCount: number;
+  onSelectCard: BattleSidebarProps["onSelectCard"];
+  onContextMenuCard: BattleSidebarProps["onContextMenuCard"];
+  onDragStartCard: BattleSidebarProps["onDragStartCard"];
+  onDragEndCard: BattleSidebarProps["onDragEndCard"];
+  onDropCard: BattleSidebarProps["onDropCard"];
+  selectedInstanceIds: ReadonlySet<string>;
+};
+
+function sameImagesForCardIds(
+  previous: Map<string, CardImageRecord[]>,
+  next: Map<string, CardImageRecord[]>,
+  cardIds: Iterable<string>
+) {
+  for (const cardId of cardIds) {
+    if (previous.get(cardId) !== next.get(cardId)) return false;
+  }
+  return true;
+}
+
+const HandCards = memo(function HandCards({
   cards,
   self,
   cardMap,
@@ -83,30 +113,7 @@ function HandCards({
   onDragStartCard,
   onDragEndCard,
   onDropCard
-}: {
-  cards: BattleCard[];
-  self?: boolean;
-  cardMap: Map<string, CardRecord>;
-  imagesByCard: Map<string, CardImageRecord[]>;
-  sleeveImageUrls?: Partial<Record<"self" | "opponent", string | null>>;
-  draggedCard: BattleCard | null;
-  draggedInstanceCount: number;
-  draggedSoulCard: BattleCard | null;
-  draggedSoulInstanceCount: number;
-  onSelectCard: (
-    card: BattleCard,
-    input?: { shiftKey?: boolean; playerId?: "self" | "opponent" }
-  ) => void;
-  onContextMenuCard: (
-    card: BattleCard,
-    event: MouseEvent<HTMLButtonElement>,
-    playerId: "self" | "opponent"
-  ) => void;
-  onDragStartCard: (card: BattleCard, playerId: "self" | "opponent") => void;
-  onDragEndCard: () => void;
-  onDropCard: (zoneId: BattleZoneId, input?: BattleDropInput) => void;
-  selectedInstanceIds: ReadonlySet<string>;
-}) {
+}: HandCardsProps) {
   const canDropToHand =
     self &&
     ((draggedSoulCard != null &&
@@ -220,9 +227,51 @@ function HandCards({
       {cards.length === 0 && <p className="bf-hand-empty">{"0\u679a"}</p>}
     </div>
   );
+}, (previous, next) => {
+  for (const key of Object.keys(previous) as Array<keyof HandCardsProps>) {
+    if (key === "imagesByCard") continue;
+    if (!Object.is(previous[key], next[key])) return false;
+  }
+  return sameImagesForCardIds(
+    previous.imagesByCard,
+    next.imagesByCard,
+    previous.cards.map((card) => card.cardId)
+  );
+});
+
+function collectSidebarImageCardIds(props: BattleSidebarProps) {
+  const cardIds = new Set<string>();
+  const addCard = (card: BattleCard) => {
+    cardIds.add(card.cardId);
+    card.soul.forEach(addCard);
+  };
+
+  props.battleState.players.self.zones.hand.cards.forEach(addCard);
+  props.battleState.players.opponent.zones.hand.cards.forEach(addCard);
+  const viewerCards = props.viewerCards.length > 0
+    ? props.viewerCards.slice(0, 2)
+    : props.activeCard ? [props.activeCard] : [];
+  viewerCards.forEach((card) => {
+    addCard(card);
+    findCompositeGroupCardsInBattleState(props.battleState, card).forEach(addCard);
+  });
+  if (props.activeCard) addCard(props.activeCard);
+  return cardIds;
 }
 
-export function BattleSidebar({
+function areBattleSidebarPropsEqual(previous: BattleSidebarProps, next: BattleSidebarProps) {
+  for (const key of Object.keys(previous) as Array<keyof BattleSidebarProps>) {
+    if (key === "imagesByCard") continue;
+    if (!Object.is(previous[key], next[key])) return false;
+  }
+  return sameImagesForCardIds(
+    previous.imagesByCard,
+    next.imagesByCard,
+    collectSidebarImageCardIds(previous)
+  );
+}
+
+function BattleSidebarComponent({
   battleState,
   activeCard,
   activeCardPlayerId = "self",
@@ -374,3 +423,5 @@ export function BattleSidebar({
     </aside>
   );
 }
+
+export const BattleSidebar = memo(BattleSidebarComponent, areBattleSidebarPropsEqual);

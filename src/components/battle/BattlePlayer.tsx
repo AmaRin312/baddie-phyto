@@ -62,6 +62,8 @@ type BattlePlayerProps = {
   onClearDice?: () => void;
 };
 
+const EMPTY_EFFECTS: string[] = [];
+
 function BattlePlayerComponent({
   player,
   side,
@@ -69,7 +71,7 @@ function BattlePlayerComponent({
   imagesByCard,
   sleeveImageUrl = null,
   playmatImageUrl = null,
-  activePersistentEffects = [],
+  activePersistentEffects = EMPTY_EFFECTS,
   draggedCard,
   draggedInstanceCount,
   draggedSoulCard,

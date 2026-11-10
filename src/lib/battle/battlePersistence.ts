@@ -1,4 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
+import {
+  finishBattleSaveMeasurement,
+  startBattleSaveMeasurement
+} from "@/lib/battle/battlePerfMetrics";
 import type { BattleState } from "@/types/battle";
 
 type BattleStateRow = {
@@ -54,10 +58,14 @@ export async function loadBattleState(roomId: string) {
 export async function saveBattleState(input: {
   roomId: string;
   battleState: BattleState;
+  updatedBy?: string | null;
 }) {
-  const updatedBy = await getCurrentUserId();
   const battleState = normalizeBattleState(input.battleState);
-  const { error } = await supabase
+  const measurement = startBattleSaveMeasurement("battle_states", battleState);
+  const updatedBy = input.updatedBy !== undefined
+    ? input.updatedBy
+    : await getCurrentUserId();
+  const { data, error } = await supabase
     .from("battle_states")
     .upsert(
       {
@@ -73,12 +81,14 @@ export async function saveBattleState(input: {
     );
 
   if (error) console.error(error);
+  finishBattleSaveMeasurement(measurement, Boolean(error), data);
   return { error };
 }
 
 export async function createBattleState(input: {
   roomId: string;
   battleState: BattleState;
+  updatedBy?: string | null;
 }) {
   return await saveBattleState(input);
 }

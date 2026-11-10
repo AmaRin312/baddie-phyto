@@ -1,5 +1,9 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import {
+  finishBattleSaveMeasurement,
+  startBattleSaveMeasurement
+} from "@/lib/battle/battlePerfMetrics";
 import type { BattlePlayerId, PlayerState } from "@/types/battle";
 
 export type RealtimeStatus =
@@ -134,24 +138,35 @@ export async function saveSyncedPlayerBattleState(input: {
   seatKey: BattlePlayerSeat;
   state: PlayerState;
   expectedVersion: number;
-}): Promise<{ data: SyncedPlayerBattleState | null; error: string | null }> {
-  const { data, error } = await supabase.rpc("save_battle_player_state", {
+}): Promise<{ data: { version: number } | null; error: string | null }> {
+  const measurement = startBattleSaveMeasurement(
+    `battle_player_states:${input.seatKey}`,
+    input.state
+  );
+  const args = {
     p_room_id: input.roomId,
     p_seat_key: input.seatKey,
     p_state: input.state,
     p_expected_version: input.expectedVersion
-  });
+  };
+  let { data, error } = await supabase.rpc("save_battle_player_state_compact", args);
+
+  if (error?.code === "PGRST202" || error?.code === "42883") {
+    ({ data, error } = await supabase.rpc("save_battle_player_state", args));
+  }
 
   if (error) {
     console.error(error);
+    finishBattleSaveMeasurement(measurement, true, data);
     return { data: null, error: error.message };
   }
 
-  const rows = data as BattlePlayerStateRow[] | null;
-  const row = rows?.[0] ?? null;
+  finishBattleSaveMeasurement(measurement, false, data);
+  const result = data as Array<{ version?: number }> | null;
+  const version = result?.[0]?.version;
   return {
-    data: row ? toSyncedPlayerState(row) : null,
-    error: null
+    data: typeof version === "number" ? { version } : null,
+    error: typeof version === "number" ? null : "保存結果からバージョンを取得できませんでした。"
   };
 }
 

@@ -8412,3 +8412,43 @@ body:has(.bf-battle-app) {
 .dm-admin-update-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dm-site-update-notice button { padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 9px; background: white; cursor: pointer; }
 .dm-site-update-notice button:first-child { color: white; background: #2563eb; }
+
+/* Compact deck tiles: reduce the outer frame by 10% horizontally and 20% vertically. */
+.dm-deck-management-section .dm-app-grid {
+  grid-template-columns: repeat(auto-fill, 135px);
+}
+
+.dm-deck-management-section .dm-app-card {
+  height: 122px;
+  padding: 6px 8px;
+  gap: 4px;
+}
+
+.dm-deck-management-section .dm-app-card h2 {
+  min-height: 2.2em;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.dm-deck-management-section .dm-app-card p,
+.dm-deck-management-section .dm-muted-text {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.dm-deck-management-images {
+  width: 61px;
+  height: 58px;
+}
+
+.dm-deck-management-images > div,
+.dm-deck-management-images article {
+  width: 34px;
+  height: 43px;
+}
+
+.dm-deck-management-empty {
+  min-width: 34px;
+  min-height: 43px;
+  font-size: 8px;
+}

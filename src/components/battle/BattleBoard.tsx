@@ -11,6 +11,8 @@ import type {
 } from "@/types/battle";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 
+const EMPTY_EFFECTS: string[] = [];
+
 type BattleBoardProps = {
   battleState: BattleState;
   cardMap: Map<string, CardRecord>;
@@ -82,7 +84,7 @@ function BattleBoardComponent({
   placementTargetPlayerId,
   sleeveImageUrls,
   playmatImageUrls,
-  activePersistentEffects = [],
+  activePersistentEffects = EMPTY_EFFECTS,
   onPlacementZoneClick,
   onChangeLife,
   onRollDice,
@@ -107,7 +109,7 @@ function BattleBoardComponent({
         imagesByCard={imagesByCard}
         sleeveImageUrl={sleeveImageUrls?.opponent ?? null}
         playmatImageUrl={playmatImageUrls?.opponent ?? null}
-        activePersistentEffects={[]}
+        activePersistentEffects={EMPTY_EFFECTS}
         draggedCard={draggedCard}
         draggedInstanceCount={draggedInstanceCount}
         draggedSoulCard={draggedSoulCard}

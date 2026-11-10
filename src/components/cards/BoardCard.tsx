@@ -1,5 +1,8 @@
+import { memo } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
+
+const EMPTY_IMAGES: readonly CardImageRecord[] = [];
 
 type BoardCardProps = {
   card: CardRecord;
@@ -12,9 +15,9 @@ type BoardCardProps = {
   preserveOrientation?: boolean;
 };
 
-export function BoardCard({
+export const BoardCard = memo(function BoardCard({
   card,
-  images = [],
+  images = EMPTY_IMAGES,
   selectedImageId,
   isPublic = true,
   sleeveImageUrl = null,
@@ -35,4 +38,4 @@ export function BoardCard({
       />
     </div>
   );
-}
+});
