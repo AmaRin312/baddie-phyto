@@ -9,11 +9,15 @@ import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { isBattleAbilityId } from "@/lib/battle/abilities/abilityTypes";
 import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
-import { searchCardRecords, setCardActive } from "@/lib/cards/cardActions";
-import { getCardTypeLabel, type CardRecord } from "@/types/baddiePhyto";
+import {
+  searchCardRecords,
+  setCardActive,
+  type CardAdminListRecord
+} from "@/lib/cards/cardActions";
+import { getCardTypeLabel } from "@/types/baddiePhyto";
 
 export default function CardsPage() {
-  const [cards, setCards] = useState<CardRecord[]>([]);
+  const [cards, setCards] = useState<CardAdminListRecord[]>([]);
   const [abilityKeyMap, setAbilityKeyMap] = useState<Map<string, string[]>>(
     () => new Map()
   );
@@ -67,7 +71,7 @@ export default function CardsPage() {
     void loadPage();
   }, [reload]);
 
-  async function handleDeactivate(card: CardRecord) {
+  async function handleDeactivate(card: CardAdminListRecord) {
     if (!window.confirm(`「${card.name}」を無効化しますか？`)) return;
     setDeletingId(card.id);
     setMessage("");

@@ -55,7 +55,7 @@ export default function FlagEditPage({ params }: FlagEditPageProps) {
   async function reload(nextFlagId: string) {
     const [flagResult, cardResult] = await Promise.all([
       loadFlag(nextFlagId),
-      loadCards({ activeOnly: true })
+      loadCards({ activeOnly: true, cardType: "flag_card" })
     ]);
 
     if (flagResult.error || !flagResult.data) {

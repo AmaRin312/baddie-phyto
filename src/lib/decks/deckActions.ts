@@ -54,6 +54,18 @@ type CachedDeckCardListResponse = {
   error: { message: string } | null;
 };
 
+export type DeckListSection = "own" | "public" | "default";
+export type DeckListPage = { items: DeckRecord[]; totalCount: number };
+export type DeckListPages = Record<DeckListSection, DeckListPage>;
+type CachedDeckPageResponse = {
+  data: DeckListPage | null;
+  error: { message: string } | null;
+};
+type CachedDeckPagesResponse = {
+  data: DeckListPages | null;
+  error: { message: string } | null;
+};
+
 const decksCache = new Map<string, { expiresAt: number; value: CachedDeckListResponse }>();
 const deckCache = new Map<string, { expiresAt: number; value: CachedDeckResponse }>();
 const deckCardsCache = new Map<
@@ -63,6 +75,11 @@ const deckCardsCache = new Map<
 const decksInFlight = new Map<string, Promise<CachedDeckListResponse>>();
 const deckInFlight = new Map<string, Promise<CachedDeckResponse>>();
 const deckCardsInFlight = new Map<string, Promise<CachedDeckCardListResponse>>();
+const deckPagesCache = new Map<string, { expiresAt: number; value: CachedDeckPageResponse }>();
+const deckPagesInFlight = new Map<string, Promise<CachedDeckPageResponse>>();
+const deckSectionsCache = new Map<string, { expiresAt: number; value: CachedDeckPagesResponse }>();
+const deckSectionsInFlight = new Map<string, Promise<CachedDeckPagesResponse>>();
+let deckPageCacheGeneration = 0;
 
 function getTimedCache<T>(cache: Map<string, { expiresAt: number; value: T }>, key: string) {
   const cached = cache.get(key);
@@ -86,13 +103,23 @@ function setTimedCache<T>(
 }
 
 function clearDeckCaches() {
+  deckPageCacheGeneration += 1;
   decksCache.clear();
   deckCache.clear();
   deckCardsCache.clear();
+  deckPagesCache.clear();
+  deckPagesInFlight.clear();
+  deckSectionsCache.clear();
+  deckSectionsInFlight.clear();
 }
 
 export function invalidateDeckListCache() {
+  deckPageCacheGeneration += 1;
   decksCache.clear();
+  deckPagesCache.clear();
+  deckPagesInFlight.clear();
+  deckSectionsCache.clear();
+  deckSectionsInFlight.clear();
 }
 
 function isMissingColumnError(error: { code?: string; message: string }, columnName: string) {
@@ -149,6 +176,158 @@ export async function loadDeckIdsWithUnavailableCards() {
     data: result.data as { deck_id: string }[] | null,
     error: result.error
   };
+}
+
+export async function loadDeckListPage(input: {
+  section: DeckListSection;
+  ownerId: string;
+  page: number;
+  pageSize: number;
+  eraKey?: DeckEraKey | "";
+  flagId?: string;
+}): Promise<CachedDeckPageResponse> {
+  const key = [input.section, input.ownerId, input.page, input.pageSize, input.eraKey ?? "", input.flagId ?? ""].join(":");
+  const cached = getTimedCache(deckPagesCache, key);
+  if (cached) return cached;
+  const inFlight = deckPagesInFlight.get(key);
+  if (inFlight) return inFlight;
+
+  const cacheGeneration = deckPageCacheGeneration;
+  const request: Promise<CachedDeckPageResponse> = (async () => {
+    try {
+      const result = await supabase.rpc("list_deck_section_page", {
+        p_section: input.section,
+        p_era_key: input.eraKey || null,
+        p_flag_id: input.flagId || null,
+        p_page: input.page,
+        p_page_size: input.pageSize
+      });
+      if (!result.error) {
+        const payload = result.data as { items?: DeckRecord[]; totalCount?: number } | null;
+        const response = {
+          data: {
+            items: Array.isArray(payload?.items) ? payload.items : [],
+            totalCount: Number(payload?.totalCount ?? 0)
+          },
+          error: null
+        };
+        if (cacheGeneration === deckPageCacheGeneration) {
+          setTimedCache(deckPagesCache, key, response);
+        }
+        return response;
+      }
+      if (result.error.code !== "PGRST202") {
+        return { data: null, error: result.error };
+      }
+
+      // Keep the listing usable until the accompanying SQL migration is applied.
+      const fallback = await loadDecks();
+      if (fallback.error) return { data: null, error: fallback.error };
+      const filtered = (fallback.data ?? []).filter((deck) => {
+        const sectionMatches = input.section === "own"
+          ? deck.owner_id === input.ownerId && deck.deck_visibility !== "default" && deck.deck_visibility !== "public"
+          : deck.deck_visibility === input.section;
+        return sectionMatches &&
+          (!input.eraKey || deck.era_key === input.eraKey) &&
+          (!input.flagId || deck.flag_id === input.flagId);
+      });
+      const start = input.page * input.pageSize;
+      const response = {
+        data: { items: filtered.slice(start, start + input.pageSize), totalCount: filtered.length },
+        error: null
+      };
+      if (cacheGeneration === deckPageCacheGeneration) {
+        setTimedCache(deckPagesCache, key, response);
+      }
+      return response;
+    } finally {
+      if (cacheGeneration === deckPageCacheGeneration) deckPagesInFlight.delete(key);
+    }
+  })();
+  deckPagesInFlight.set(key, request);
+  return request;
+}
+
+export async function loadDeckListPages(input: {
+  ownerId: string;
+  pages: Record<DeckListSection, number>;
+  pageSize: number;
+  eraKey?: DeckEraKey | "";
+  flagId?: string;
+}): Promise<CachedDeckPagesResponse> {
+  const key = [
+    input.ownerId,
+    input.pages.own,
+    input.pages.public,
+    input.pages.default,
+    input.pageSize,
+    input.eraKey ?? "",
+    input.flagId ?? ""
+  ].join(":");
+  const cached = getTimedCache(deckSectionsCache, key);
+  if (cached) return cached;
+  const inFlight = deckSectionsInFlight.get(key);
+  if (inFlight) return inFlight;
+
+  const cacheGeneration = deckPageCacheGeneration;
+  const request: Promise<CachedDeckPagesResponse> = (async () => {
+    try {
+      const result = await supabase.rpc("list_deck_sections_page", {
+        p_era_key: input.eraKey || null,
+        p_flag_id: input.flagId || null,
+        p_own_page: input.pages.own,
+        p_public_page: input.pages.public,
+        p_default_page: input.pages.default,
+        p_page_size: input.pageSize
+      });
+      if (!result.error) {
+        const payload = result.data as Partial<DeckListPages> | null;
+        const sections = ["own", "public", "default"] as const;
+        const data = Object.fromEntries(sections.map((section) => {
+          const page = payload?.[section] as DeckListPage | undefined;
+          return [section, {
+            items: Array.isArray(page?.items) ? page.items : [],
+            totalCount: Number(page?.totalCount ?? 0)
+          }];
+        })) as DeckListPages;
+        const response = { data, error: null };
+        if (cacheGeneration === deckPageCacheGeneration) {
+          setTimedCache(deckSectionsCache, key, response);
+        }
+        return response;
+      }
+      if (result.error.code !== "PGRST202") {
+        return { data: null, error: result.error };
+      }
+
+      const sections = ["own", "public", "default"] as const;
+      const fallbackResults = await Promise.all(sections.map((section) =>
+        loadDeckListPage({
+          section,
+          ownerId: input.ownerId,
+          page: input.pages[section],
+          pageSize: input.pageSize,
+          eraKey: input.eraKey,
+          flagId: input.flagId
+        })
+      ));
+      const failed = fallbackResults.find((fallback) => fallback.error);
+      if (failed?.error) return { data: null, error: failed.error };
+      const data = Object.fromEntries(sections.map((section, index) => [
+        section,
+        fallbackResults[index].data ?? { items: [], totalCount: 0 }
+      ])) as DeckListPages;
+      const response = { data, error: null };
+      if (cacheGeneration === deckPageCacheGeneration) {
+        setTimedCache(deckSectionsCache, key, response);
+      }
+      return response;
+    } finally {
+      if (cacheGeneration === deckPageCacheGeneration) deckSectionsInFlight.delete(key);
+    }
+  })();
+  deckSectionsInFlight.set(key, request);
+  return request;
 }
 
 export async function loadDeck(deckId: string) {

@@ -5,6 +5,7 @@ import {
   normalizeImportText
 } from "@/lib/cards/excelZipImport/excelZipImportNormalization";
 import { getExcelZipImageStoragePath } from "@/lib/cards/excelZipImport/excelZipImageHash";
+import { createCardThumbnail } from "@/lib/storage/cardImageStorage";
 import type {
   ExcelZipCardGroup,
   ExcelZipImageEntry,
@@ -183,11 +184,28 @@ async function uploadImagesForCard(input: {
     }
 
     uploadedPaths.push(path);
+    const thumbnailPath = `${input.userId}/${input.cardId}/thumbnails/${crypto.randomUUID()}.webp`;
+    let storedThumbnailPath = path;
+    try {
+      const thumbnail = await createCardThumbnail(uploadBlob);
+      if (thumbnail) {
+        const thumbnailUpload = await supabase.storage.from(BUCKET_NAME).upload(thumbnailPath, thumbnail, {
+          upsert: false,
+          contentType: "image/webp"
+        });
+        if (!thumbnailUpload.error) {
+          storedThumbnailPath = thumbnailPath;
+          uploadedPaths.push(thumbnailPath);
+        }
+      }
+    } catch (thumbnailError) {
+      console.warn(`サムネイル生成に失敗しました。元画像を使用します: ${imageFile}`, thumbnailError);
+    }
     imageRows.push({
       card_id: input.cardId,
       owner_id: input.userId,
       image_path: path,
-      thumbnail_path: path,
+      thumbnail_path: storedThumbnailPath,
       is_default: !input.hasExistingImages && index === 0
     });
   }

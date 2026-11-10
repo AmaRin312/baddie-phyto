@@ -66,7 +66,10 @@ function CardViewerComponent({
     );
   }
 
-  const imageSrc = variant === "board" ? displayCard.thumbnailUrl : displayCard.imageUrl;
+  const imageSrc =
+    variant === "board" || variant === "compact"
+      ? displayCard.thumbnailUrl
+      : displayCard.imageUrl;
   const shouldForcePortraitImage =
     card.orientation === "horizontal" &&
     !preserveOrientation;

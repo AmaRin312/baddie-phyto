@@ -46,6 +46,7 @@ type CardListCacheEntry = {
 
 const cardListCache = new Map<string, CardListCacheEntry>();
 const cardListInFlight = new Map<string, Promise<CachedCardResponse>>();
+let cardCacheGeneration = 0;
 
 function getCachedCardResponse(key: string): CachedCardResponse | null {
   const cached = cardListCache.get(key);
@@ -65,7 +66,9 @@ function setCachedCardResponse(key: string, value: CachedCardResponse) {
 }
 
 function clearCardCache() {
+  cardCacheGeneration += 1;
   cardListCache.clear();
+  cardListInFlight.clear();
 }
 
 export type CreateCardInput = {
@@ -115,14 +118,16 @@ export async function ensureFlagForFlagCard(card: CardRecord) {
   });
 }
 
-export async function loadCards(options?: { activeOnly?: boolean }) {
-  const cacheKey = options?.activeOnly ? "cards:active" : "cards:all";
+export async function loadCards(options?: { activeOnly?: boolean; cardType?: CardType }) {
+  const cacheKey = `cards:${options?.activeOnly ? "active" : "all"}:${options?.cardType ?? "any"}`;
   const cached = getCachedCardResponse(cacheKey);
   if (cached) return cached;
   const inFlight = cardListInFlight.get(cacheKey);
   if (inFlight) return inFlight;
 
-  const request: Promise<CachedCardResponse> = (async () => {
+  const cacheGeneration = cardCacheGeneration;
+  let request: Promise<CachedCardResponse>;
+  request = (async () => {
     try {
       const cards: CardRecord[] = [];
       for (let offset = 0; ; offset += CARD_LIST_PAGE_SIZE) {
@@ -134,6 +139,7 @@ export async function loadCards(options?: { activeOnly?: boolean }) {
           .range(offset, offset + CARD_LIST_PAGE_SIZE - 1);
 
         if (options?.activeOnly) query = query.eq("is_active", true);
+        if (options?.cardType) query = query.eq("card_type", options.cardType);
 
         const result = await query.returns<CardRecord[]>();
         if (result.error) return { data: null, error: result.error };
@@ -143,10 +149,10 @@ export async function loadCards(options?: { activeOnly?: boolean }) {
       }
 
       const result = { data: cards, error: null };
-      setCachedCardResponse(cacheKey, result);
+      if (cacheGeneration === cardCacheGeneration) setCachedCardResponse(cacheKey, result);
       return result;
     } finally {
-      cardListInFlight.delete(cacheKey);
+      if (cacheGeneration === cardCacheGeneration) cardListInFlight.delete(cacheKey);
     }
   })();
 
@@ -170,7 +176,9 @@ export async function loadCardsByIds(cardIds: readonly string[]) {
   const inFlight = cardListInFlight.get(cacheKey);
   if (inFlight) return inFlight;
 
-  const request: Promise<CachedCardResponse> = (async () => {
+  const cacheGeneration = cardCacheGeneration;
+  let request: Promise<CachedCardResponse>;
+  request = (async () => {
     try {
       const result = await supabase
         .from("cards")
@@ -179,13 +187,13 @@ export async function loadCardsByIds(cardIds: readonly string[]) {
         .order("name")
         .returns<CardRecord[]>();
 
-      if (!result.error) {
+      if (!result.error && cacheGeneration === cardCacheGeneration) {
         setCachedCardResponse(cacheKey, result);
       }
 
       return result;
     } finally {
-      cardListInFlight.delete(cacheKey);
+      if (cacheGeneration === cardCacheGeneration) cardListInFlight.delete(cacheKey);
     }
   })();
 
@@ -197,14 +205,23 @@ export async function searchCardRecords(input?: {
   keyword?: string;
   includeInactive?: boolean;
 }) {
-  let query = supabase.from("cards").select(CARD_SELECT_COLUMNS).order("name");
+  let query = supabase
+    .from("cards")
+    .select("id,name,worlds,races,size,card_type,is_active")
+    .order("name")
+    .order("id");
   const keyword = input?.keyword?.trim();
 
   if (keyword) query = query.ilike("name", `%${keyword}%`);
   if (!input?.includeInactive) query = query.eq("is_active", true);
 
-  return await query.returns<CardRecord[]>();
+  return await query.returns<CardAdminListRecord[]>();
 }
+
+export type CardAdminListRecord = Pick<
+  CardRecord,
+  "id" | "name" | "worlds" | "races" | "size" | "card_type" | "is_active"
+>;
 
 export async function searchCards(input?: {
   keyword?: string;

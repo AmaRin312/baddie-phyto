@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/battle/battleRooms";
 import type { BattlePlayerSeat } from "@/lib/battle/battlePlayerStateSync";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
-import { loadAllDeckCards, loadDecks } from "@/lib/decks/deckActions";
+import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
@@ -86,9 +86,11 @@ export function BattleStartPanel() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [selectedDeckId, setSelectedDeckId] = useState("");
   const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
+  const [previewDeckCardsLoading, setPreviewDeckCardsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const previewRequestId = useRef(0);
 
   const flagMap = useMemo(
     () => new Map(flags.map((flag) => [flag.id, flag])),
@@ -159,34 +161,30 @@ export function BattleStartPanel() {
       }
 
       setCurrentUserId(profile.id);
-      const [deckResult, deckCardResult, flagResult] = await Promise.allSettled([
+      void refreshRooms();
+      const [deckResult, flagResult] = await Promise.allSettled([
         loadDecks(),
-        loadAllDeckCards(),
         loadFlagsLite()
       ]);
 
       const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
-      const deckCardsResponse =
-        deckCardResult.status === "fulfilled" ? deckCardResult.value : null;
       const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
 
-      if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
-        console.error(decksResponse?.error ?? deckCardsResponse?.error);
+      if (!decksResponse || decksResponse.error) {
+        console.error(decksResponse?.error);
         setMessage("対戦開始に必要なデッキ情報の読み込みに失敗しました。");
       } else {
         const nextDecks = (decksResponse.data ?? []) as unknown as DeckRecord[];
-        const nextDeckCards = deckCardsResponse.data ?? [];
         const nextFlags = ((flagsResponse?.error ? [] : flagsResponse?.data ?? []) ??
           []) as FlagRecord[];
 
         setDecks(nextDecks);
-        setDeckCards(nextDeckCards);
         setFlags(nextFlags);
 
-        const relatedCardIds = [
-          ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
-          ...nextFlags.map((flag: FlagRecord) => flag.card_id).filter(Boolean)
-        ] as string[];
+        const relatedCardIds = [...new Set([
+          ...nextDecks.map((deck) => deck.buddy_card_id),
+          ...nextFlags.map((flag: FlagRecord) => flag.card_id)
+        ].filter((id): id is string => Boolean(id)))];
 
         const [cardsResponse, imagesResponse] = await Promise.allSettled([
           loadCardsByIds(relatedCardIds),
@@ -211,15 +209,68 @@ export function BattleStartPanel() {
         }
       }
 
-      await refreshRooms();
       setLoading(false);
     }
 
     void loadPage();
-  }, [router]);
+  }, [refreshRooms, router]);
 
   function canStartDeck(deck: DeckRecord | null) {
     return Boolean(deck?.flag_id && deck.buddy_card_id);
+  }
+
+  async function openDeckPreview(deck: DeckRecord) {
+    const requestId = ++previewRequestId.current;
+    setPreviewDeck(deck);
+    setDeckCards([]);
+    setPreviewDeckCardsLoading(true);
+
+    try {
+      const deckCardsResult = await loadDeckCards(deck.id);
+      if (requestId !== previewRequestId.current) return;
+      if (deckCardsResult.error) {
+        setMessage(`デッキ内容の読み込みに失敗しました。${deckCardsResult.error.message}`);
+        setPreviewDeckCardsLoading(false);
+        return;
+      }
+
+      const nextDeckCards = deckCardsResult.data ?? [];
+      setDeckCards(nextDeckCards);
+      const cardIds = [...new Set(nextDeckCards.map((item) => item.card_id))];
+      const missingCardIds = cardIds.filter((id) => !cardMap.has(id));
+      const missingImageIds = cardIds.filter((id) => !imagesByCard.has(id));
+      const [cardsResult, imagesResult] = await Promise.all([
+        loadCardsByIds(missingCardIds),
+        loadCardImagesByCardIds(missingImageIds)
+      ]);
+      if (requestId !== previewRequestId.current) return;
+      if (cardsResult.error || imagesResult.error) {
+        console.warn("Battle deck preview metadata failed to load.", cardsResult.error ?? imagesResult.error);
+      }
+      if (!cardsResult.error && cardsResult.data?.length) {
+        setCards((current) => {
+          const incomingIds = new Set(cardsResult.data!.map((card) => card.id));
+          return [...current.filter((card) => !incomingIds.has(card.id)), ...cardsResult.data!];
+        });
+      }
+      if (!imagesResult.error && imagesResult.data?.length) {
+        setImages((current) => {
+          const incomingIds = new Set(current.map((image) => image.id));
+          return [...current, ...imagesResult.data!.filter((image) => !incomingIds.has(image.id))];
+        });
+      }
+      setPreviewDeckCardsLoading(false);
+    } catch (error) {
+      if (requestId !== previewRequestId.current) return;
+      setMessage(`デッキ内容の読み込みに失敗しました。${error instanceof Error ? error.message : ""}`);
+      setPreviewDeckCardsLoading(false);
+    }
+  }
+
+  function closeDeckPreview() {
+    previewRequestId.current += 1;
+    setPreviewDeck(null);
+    setPreviewDeckCardsLoading(false);
   }
 
   function startSolo(deckId: string) {
@@ -250,9 +301,6 @@ export function BattleStartPanel() {
     const buddyCard = deck.buddy_card_id
       ? cardMap.get(deck.buddy_card_id) ?? null
       : null;
-    const buddyDeckCard = (deckCardMap.get(deck.id) ?? []).find(
-      (deckCard) => deckCard.card_id === deck.buddy_card_id
-    );
     const flagImageId = findDisplayImageId(
       imagesByCard,
       flagCard?.id,
@@ -261,7 +309,7 @@ export function BattleStartPanel() {
     const buddyImageId = findDisplayImageId(
       imagesByCard,
       buddyCard?.id,
-      deck.selected_buddy_image_id ?? buddyDeckCard?.selected_image_id
+      deck.selected_buddy_image_id
     );
 
     return (
@@ -345,7 +393,7 @@ export function BattleStartPanel() {
       <div
         key={deck.id}
         className="dm-deck-management-item"
-        onDoubleClick={() => setPreviewDeck(deck)}
+        onDoubleClick={() => void openDeckPreview(deck)}
       >
         <AppCard title={deck.name}>
           <button
@@ -355,7 +403,7 @@ export function BattleStartPanel() {
             }`}
             onClick={() => setSelectedDeckId(deck.id)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") setPreviewDeck(deck);
+              if (event.key === "Enter") void openDeckPreview(deck);
             }}
             title="クリックで選択、ダブルクリックでデッキ内容を表示"
           >
@@ -492,7 +540,7 @@ export function BattleStartPanel() {
         <div
           className="dm-card-detail-modal-backdrop"
           role="presentation"
-          onClick={() => setPreviewDeck(null)}
+          onClick={closeDeckPreview}
         >
           <section
             className="dm-card-detail-modal dm-deck-action-modal"
@@ -509,20 +557,22 @@ export function BattleStartPanel() {
               <button
                 type="button"
                 className="dm-dialog-close"
-                onClick={() => setPreviewDeck(null)}
+                onClick={closeDeckPreview}
               >
                 ×
               </button>
             </header>
             <div className="dm-card-detail-modal-body">
               <AppCard title="デッキ内容一覧">
-                {renderDeckContentList(previewDeck)}
+                {previewDeckCardsLoading
+                  ? <p className="dm-muted-text">デッキ内容を読み込んでいます。</p>
+                  : renderDeckContentList(previewDeck)}
               </AppCard>
               <div className="dm-dialog-actions">
                 <button
                   type="button"
                   className="dm-button secondary"
-                  onClick={() => setPreviewDeck(null)}
+                  onClick={closeDeckPreview}
                 >
                   戻る
                 </button>
@@ -531,7 +581,7 @@ export function BattleStartPanel() {
                   className="dm-button primary"
                   onClick={() => {
                     setSelectedDeckId(previewDeck.id);
-                    setPreviewDeck(null);
+                    closeDeckPreview();
                   }}
                 >
                   このデッキを選択

@@ -23,7 +23,7 @@ export default function NewFlagPage() {
         return;
       }
 
-      const { data, error } = await loadCards({ activeOnly: true });
+      const { data, error } = await loadCards({ activeOnly: true, cardType: "flag_card" });
       if (error) {
         console.error(error);
         setMessage(`フラッグカード候補の読み込みに失敗しました。${error.message}`);

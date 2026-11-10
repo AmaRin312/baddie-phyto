@@ -12,8 +12,9 @@ import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
   copyDeck,
   deleteDeck,
-  loadAllDeckCards,
-  loadDecks
+  loadDeckListPages,
+  loadDeckCards,
+  type DeckListSection
 } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { getPublicSupplyImageUrl, loadBattleSupplies } from "@/lib/supplies/supplyActions";
@@ -61,15 +62,19 @@ export default function DecksPage() {
   const [supplies, setSupplies] = useState<BattleSupplyRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingPageAssets, setLoadingPageAssets] = useState(false);
   const [message, setMessage] = useState("");
   const [eraFilter, setEraFilter] = useState<DeckEraKey | "">("");
   const [flagFilter, setFlagFilter] = useState("");
   const [sectionPages, setSectionPages] = useState<Record<string, number>>({});
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
+  const [pageRefreshKey, setPageRefreshKey] = useState(0);
   const [selectedDeckForAction, setSelectedDeckForAction] =
     useState<DeckRecord | null>(null);
   const [copyingDeck, setCopyingDeck] = useState(false);
   const [deletingDeck, setDeletingDeck] = useState(false);
   const requestedImageCardIds = useRef(new Set<string>());
+  const lastDeckRefreshAt = useRef(0);
 
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
@@ -88,20 +93,12 @@ export default function DecksPage() {
     return map;
   }, [images]);
 
-  const filteredDecks = useMemo(
-    () => decks.filter(deck =>
-      (!eraFilter || deck.era_key === eraFilter) &&
-      (!flagFilter || deck.flag_id === flagFilter)
-    ),
-    [decks, eraFilter, flagFilter]
-  );
-
   const sections: DeckSection[] = useMemo(
     () => [
       {
         key: "own",
         title: "作成したデッキ",
-        decks: filteredDecks.filter(
+        decks: decks.filter(
           deck =>
             deck.owner_id === currentUserId &&
             deck.deck_visibility !== "default" &&
@@ -111,15 +108,20 @@ export default function DecksPage() {
       {
         key: "public",
         title: "共有デッキ",
-        decks: filteredDecks.filter(deck => deck.deck_visibility === "public")
+        decks: decks.filter(deck => deck.deck_visibility === "public")
       },
       {
         key: "default",
         title: "サンプルデッキ",
-        decks: filteredDecks.filter((deck) => deck.deck_visibility === "default")
+        decks: decks.filter((deck) => deck.deck_visibility === "default")
       }
     ],
-    [currentUserId, filteredDecks]
+    [currentUserId, decks]
+  );
+
+  const visibleDecks = useMemo(
+    () => sections.flatMap((section) => section.decks),
+    [sections]
   );
 
   function resetSectionPages() {
@@ -127,6 +129,8 @@ export default function DecksPage() {
   }
 
   function setSectionPage(key: string, page: number) {
+    if (loadingPageAssets) return;
+    setLoadingPageAssets(true);
     setSectionPages(current => ({ ...current, [key]: page }));
   }
 
@@ -139,94 +143,153 @@ export default function DecksPage() {
       }
 
       setCurrentUserId(profile.id);
-
-      const [deckResult, deckCardResult, flagResult, supplyResult] = await Promise.allSettled([
-        loadDecks({ fresh: true }),
-        loadAllDeckCards(),
-        loadFlagsLite(),
-        loadBattleSupplies()
-      ]);
-
-      const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
-      const deckCardsResponse =
-        deckCardResult.status === "fulfilled" ? deckCardResult.value : null;
-      const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
-      const suppliesResponse = supplyResult.status === "fulfilled" ? supplyResult.value : null;
-
-      if (!decksResponse || !deckCardsResponse || decksResponse.error || deckCardsResponse.error) {
-        console.error(decksResponse?.error ?? deckCardsResponse?.error);
-        setMessage("デッキ一覧の読み込みに失敗しました。商品表示条件のSQL適用状況を確認してください。");
-      } else {
-        const nextDecks = (decksResponse.data ?? []) as unknown as DeckRecord[];
-        const nextDeckIds = new Set(nextDecks.map((deck) => deck.id));
-        const nextDeckCards = (deckCardsResponse.data ?? [])
-          .filter((deckCard) => nextDeckIds.has(deckCard.deck_id));
-        const nextFlags = ((flagsResponse?.error ? [] : flagsResponse?.data ?? []) ??
-          []) as FlagRecord[];
-
-        setDecks(nextDecks);
-        setDeckCards(nextDeckCards);
-        setFlags(nextFlags);
-        setSupplies(suppliesResponse?.error ? [] : suppliesResponse?.data ?? []);
-
-        const relatedCardIds = [
-          ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
-          ...nextFlags.map((flag: FlagRecord) => flag.card_id).filter(Boolean)
-        ] as string[];
-
-        const previewImageCardIds = [
-          ...nextDecks.map((deck) => {
-            const selectedFlag = nextFlags.find((flag) => flag.id === deck.flag_id);
-            return selectedFlag?.card_id ?? null;
-          }),
-          ...nextDecks.map((deck) => deck.buddy_card_id)
-        ].filter(Boolean) as string[];
-        previewImageCardIds.forEach((cardId) => requestedImageCardIds.current.add(cardId));
-
-        const [cardsResponse, imagesResponse] = await Promise.allSettled([
-          loadCardsByIds(relatedCardIds),
-          loadCardImagesByCardIds([...new Set(previewImageCardIds)])
-        ]);
-
-        const nextCardsResponse =
-          cardsResponse.status === "fulfilled" ? cardsResponse.value : null;
-        const nextImagesResponse =
-          imagesResponse.status === "fulfilled" ? imagesResponse.value : null;
-
-        setCards(
-          (nextCardsResponse?.error ? [] : (nextCardsResponse?.data ?? [])) as unknown as CardRecord[]
-        );
-        setImages(nextImagesResponse?.error ? [] : nextImagesResponse?.data ?? []);
-
-        if (flagsResponse?.error || nextCardsResponse?.error || nextImagesResponse?.error) {
-          console.warn(
-            "Optional deck metadata failed to load.",
-            flagsResponse?.error ?? nextCardsResponse?.error ?? nextImagesResponse?.error
-          );
-        }
+      try {
+        const flagResult = await loadFlagsLite();
+        if (flagResult.error) console.warn("Optional flag metadata failed to load.", flagResult.error);
+        setFlags((flagResult.error ? [] : flagResult.data ?? []) as FlagRecord[]);
+      } catch (error) {
+        console.warn("Optional flag metadata failed to load.", error);
+        setFlags([]);
       }
-
-      setLoading(false);
     }
 
     void loadPage();
   }, []);
 
   useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    if (!loading) setLoadingPageAssets(true);
+    void loadDeckListPages({
+      ownerId: currentUserId,
+      pages: {
+        own: sectionPages.own ?? 0,
+        public: sectionPages.public ?? 0,
+        default: sectionPages.default ?? 0
+      },
+      pageSize: DECKS_PER_PAGE,
+      eraKey: eraFilter,
+      flagId: flagFilter
+    }).then((pageResult) => {
+      if (cancelled) return;
+      if (pageResult.error || !pageResult.data) {
+        console.error(pageResult.error);
+        setMessage("デッキ一覧の読み込みに失敗しました。商品表示条件のSQL適用状況を確認してください。");
+        setLoadingPageAssets(false);
+        return;
+      }
+      const sections = ["own", "public", "default"] as const satisfies readonly DeckListSection[];
+      const nextDecks = sections.flatMap((section) => pageResult.data![section].items);
+      const nextCounts = Object.fromEntries(sections.map((section) => [
+        section,
+        pageResult.data![section].totalCount
+      ]));
+      setSectionPages((current) => {
+        let changed = false;
+        const next = { ...current };
+        for (const section of sections) {
+          const count = pageResult.data![section].totalCount;
+          const lastPage = Math.max(0, Math.ceil(count / DECKS_PER_PAGE) - 1);
+          if ((next[section] ?? 0) > lastPage) {
+            next[section] = lastPage;
+            changed = true;
+          }
+        }
+        return changed ? next : current;
+      });
+      setDecks(nextDecks);
+      setSectionCounts(nextCounts);
+      setMessage("");
+      lastDeckRefreshAt.current = Date.now();
+      setLoadingPageAssets(true);
+      setLoading(false);
+    }).catch((error) => {
+      console.error(error);
+      if (!cancelled) {
+        setMessage("デッキ一覧の読み込みに失敗しました。");
+        setLoadingPageAssets(false);
+      }
+    }).finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [currentUserId, eraFilter, flagFilter, pageRefreshKey, sectionPages]);
+
+  useEffect(() => {
+    if (loading || !currentUserId) return;
+    if (visibleDecks.length === 0) {
+      setLoadingPageAssets(false);
+      return;
+    }
+    let cancelled = false;
+    let settled = false;
+    const flagCardIds = visibleDecks
+      .map((deck) => flags.find((flag) => flag.id === deck.flag_id)?.card_id)
+      .filter((id): id is string => Boolean(id));
+    const cardIds = [...new Set([
+      ...flagCardIds,
+      ...visibleDecks.map((deck) => deck.buddy_card_id).filter((id): id is string => Boolean(id))
+    ])];
+    const missingCardIds = cardIds.filter((id) => !cardMap.has(id));
+    const missingImageIds = cardIds.filter((id) => !requestedImageCardIds.current.has(id));
+    missingImageIds.forEach((id) => requestedImageCardIds.current.add(id));
+    if (missingCardIds.length === 0 && missingImageIds.length === 0) {
+      setLoadingPageAssets(false);
+      return;
+    }
+    setLoadingPageAssets(true);
+
+    void Promise.all([
+      loadCardsByIds(missingCardIds),
+      loadCardImagesByCardIds(missingImageIds)
+    ]).then(([cardsResult, imagesResult]) => {
+      settled = true;
+      if (cancelled) return;
+      if (!cardsResult.error && cardsResult.data?.length) {
+        setCards((current) => {
+          const incomingIds = new Set(cardsResult.data!.map((card) => card.id));
+          return [...current.filter((card) => !incomingIds.has(card.id)), ...cardsResult.data!];
+        });
+      }
+      if (cardsResult.error) console.warn("Deck preview cards failed to load.", cardsResult.error);
+      if (imagesResult.error) {
+        missingImageIds.forEach((id) => requestedImageCardIds.current.delete(id));
+        console.warn("Deck preview images failed to load.", imagesResult.error);
+      } else if (imagesResult.data?.length) {
+        setImages((current) => {
+          const existingIds = new Set(current.map((image) => image.id));
+          return [...current, ...imagesResult.data!.filter((image) => !existingIds.has(image.id))];
+        });
+      }
+    }).catch((error) => {
+      console.warn("Deck preview metadata failed to load.", error);
+      missingImageIds.forEach((id) => requestedImageCardIds.current.delete(id));
+    }).finally(() => {
+      settled = true;
+      if (!cancelled) setLoadingPageAssets(false);
+    });
+    return () => {
+      cancelled = true;
+      if (!settled) {
+        missingImageIds.forEach((id) => requestedImageCardIds.current.delete(id));
+      }
+    };
+  }, [cardMap, flags, loading, visibleDecks]);
+
+  useEffect(() => {
     if (loading) return;
     let checking = false;
     async function refreshVisibleDecks() {
-      if (checking || document.visibilityState !== "visible") return;
+      if (
+        checking ||
+        document.visibilityState !== "visible" ||
+        Date.now() - lastDeckRefreshAt.current < 60_000
+      ) return;
       checking = true;
       try {
-        const result = await loadDecks({ fresh: true });
-        if (result.error) return;
-        const visibleDecks = result.data ?? [];
-        const visibleIds = new Set(visibleDecks.map((deck) => deck.id));
-        setDecks(visibleDecks);
-        setSelectedDeckForAction((current) =>
-          current && !visibleIds.has(current.id) ? null : current
-        );
+        setPageRefreshKey((value) => value + 1);
       } finally {
         checking = false;
       }
@@ -238,39 +301,65 @@ export default function DecksPage() {
       window.removeEventListener("focus", refreshVisibleDecks);
       document.removeEventListener("visibilitychange", refreshVisibleDecks);
     };
-  }, [loading]);
+  }, [currentUserId, loading]);
 
   useEffect(() => {
     if (!selectedDeckForAction) return;
-
-    const deckCardIds = (deckCardMap.get(selectedDeckForAction.id) ?? []).map(
-      (deckCard) => deckCard.card_id
-    );
-    const selectedFlag = flags.find((flag) => flag.id === selectedDeckForAction.flag_id);
-    const cardIdsToLoad = [...new Set([
-      ...deckCardIds,
-      selectedFlag?.card_id,
-      selectedDeckForAction.buddy_card_id
-    ].filter((cardId): cardId is string => Boolean(cardId)))].filter(
-      (cardId) => !requestedImageCardIds.current.has(cardId)
-    );
-
-    if (cardIdsToLoad.length === 0) return;
-    cardIdsToLoad.forEach((cardId) => requestedImageCardIds.current.add(cardId));
-
-    void loadCardImagesByCardIds(cardIdsToLoad).then((result) => {
-      if (result.error) {
-        cardIdsToLoad.forEach((cardId) => requestedImageCardIds.current.delete(cardId));
+    let cancelled = false;
+    let imageLoadSettled = false;
+    let pendingImageIds: string[] = [];
+    const deckId = selectedDeckForAction.id;
+    void (async () => {
+      const [deckCardsResult, suppliesResult] = await Promise.all([
+        loadDeckCards(deckId),
+        loadBattleSupplies()
+      ]);
+      if (cancelled) return;
+      if (deckCardsResult.error) {
+        setMessage("デッキ内容の読み込みに失敗しました。");
         return;
       }
-      if (result.data?.length) {
-        setImages((current) => {
-          const knownIds = new Set(current.map((image) => image.id));
-          return [...current, ...result.data!.filter((image) => !knownIds.has(image.id))];
+      const nextDeckCards = deckCardsResult.data ?? [];
+      setDeckCards(current => [
+        ...current.filter(item => item.deck_id !== deckId),
+        ...nextDeckCards
+      ]);
+      if (!suppliesResult.error) setSupplies(suppliesResult.data ?? []);
+
+      const flag = flags.find(item => item.id === selectedDeckForAction.flag_id);
+      const cardIds = [...new Set([
+        ...nextDeckCards.map(item => item.card_id),
+        flag?.card_id,
+        selectedDeckForAction.buddy_card_id
+      ].filter((id): id is string => Boolean(id)))];
+      const missingCardIds = cardIds.filter(id => !cardMap.has(id));
+      const missingImageIds = cardIds.filter(id => !requestedImageCardIds.current.has(id));
+      pendingImageIds = missingImageIds;
+      missingImageIds.forEach(id => requestedImageCardIds.current.add(id));
+      const [cardsResult, imagesResult] = await Promise.all([
+        loadCardsByIds(missingCardIds),
+        loadCardImagesByCardIds(missingImageIds)
+      ]);
+      imageLoadSettled = true;
+      if (cancelled) return;
+      if (!cardsResult.error && cardsResult.data?.length) {
+        setCards(current => [...current.filter(card => !cardsResult.data!.some(next => next.id === card.id)), ...cardsResult.data!]);
+      }
+      if (imagesResult.error) missingImageIds.forEach(id => requestedImageCardIds.current.delete(id));
+      else if (imagesResult.data?.length) {
+        setImages(current => {
+          const ids = new Set(current.map(image => image.id));
+          return [...current, ...imagesResult.data!.filter(image => !ids.has(image.id))];
         });
       }
-    });
-  }, [deckCardMap, flags, selectedDeckForAction]);
+    })();
+    return () => {
+      cancelled = true;
+      if (!imageLoadSettled) {
+        pendingImageIds.forEach(id => requestedImageCardIds.current.delete(id));
+      }
+    };
+  }, [cardMap, flags, selectedDeckForAction]);
 
   async function handleCopySelectedDeck() {
     if (!selectedDeckForAction) return;
@@ -313,10 +402,10 @@ export default function DecksPage() {
       return;
     }
 
-    setDecks((previous) => previous.filter((deck) => deck.id !== targetDeckId));
     setDeckCards((previous) => previous.filter((deckCard) => deckCard.deck_id !== targetDeckId));
     setSelectedDeckForAction(null);
     setMessage("デッキを削除しました。");
+    setPageRefreshKey((value) => value + 1);
   }
 
   function renderDeckContentList(deck: DeckRecord) {
@@ -452,9 +541,12 @@ export default function DecksPage() {
           className="dm-deck-management-filter"
           value={eraFilter}
           onChange={(event) => {
+            if (loading || loadingPageAssets) return;
+            setLoadingPageAssets(true);
             setEraFilter(event.target.value as DeckEraKey | "");
             resetSectionPages();
           }}
+          disabled={loading || loadingPageAssets}
           aria-label="年代フィルタ"
         >
           <option value="">年代: すべて</option>
@@ -468,9 +560,12 @@ export default function DecksPage() {
           className="dm-deck-management-filter"
           value={flagFilter}
           onChange={event => {
+            if (loading || loadingPageAssets) return;
+            setLoadingPageAssets(true);
             setFlagFilter(event.target.value);
             resetSectionPages();
           }}
+          disabled={loading || loadingPageAssets}
           aria-label="フラッグで絞り込み"
         >
           <option value="">フラッグ: すべて</option>
@@ -488,25 +583,26 @@ export default function DecksPage() {
           {sections.map((section) => (
             <section key={section.key} className="dm-deck-management-section">
               {(() => {
-                const pageCount = Math.max(1, Math.ceil(section.decks.length / DECKS_PER_PAGE));
+                const totalCount = sectionCounts[section.key] ?? 0;
+                const pageCount = Math.max(1, Math.ceil(totalCount / DECKS_PER_PAGE));
                 const page = Math.min(sectionPages[section.key] ?? 0, pageCount - 1);
-                const visibleDecks = section.decks.slice(page * DECKS_PER_PAGE, (page + 1) * DECKS_PER_PAGE);
+                const pageDecks = section.decks;
                 return (
                   <>
               <div className="dm-section-heading">
                 <div>
                   <h2>{section.title}</h2>
                 </div>
-                <span>{section.decks.length}件</span>
+                <span>{totalCount}件</span>
               </div>
               <div className="dm-app-grid">
-                {visibleDecks.map(renderDeckCard)}
+                {pageDecks.map(renderDeckCard)}
               </div>
-                    {section.decks.length > DECKS_PER_PAGE && (
+                    {totalCount > DECKS_PER_PAGE && (
                       <nav className="dm-deck-pagination" aria-label={`${section.title}のページ切り替え`}>
-                        <button type="button" className="dm-button secondary" disabled={page === 0} onClick={() => setSectionPage(section.key, page - 1)}>前</button>
+                        <button type="button" className="dm-button secondary" disabled={loadingPageAssets || page === 0} onClick={() => setSectionPage(section.key, page - 1)}>前</button>
                         <span>{page + 1} / {pageCount}</span>
-                        <button type="button" className="dm-button secondary" disabled={page >= pageCount - 1} onClick={() => setSectionPage(section.key, page + 1)}>次</button>
+                        <button type="button" className="dm-button secondary" disabled={loadingPageAssets || page >= pageCount - 1} onClick={() => setSectionPage(section.key, page + 1)}>次</button>
                       </nav>
                     )}
                   </>
