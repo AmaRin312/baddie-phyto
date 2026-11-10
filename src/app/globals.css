@@ -278,6 +278,10 @@ select {
   width: min(1680px, calc(100vw - 56px));
 }
 
+.dm-app-main:has(.dm-deck-management-sections) {
+  width: min(1760px, calc(100vw - 56px));
+}
+
 .dm-app-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4882,6 +4886,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 8px;
 }
 
 .dm-deck-management-filter {
@@ -4906,7 +4911,7 @@ select {
 }
 
 .dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, 125px);
+  grid-template-columns: repeat(auto-fill, 150px);
   justify-content: start;
   gap: 6px;
 }
@@ -4922,7 +4927,7 @@ select {
 }
 
 .dm-deck-management-section .dm-app-card h2 {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.2;
   min-height: 2.4em;
   overflow-wrap: anywhere;
@@ -5037,6 +5042,22 @@ select {
   background: rgba(239, 246, 255, 0.62);
   font-size: 9px;
   font-weight: 850;
+}
+
+.dm-deck-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.dm-deck-pagination > span {
+  min-width: 56px;
+  color: var(--dm-muted);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .dm-deck-action-modal {

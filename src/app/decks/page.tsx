@@ -36,6 +36,8 @@ type DeckSection = {
   decks: DeckRecord[];
 };
 
+const DECKS_PER_PAGE = 30;
+
 function findDisplayImageId(
   imagesByCard: Map<string, CardImageRecord[]>,
   cardId: string | null | undefined,
@@ -61,6 +63,8 @@ export default function DecksPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [eraFilter, setEraFilter] = useState<DeckEraKey | "">("");
+  const [flagFilter, setFlagFilter] = useState("");
+  const [sectionPages, setSectionPages] = useState<Record<string, number>>({});
   const [selectedDeckForAction, setSelectedDeckForAction] =
     useState<DeckRecord | null>(null);
   const [copyingDeck, setCopyingDeck] = useState(false);
@@ -84,17 +88,20 @@ export default function DecksPage() {
     return map;
   }, [images]);
 
-  const eraFilteredDecks = useMemo(() => {
-    if (!eraFilter) return decks;
-    return decks.filter((deck) => deck.era_key === eraFilter);
-  }, [decks, eraFilter]);
+  const filteredDecks = useMemo(
+    () => decks.filter(deck =>
+      (!eraFilter || deck.era_key === eraFilter) &&
+      (!flagFilter || deck.flag_id === flagFilter)
+    ),
+    [decks, eraFilter, flagFilter]
+  );
 
   const sections: DeckSection[] = useMemo(
     () => [
       {
         key: "own",
         title: "作成したデッキ",
-        decks: eraFilteredDecks.filter(
+        decks: filteredDecks.filter(
           deck =>
             deck.owner_id === currentUserId &&
             deck.deck_visibility !== "default" &&
@@ -104,16 +111,24 @@ export default function DecksPage() {
       {
         key: "public",
         title: "共有デッキ",
-        decks: eraFilteredDecks.filter(deck => deck.deck_visibility === "public")
+        decks: filteredDecks.filter(deck => deck.deck_visibility === "public")
       },
       {
         key: "default",
         title: "サンプルデッキ",
-        decks: eraFilteredDecks.filter((deck) => deck.deck_visibility === "default")
+        decks: filteredDecks.filter((deck) => deck.deck_visibility === "default")
       }
     ],
-    [currentUserId, eraFilteredDecks]
+    [currentUserId, filteredDecks]
   );
+
+  function resetSectionPages() {
+    setSectionPages({});
+  }
+
+  function setSectionPage(key: string, page: number) {
+    setSectionPages(current => ({ ...current, [key]: page }));
+  }
 
   useEffect(() => {
     async function loadPage() {
@@ -436,7 +451,10 @@ export default function DecksPage() {
         <select
           className="dm-deck-management-filter"
           value={eraFilter}
-          onChange={(event) => setEraFilter(event.target.value as DeckEraKey | "")}
+          onChange={(event) => {
+            setEraFilter(event.target.value as DeckEraKey | "");
+            resetSectionPages();
+          }}
           aria-label="年代フィルタ"
         >
           <option value="">年代: すべて</option>
@@ -444,6 +462,20 @@ export default function DecksPage() {
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
+          ))}
+        </select>
+        <select
+          className="dm-deck-management-filter"
+          value={flagFilter}
+          onChange={event => {
+            setFlagFilter(event.target.value);
+            resetSectionPages();
+          }}
+          aria-label="フラッグで絞り込み"
+        >
+          <option value="">フラッグ: すべて</option>
+          {flags.filter(flag => flag.is_active && flag.can_be_selected_as_flag).map(flag => (
+            <option key={flag.id} value={flag.id}>{flag.name ?? "名称未設定"}</option>
           ))}
         </select>
       </div>
@@ -455,6 +487,12 @@ export default function DecksPage() {
         <div className="dm-deck-management-sections">
           {sections.map((section) => (
             <section key={section.key} className="dm-deck-management-section">
+              {(() => {
+                const pageCount = Math.max(1, Math.ceil(section.decks.length / DECKS_PER_PAGE));
+                const page = Math.min(sectionPages[section.key] ?? 0, pageCount - 1);
+                const visibleDecks = section.decks.slice(page * DECKS_PER_PAGE, (page + 1) * DECKS_PER_PAGE);
+                return (
+                  <>
               <div className="dm-section-heading">
                 <div>
                   <h2>{section.title}</h2>
@@ -462,8 +500,18 @@ export default function DecksPage() {
                 <span>{section.decks.length}件</span>
               </div>
               <div className="dm-app-grid">
-                {section.decks.map(renderDeckCard)}
+                {visibleDecks.map(renderDeckCard)}
               </div>
+                    {section.decks.length > DECKS_PER_PAGE && (
+                      <nav className="dm-deck-pagination" aria-label={`${section.title}のページ切り替え`}>
+                        <button type="button" className="dm-button secondary" disabled={page === 0} onClick={() => setSectionPage(section.key, page - 1)}>前</button>
+                        <span>{page + 1} / {pageCount}</span>
+                        <button type="button" className="dm-button secondary" disabled={page >= pageCount - 1} onClick={() => setSectionPage(section.key, page + 1)}>次</button>
+                      </nav>
+                    )}
+                  </>
+                );
+              })()}
             </section>
           ))}
         </div>
