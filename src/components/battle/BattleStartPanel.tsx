@@ -142,7 +142,7 @@ export function BattleStartPanel() {
 
   const effectiveSelectedDeckId = filteredDecks.some((deck) => deck.id === selectedDeckId)
     ? selectedDeckId
-    : filteredDecks[0]?.id ?? "";
+    : "";
   const selectedDeck = useMemo(
     () =>
       filteredDecks.find((deck) => deck.id === effectiveSelectedDeckId) ?? null,
@@ -528,6 +528,7 @@ export function BattleStartPanel() {
             value={effectiveSelectedDeckId}
             onChange={(event) => setSelectedDeckId(event.target.value)}
           >
+            <option value="">デッキを選択してください</option>
             {filteredDecks.map((deck) => (
               <option key={deck.id} value={deck.id}>
                 {deck.name}

@@ -481,7 +481,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }, [deferredSearchFilters, safeSearchPage]);
 
   useEffect(() => {
-    if (deferredSearchFilters.worlds.length === 0) {
+    if (
+      deferredSearchFilters.worlds.length === 0 &&
+      deferredSearchFilters.attributes.length === 0
+    ) {
       setSearchResults([]);
       setSearchTotalCount(0);
       setSearchLoading(false);
@@ -1357,8 +1360,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     );
                   })}
                 </div>
-                {searchFilters.worlds.length === 0 ? (
-                  <p className="dm-muted-text">詳細検索からワールドを選択してください。</p>
+                {searchFilters.worlds.length === 0 && searchFilters.attributes.length === 0 ? (
+                  <p className="dm-muted-text">詳細検索からワールドまたは属性を選択してください。</p>
                 ) : searchError ? (
                   <p className="dm-form-message">{searchError}</p>
                 ) : searchLoading ? (
