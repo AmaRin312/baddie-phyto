@@ -372,6 +372,7 @@ function BattleSidebarComponent({
                       images={imagesByCard.get(viewerCardRecord.id) ?? []}
                       selectedImageId={viewerCard.selectedImageId}
                       preserveOrientation
+                      progressiveImage
                     />
                   )}
                 </div>

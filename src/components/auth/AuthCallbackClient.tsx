@@ -68,15 +68,6 @@ export function AuthCallbackClient() {
         router.replace(`/login?message=${encodeURIComponent(error.message)}`);
         return;
       }
-
-      const sessionReady = await waitForSessionReady();
-      if (!sessionReady) {
-        router.replace(
-          `/login?message=${encodeURIComponent("ログインセッションの取得に失敗しました。")}`
-        );
-        return;
-      }
-
       setMessage("ログインに成功しました。ホームへ移動します...");
       window.location.replace(nextPath);
     }

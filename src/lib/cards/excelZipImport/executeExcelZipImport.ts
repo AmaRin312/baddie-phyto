@@ -171,6 +171,7 @@ async function uploadImagesForCard(input: {
       .from(BUCKET_NAME)
       .upload(path, uploadBlob, {
         upsert: false,
+        cacheControl: "31536000",
         contentType
       });
 
@@ -191,6 +192,7 @@ async function uploadImagesForCard(input: {
       if (thumbnail) {
         const thumbnailUpload = await supabase.storage.from(BUCKET_NAME).upload(thumbnailPath, thumbnail, {
           upsert: false,
+          cacheControl: "31536000",
           contentType: "image/webp"
         });
         if (!thumbnailUpload.error) {

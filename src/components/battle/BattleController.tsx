@@ -36,6 +36,7 @@ import {
   loadBattleRoom,
   PREALLOCATED_BATTLE_ROOMS,
   leaveBattleRoomBeforeDeckSelection,
+  touchBattleRoom,
   releaseBattleRoom,
   updateBattleRoomDeck
 } from "@/lib/battle/battleRooms";
@@ -79,13 +80,16 @@ import type {
   AbilityId,
   BattleCardAbilityMap
 } from "@/lib/battle/abilities/abilityTypes";
-import { createInitialBattleState } from "@/lib/battle/createInitialBattleState";
+import {
+  createEmptyBattleState,
+  createInitialBattleState
+} from "@/lib/battle/createInitialBattleState";
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
 import { loadDeck, loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
-import { loadFlag } from "@/lib/flags/flagActions";
+import { loadFlag, loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
   getPublicSupplyImageUrl,
@@ -116,7 +120,8 @@ import type {
   DeckCardRecord,
   DeckRecord,
   CardRecord,
-  DeckEraKey
+  DeckEraKey,
+  FlagRecord
 } from "@/types/baddiePhyto";
 import {
   DECK_ERA_OPTIONS,
@@ -438,6 +443,9 @@ export function BattleController() {
   const [deckChangeTargetId, setDeckChangeTargetId] = useState("");
   const [deckChangeSearchText, setDeckChangeSearchText] = useState("");
   const [deckChangeEraKey, setDeckChangeEraKey] = useState<DeckEraKey | "">("");
+  const [deckChangeCollectionFilter, setDeckChangeCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
+  const [deckChangeFlagId, setDeckChangeFlagId] = useState("");
+  const [changeableFlags, setChangeableFlags] = useState<FlagRecord[]>([]);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
@@ -573,6 +581,42 @@ export function BattleController() {
         return;
       }
 
+      if (!isRealtimeBattle && roomId) {
+        setLoading(true);
+        setMessage("");
+        const profile = await getOrCreateProfile();
+        if (!profile) {
+          window.location.href = "/login";
+          return;
+        }
+        currentUserIdRef.current = profile.id;
+
+        const savedStateResult = await loadBattleState(roomId);
+        if (savedStateResult.error) {
+          setMessage("一人回しの盤面を読み込めませんでした。");
+          setLoading(false);
+          return;
+        }
+
+        const initialState = savedStateResult.data ?? createEmptyBattleState();
+        setBattleState(initialState);
+        setBattleDeck(null);
+        setPlayerSupplyDecks({});
+        setCards([]);
+        setImages([]);
+        resetSourceRef.current = null;
+        if (!savedStateResult.data) {
+          const createResult = await createBattleState({
+            roomId,
+            battleState: initialState,
+            updatedBy: profile.id
+          });
+          if (createResult.error) setMessage("一人回しの盤面を保存できませんでした。");
+        }
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
       setMessage("デッキを選択してからBattleを開始してください。");
       return;
@@ -595,38 +639,23 @@ export function BattleController() {
     setMessage("");
     setSyncMessage("");
 
-    const [
-      deckResult,
-      deckCardsResult,
-      shortcutResult,
-      abilityMapResult,
-      supplyResult,
-      siteSupplySettingsResult,
-      roomResult
-    ] =
-      await Promise.allSettled([
-        loadDeck(deckId),
-        loadDeckCards(deckId),
-        loadShortcutSettings(),
-        loadBattleCardAbilityMap(),
-        loadBattleSupplies(),
-        loadSiteSupplySettings(),
-        isRealtimeBattle ? loadBattleRoom(roomId) : Promise.resolve({ data: null, error: null })
-      ]);
+    const optionalMetadataPromise = Promise.allSettled([
+      loadBattleSupplies(),
+      loadSiteSupplySettings(),
+      isRealtimeBattle ? loadBattleRoom(roomId) : Promise.resolve({ data: null, error: null })
+    ]);
+    const [deckResult, deckCardsResult, shortcutResult, abilityMapResult] = await Promise.allSettled([
+      loadDeck(deckId),
+      loadDeckCards(deckId),
+      loadShortcutSettings(),
+      loadBattleCardAbilityMap()
+    ]);
 
     const deckResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
     const deckCardsResponse =
       deckCardsResult.status === "fulfilled" ? deckCardsResult.value : null;
-    const shortcutResponse =
-      shortcutResult.status === "fulfilled" ? shortcutResult.value : null;
-    const abilityMapResponse =
-      abilityMapResult.status === "fulfilled" ? abilityMapResult.value : null;
-    const supplyResponse = supplyResult.status === "fulfilled" ? supplyResult.value : null;
-    const siteSupplySettingsResponse =
-      siteSupplySettingsResult.status === "fulfilled"
-        ? siteSupplySettingsResult.value
-        : null;
-    const roomResponse = roomResult.status === "fulfilled" ? roomResult.value : null;
+    const shortcutResponse = shortcutResult.status === "fulfilled" ? shortcutResult.value : null;
+    const abilityMapResponse = abilityMapResult.status === "fulfilled" ? abilityMapResult.value : null;
 
     if (
       !deckResponse ||
@@ -726,72 +755,82 @@ export function BattleController() {
         }
       });
 
+      const initialSaveTasks: Promise<void>[] = [];
       if (!savedBattleStateResult.data) {
-        const createResult = await createBattleState({
-          roomId,
-          battleState: initialState,
-          updatedBy: currentUserIdRef.current ?? undefined
-        });
-        if (createResult.error) {
-          setMessage("BattleStateの初期保存に失敗しました。");
-        }
+        initialSaveTasks.push((async () => {
+          const createResult = await createBattleState({
+            roomId,
+            battleState: initialState,
+            updatedBy: currentUserIdRef.current ?? undefined
+          });
+          if (createResult.error) setMessage("BattleStateの初期保存に失敗しました。");
+        })());
       }
 
       if (isRealtimeBattle && selfSeat && !syncedSeats[selfSeat]) {
-        const result = await saveSyncedPlayerBattleState({
-          roomId,
-          seatKey: selfSeat,
-          state: initialState.players.self,
-          expectedVersion: playerVersionsRef.current[selfSeat] ?? 0
-        });
-        if (result.data) {
-          rememberPlayerVersion(selfSeat, result.data.version);
-        } else if (result.error) {
-          setRealtimeStatus("error");
-          setSyncMessage("自分の固定席PlayerStateの初期保存に失敗しました。");
-        }
+        initialSaveTasks.push((async () => {
+          const result = await saveSyncedPlayerBattleState({
+            roomId,
+            seatKey: selfSeat,
+            state: initialState.players.self,
+            expectedVersion: playerVersionsRef.current[selfSeat] ?? 0
+          });
+          if (result.data) {
+            rememberPlayerVersion(selfSeat, result.data.version);
+          } else if (result.error) {
+            setRealtimeStatus("error");
+            setSyncMessage("自分の固定席PlayerStateの初期保存に失敗しました。");
+          }
+        })());
       }
+      await Promise.all(initialSaveTasks);
 
       resetSourceRef.current = resetSource;
-      setCards((((cardResponse?.error ? [] : cardResponse?.data) ?? []) as unknown as CardRecord[]));
+      setCards((cardResponse.error ? [] : cardResponse.data ?? []) as unknown as CardRecord[]);
       setBattleDeck(deckResponse.data);
-      if (supplyResponse?.error) {
-        console.warn("Battle supplies are not available yet.", supplyResponse.error);
-      } else {
-        setBattleSupplies(supplyResponse?.data ?? []);
-      }
-      if (siteSupplySettingsResponse?.error) {
-        console.warn(
-          "Site supply settings are not available yet.",
-          siteSupplySettingsResponse.error
-        );
-      } else {
-        setSiteSupplySettings(siteSupplySettingsResponse?.data ?? null);
-      }
-      if (roomResponse?.error) {
-        console.warn("Battle room supply metadata is not available yet.", roomResponse.error);
-      }
-      const selfSupplyDeck = deckResponse.data;
-      const opponentDeckId =
-        isRealtimeBattle && selfSeat && roomResponse?.data
-          ? selfSeat === "player1"
-            ? roomResponse.data.guest_deck_id
-            : roomResponse.data.host_deck_id
-          : null;
-      const opponentDeckResult = opponentDeckId
-        ? await loadDeck(opponentDeckId)
-        : { data: null, error: null };
-      if (opponentDeckResult.error) {
-        console.warn("Opponent deck supply metadata is not available yet.", opponentDeckResult.error);
-      }
-      const opponentDeck = opponentDeckResult.data ?? null;
-      setPlayerSupplyDecks({
-        self: selfSupplyDeck,
-        ...(opponentDeck ? { opponent: opponentDeck } : {})
-      });
+      setPlayerSupplyDecks({ self: deckResponse.data });
       setCardAbilityMap(abilityMapResponse?.error ? new Map() : abilityMapResponse?.data ?? new Map());
       setShortcutSettings(shortcutResponse?.data ?? mergeWithDefaultShortcuts(null));
       setBattleState(initialState);
+      setLoading(false);
+
+      void optionalMetadataPromise.then(async ([supplyResult, siteSettingsResult, roomResult]) => {
+        if (supplyResult.status === "fulfilled") {
+          if (supplyResult.value.error) {
+            console.warn("Battle supplies are not available yet.", supplyResult.value.error);
+          } else {
+            setBattleSupplies(supplyResult.value.data ?? []);
+          }
+        }
+        if (siteSettingsResult.status === "fulfilled") {
+          if (siteSettingsResult.value.error) {
+            console.warn("Site supply settings are not available yet.", siteSettingsResult.value.error);
+          } else {
+            setSiteSupplySettings(siteSettingsResult.value.data ?? null);
+          }
+        }
+
+        if (roomResult.status === "fulfilled" && roomResult.value.error) {
+          console.warn("Battle room supply metadata is not available yet.", roomResult.value.error);
+        }
+        const opponentDeckId =
+          isRealtimeBattle && selfSeat && roomResult.status === "fulfilled" && roomResult.value.data
+            ? selfSeat === "player1"
+              ? roomResult.value.data.guest_deck_id
+              : roomResult.value.data.host_deck_id
+            : null;
+        if (opponentDeckId) {
+          const opponentDeckResult = await loadDeck(opponentDeckId);
+          if (opponentDeckResult.error) {
+            console.warn("Opponent deck supply metadata is not available yet.", opponentDeckResult.error);
+          } else if (opponentDeckResult.data) {
+            const opponentDeck = opponentDeckResult.data;
+            setPlayerSupplyDecks((current) => ({ ...current, opponent: opponentDeck }));
+          }
+        }
+      }).catch((error: unknown) => {
+        console.warn("Optional battle metadata could not be loaded.", error);
+      });
     } catch (error) {
       console.error(error);
       setMessage(
@@ -799,9 +838,8 @@ export function BattleController() {
           ? error.message
           : "BattleStateの生成に失敗しました。"
       );
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [deckId, isRealtimeBattle, roomId, selfSeat]);
 
   async function handleConfirmRoomDeckSelection() {
@@ -849,6 +887,20 @@ export function BattleController() {
   }, [loadBattle]);
 
   const isBattleLoaded = battleState != null;
+
+  useEffect(() => {
+    if (!isRealtimeBattle || !roomId || !selfSeat) return;
+
+    const sendHeartbeat = () => {
+      void touchBattleRoom(roomId, selfSeat).then(({ error }) => {
+        if (error) console.warn("Battle room heartbeat failed.", error);
+      });
+    };
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [isRealtimeBattle, roomId, selfSeat]);
 
   const refreshOpponentSupplyMetadata = useCallback(async () => {
     if (!isRealtimeBattle || !roomId || !selfSeat) return;
@@ -1469,13 +1521,15 @@ export function BattleController() {
   }
 
   function handleResetBattleState() {
-    if (!roomId || !resetSourceRef.current) return;
+    if (!roomId) return;
     const confirmed = window.confirm(
       "対戦盤面を初期状態へリセットします。現在の盤面は保存済み状態も含めて上書きされます。よろしいですか？"
     );
     if (!confirmed) return;
 
-    const freshBattleState = createInitialBattleState(resetSourceRef.current);
+    const freshBattleState = resetSourceRef.current
+      ? createInitialBattleState(resetSourceRef.current)
+      : createEmptyBattleState();
     const nextState =
       isRealtimeBattle && battleState
         ? {
@@ -1610,9 +1664,12 @@ export function BattleController() {
         !searchText || deck.name.toLowerCase().includes(searchText);
       const matchesEra =
         !deckChangeEraKey || deck.era_key === deckChangeEraKey;
-      return matchesSearch && matchesEra;
+      const matchesCollection =
+        deckChangeCollectionFilter === "all" || deck.deck_visibility === deckChangeCollectionFilter;
+      const matchesFlag = !deckChangeFlagId || deck.flag_id === deckChangeFlagId;
+      return matchesSearch && matchesEra && matchesCollection && matchesFlag;
     });
-  }, [changeableDecks, deckChangeEraKey, deckChangeSearchText]);
+  }, [changeableDecks, deckChangeCollectionFilter, deckChangeEraKey, deckChangeFlagId, deckChangeSearchText]);
 
   const resolvedDeckChangeTargetId = useMemo(() => {
     if (filteredChangeableDecks.length === 0) return "";
@@ -1629,12 +1686,15 @@ export function BattleController() {
     setDeckChangeLoading(true);
     setDeckChangeSearchText("");
     setDeckChangeEraKey("");
+    setDeckChangeCollectionFilter("all");
+    setDeckChangeFlagId("");
     try {
-      const deckResult = await loadDecks();
+      const [deckResult, flagsResult] = await Promise.all([loadDecks(), loadFlagsLite()]);
       if (deckResult.error) {
         setDeckChangeError(getErrorMessage(deckResult.error) ?? "デッキ一覧を読み込めませんでした。");
         return;
       }
+      setChangeableFlags(flagsResult.error ? [] : flagsResult.data ?? []);
 
       const currentUserId = currentUserIdRef.current ?? "";
       const visibleDecks = (deckResult.data ?? []).filter(
@@ -3608,6 +3668,41 @@ export function BattleController() {
             <p>対戦開始に使えるデッキがありません。</p>
           ) : (
             <div className="bf-deck-change-popup">
+              <div className="bf-deck-change-search-row">
+                <label className="dm-form-label" htmlFor="battle-deck-change-collection">
+                  デッキ区分
+                  <select
+                    id="battle-deck-change-collection"
+                    className="dm-input"
+                    value={deckChangeCollectionFilter}
+                    onChange={(event) => setDeckChangeCollectionFilter(event.target.value as typeof deckChangeCollectionFilter)}
+                    disabled={deckChangeLoading}
+                  >
+                    <option value="all">すべて</option>
+                    <option value="private">自分のデッキ</option>
+                    <option value="public">共有デッキ</option>
+                    <option value="default">サンプルデッキ</option>
+                  </select>
+                </label>
+                <label className="dm-form-label" htmlFor="battle-deck-change-flag">
+                  フラッグ
+                  <select
+                    id="battle-deck-change-flag"
+                    className="dm-input"
+                    value={deckChangeFlagId}
+                    onChange={(event) => setDeckChangeFlagId(event.target.value)}
+                    disabled={deckChangeLoading}
+                  >
+                    <option value="">すべて</option>
+                    {changeableFlags.map((flag) => (
+                      <option key={flag.id} value={flag.id}>
+                        {flag.name ?? "名称未設定"}
+                        {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="bf-deck-change-search-row">
                 <label className="dm-form-label" htmlFor="battle-deck-change-search">
                   デッキ名

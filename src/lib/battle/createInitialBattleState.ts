@@ -113,6 +113,25 @@ function createEmptyPlayer(id: BattlePlayerId, name: string): PlayerState {
   };
 }
 
+export function createEmptyBattleState(): BattleState {
+  const self = createEmptyPlayer("self", "自分");
+  const opponent = createEmptyPlayer("opponent", "相手");
+
+  return {
+    id: crypto.randomUUID(),
+    version: 0,
+    startedAt: new Date().toISOString(),
+    players: { self, opponent },
+    activeViewerCardInstanceId: null,
+    ruleState: {
+      itemLimit: 1,
+      appliedRuleEffectIds: []
+    },
+    deckLook: null,
+    meta: {}
+  };
+}
+
 export function createInitialBattleState({
   flag,
   buddyCardId,

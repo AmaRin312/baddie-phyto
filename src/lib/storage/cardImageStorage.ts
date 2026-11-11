@@ -201,7 +201,7 @@ export async function uploadCardImage(input: {
   const shouldBeDefault = !existingImages.error && (existingImages.data ?? []).length === 0;
   const uploadResult = await supabase.storage
     .from(BUCKET_NAME)
-    .upload(imagePath, input.file, { upsert: false });
+    .upload(imagePath, input.file, { upsert: false, cacheControl: "31536000" });
 
   if (uploadResult.error) return { data: null, error: uploadResult.error };
 
@@ -211,6 +211,7 @@ export async function uploadCardImage(input: {
     if (thumbnail) {
       const thumbnailUpload = await supabase.storage.from(BUCKET_NAME).upload(thumbnailPath, thumbnail, {
         upsert: false,
+        cacheControl: "31536000",
         contentType: "image/webp"
       });
       if (!thumbnailUpload.error) storedThumbnailPath = thumbnailPath;

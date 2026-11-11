@@ -18,6 +18,7 @@ import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
+  DECK_ERA_OPTIONS,
   getDeckEraLabel,
   type CardImageRecord,
   type CardRecord,
@@ -44,17 +45,17 @@ function createSoloRoomId(deckId: string) {
 }
 
 function buildBattleUrl(input: {
-  deckId: string;
+  deckId?: string;
   roomId: string;
   seat: BattlePlayerSeat;
   mode: "solo" | "match";
 }) {
   const params = new URLSearchParams({
-    deckId: input.deckId,
     roomId: input.roomId,
     seat: input.seat,
     mode: input.mode
   });
+  if (input.deckId) params.set("deckId", input.deckId);
   return `/battle?${params.toString()}`;
 }
 
@@ -84,7 +85,11 @@ export function BattleStartPanel() {
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const [rooms, setRooms] = useState<BattleRoomRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
+  const [selectedBattleMode, setSelectedBattleMode] = useState<"solo" | "match" | null>(null);
   const [selectedDeckId, setSelectedDeckId] = useState("");
+  const [deckCollectionFilter, setDeckCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
+  const [deckEraFilter, setDeckEraFilter] = useState("");
+  const [deckFlagFilter, setDeckFlagFilter] = useState("");
   const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
   const [previewDeckCardsLoading, setPreviewDeckCardsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -126,11 +131,22 @@ export function BattleStartPanel() {
     [currentUserId, decks]
   );
 
-  const effectiveSelectedDeckId = selectedDeckId || visibleDecks[0]?.id || "";
+  const filteredDecks = useMemo(
+    () => visibleDecks.filter((deck) =>
+      (deckCollectionFilter === "all" || deck.deck_visibility === deckCollectionFilter) &&
+      (!deckEraFilter || deck.era_key === deckEraFilter) &&
+      (!deckFlagFilter || deck.flag_id === deckFlagFilter)
+    ),
+    [deckCollectionFilter, deckEraFilter, deckFlagFilter, visibleDecks]
+  );
+
+  const effectiveSelectedDeckId = filteredDecks.some((deck) => deck.id === selectedDeckId)
+    ? selectedDeckId
+    : filteredDecks[0]?.id ?? "";
   const selectedDeck = useMemo(
     () =>
-      visibleDecks.find((deck) => deck.id === effectiveSelectedDeckId) ?? null,
-    [effectiveSelectedDeckId, visibleDecks]
+      filteredDecks.find((deck) => deck.id === effectiveSelectedDeckId) ?? null,
+    [effectiveSelectedDeckId, filteredDecks]
   );
 
   const refreshRooms = useCallback(async () => {
@@ -147,10 +163,16 @@ export function BattleStartPanel() {
   }, []);
 
   useEffect(() => {
+    if (selectedBattleMode !== "match") return;
+    void refreshRooms();
     const refreshOnFocus = () => void refreshRooms();
     window.addEventListener("focus", refreshOnFocus);
-    return () => window.removeEventListener("focus", refreshOnFocus);
-  }, [refreshRooms]);
+    const intervalId = window.setInterval(refreshOnFocus, 30_000);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [refreshRooms, selectedBattleMode]);
 
   useEffect(() => {
     async function loadPage() {
@@ -161,7 +183,6 @@ export function BattleStartPanel() {
       }
 
       setCurrentUserId(profile.id);
-      void refreshRooms();
       const [deckResult, flagResult] = await Promise.allSettled([
         loadDecks(),
         loadFlagsLite()
@@ -213,7 +234,7 @@ export function BattleStartPanel() {
     }
 
     void loadPage();
-  }, [refreshRooms, router]);
+  }, [router]);
 
   function canStartDeck(deck: DeckRecord | null) {
     return Boolean(deck?.flag_id && deck.buddy_card_id);
@@ -273,11 +294,12 @@ export function BattleStartPanel() {
     setPreviewDeckCardsLoading(false);
   }
 
-  function startSolo(deckId: string) {
+  function startSolo(deckId?: string) {
+    const roomId = deckId ? createSoloRoomId(deckId) : `solo-empty-${crypto.randomUUID()}`;
     router.push(
       buildBattleUrl({
-        deckId,
-        roomId: createSoloRoomId(deckId),
+        ...(deckId ? { deckId } : {}),
+        roomId,
         seat: "player1",
         mode: "solo"
       })
@@ -423,20 +445,80 @@ export function BattleStartPanel() {
         <Link href="/decks" className="dm-button secondary">
           デッキ管理
         </Link>
-        <button
-          type="button"
-          className="dm-button secondary"
-          onClick={() => void refreshRooms()}
-        >
-          ルーム再読み込み
-        </button>
+        {selectedBattleMode === "match" && (
+          <button
+            type="button"
+            className="dm-button secondary"
+            onClick={() => void refreshRooms()}
+          >
+            ルーム再読み込み
+          </button>
+        )}
       </div>
 
-      <div className="dm-app-grid">
-        <AppCard
-          title="一人回し"
-          description="一人回し用のデッキを選択します。対人戦ではルーム入室後にデッキを選びます。"
-        >
+      {selectedBattleMode === null ? (
+        <AppCard title="対戦モードを選択" description="先にプレイ方法を選んでください。">
+          <div className="dm-app-grid">
+            <button
+              type="button"
+              className="dm-button primary"
+              onClick={() => setSelectedBattleMode("solo")}
+            >
+              一人回し
+            </button>
+            <button
+              type="button"
+              className="dm-button secondary"
+              onClick={() => setSelectedBattleMode("match")}
+            >
+              対人ルーム
+            </button>
+          </div>
+        </AppCard>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="dm-button secondary"
+            onClick={() => setSelectedBattleMode(null)}
+          >
+            モード選択に戻る
+          </button>
+          {selectedBattleMode === "solo" && (
+            <AppCard
+              title="一人回し"
+              description="使用するデッキを選択してください。"
+            >
+          <div className="dm-deck-search-filters">
+            <label className="dm-form-label">
+              デッキ区分
+              <select className="dm-input" value={deckCollectionFilter} onChange={(event) => setDeckCollectionFilter(event.target.value as typeof deckCollectionFilter)}>
+                <option value="all">すべて</option>
+                <option value="private">自分のデッキ</option>
+                <option value="public">共有デッキ</option>
+                <option value="default">サンプルデッキ</option>
+              </select>
+            </label>
+            <label className="dm-form-label">
+              年代
+              <select className="dm-input" value={deckEraFilter} onChange={(event) => setDeckEraFilter(event.target.value)}>
+                <option value="">すべて</option>
+                {DECK_ERA_OPTIONS.map((era) => <option key={era.value} value={era.value}>{era.label}</option>)}
+              </select>
+            </label>
+            <label className="dm-form-label">
+              フラッグ
+              <select className="dm-input" value={deckFlagFilter} onChange={(event) => setDeckFlagFilter(event.target.value)}>
+                <option value="">すべて</option>
+                {flags.map((flag) => (
+                  <option key={flag.id} value={flag.id}>
+                    {flag.name ?? "名称未設定"}
+                    {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <label className="dm-form-label" htmlFor="battle-solo-deck">
             使用デッキ
           </label>
@@ -446,7 +528,7 @@ export function BattleStartPanel() {
             value={effectiveSelectedDeckId}
             onChange={(event) => setSelectedDeckId(event.target.value)}
           >
-            {visibleDecks.map((deck) => (
+            {filteredDecks.map((deck) => (
               <option key={deck.id} value={deck.id}>
                 {deck.name}
               </option>
@@ -470,17 +552,34 @@ export function BattleStartPanel() {
                   対戦開始にはフラッグとバディが必要です。
                 </p>
               )}
+              <button
+                type="button"
+                className="dm-button secondary"
+                onClick={() => startSolo()}
+              >
+                デッキを選ばずに一人回し
+              </button>
             </>
           ) : (
-            <p className="dm-muted-text">デッキを選択してください。</p>
+            <>
+              <p className="dm-muted-text">条件に合うデッキがありません。</p>
+              <button
+                type="button"
+                className="dm-button primary"
+                onClick={() => startSolo()}
+              >
+                デッキを選ばずに一人回し
+              </button>
+            </>
           )}
-        </AppCard>
-
-      </div>
+            </AppCard>
+          )}
+        </>
+      )}
 
       {message && <p className="dm-form-message">{message}</p>}
 
-      <AppCard
+      {selectedBattleMode === "match" && <AppCard
         title="対人ルーム"
         description="用意済みの2ルームを利用します。ルームに入った後で対戦デッキを選択します。"
       >
@@ -502,12 +601,18 @@ export function BattleStartPanel() {
                   type="button"
                   className="dm-button secondary"
                   disabled={
-                    (Boolean(room.guest_user_id) && room.host_user_id !== currentUserId)
+                    Boolean(
+                      room.guest_user_id &&
+                      room.guest_user_id !== currentUserId &&
+                      room.host_user_id !== currentUserId
+                    )
                   }
                   onClick={() => void handleJoinRoom(room)}
                 >
                   {room.host_user_id === currentUserId
                     ? "再入室"
+                    : room.guest_user_id === currentUserId
+                      ? "再入室"
                     : !room.host_user_id
                       ? "ルームを使用"
                       : room.guest_user_id
@@ -518,15 +623,15 @@ export function BattleStartPanel() {
             </div>
           ))}
         </div>
-      </AppCard>
+      </AppCard>}
 
-      {loading ? (
+      {selectedBattleMode === "solo" && (loading ? (
         <AppCard title="読み込み中" description="デッキを取得しています。" />
       ) : (
         <div className="dm-deck-management-section">
           <div className="dm-app-grid">
-            {visibleDecks.map(renderDeck)}
-            {visibleDecks.length === 0 && (
+            {filteredDecks.map(renderDeck)}
+            {filteredDecks.length === 0 && (
               <AppCard
                 title="デッキがありません"
                 description="まずデッキを作成してください。"
@@ -534,7 +639,7 @@ export function BattleStartPanel() {
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {previewDeck && (
         <div

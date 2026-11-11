@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { getDisplayCard } from "@/lib/cards/cardPresentation";
 import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 import styles from "./CardViewer.module.css";
@@ -15,6 +15,7 @@ type CardViewerProps = {
   horizontalRotation?: "clockwise" | "counterclockwise";
   faceDownImageUrl?: string | null;
   preserveOrientation?: boolean;
+  progressiveImage?: boolean;
 };
 
 function formatValue(value: number | null) {
@@ -31,8 +32,10 @@ function CardViewerComponent({
   horizontalRotation = "clockwise",
   forcePortraitZoomPercent,
   faceDownImageUrl = null,
-  preserveOrientation = false
+  preserveOrientation = false,
+  progressiveImage = false
 }: CardViewerProps) {
+  const [loadedFullImageUrl, setLoadedFullImageUrl] = useState<string | null>(null);
   const displayCard = getDisplayCard({ card, images, selectedImageId });
   const rootClassName = [
     styles.viewer,
@@ -70,6 +73,14 @@ function CardViewerComponent({
     variant === "board" || variant === "compact"
       ? displayCard.thumbnailUrl
       : displayCard.imageUrl;
+  const progressiveThumbnailUrl =
+    progressiveImage && variant === "viewer" && displayCard.thumbnailUrl !== displayCard.imageUrl
+      ? displayCard.thumbnailUrl
+      : null;
+  const visibleImageSrc =
+    progressiveThumbnailUrl && loadedFullImageUrl !== displayCard.imageUrl
+      ? progressiveThumbnailUrl
+      : imageSrc;
   const shouldForcePortraitImage =
     card.orientation === "horizontal" &&
     !preserveOrientation;
@@ -88,19 +99,34 @@ function CardViewerComponent({
       ? { width: `${forcePortraitZoomPercent}%` }
       : undefined;
 
-  if (!displayCard.useHtmlCard && imageSrc) {
+  if (!displayCard.useHtmlCard && visibleImageSrc) {
     return (
       <article className={rootClassName} aria-label={displayCard.name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className={imageClassName}
-          src={imageSrc}
+          src={visibleImageSrc}
           alt={displayCard.name}
           style={imageStyle}
           loading={variant === "viewer" ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={variant === "viewer" ? "high" : "low"}
           draggable={false}
         />
+        {progressiveThumbnailUrl && displayCard.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            aria-hidden="true"
+            className={styles.progressivePreload}
+            src={displayCard.imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            draggable={false}
+            onLoad={() => setLoadedFullImageUrl(displayCard.imageUrl)}
+          />
+        )}
       </article>
     );
   }
@@ -173,6 +199,7 @@ export const CardViewer = memo(CardViewerComponent, (prevProps, nextProps) => {
     prevProps.horizontalRotation === nextProps.horizontalRotation &&
     prevProps.faceDownImageUrl === nextProps.faceDownImageUrl &&
     prevProps.preserveOrientation === nextProps.preserveOrientation &&
+    prevProps.progressiveImage === nextProps.progressiveImage &&
     areImagesEqual(prevProps.images, nextProps.images)
   );
 });

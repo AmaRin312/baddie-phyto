@@ -787,6 +787,7 @@ async function uploadImagesForCard(supabase, row, cardId, ownerId, dryRun, repla
         .from(BUCKET_NAME)
         .upload(storagePath, image.bytes, {
           upsert: false,
+          cacheControl: "31536000",
           contentType: image.contentType
         });
       if (uploadError) throw new Error(uploadError.message);

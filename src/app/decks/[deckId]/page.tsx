@@ -132,6 +132,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
   const searchResultsRef = useRef<HTMLDivElement | null>(null);
+  const deckCardButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const worldPresetDeckIdRef = useRef<string | null>(null);
   const deferredSearchFilters = useDeferredValue(searchFilters);
 
@@ -196,19 +197,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         nextCardMap.get(flag.card_id ?? "")?.card_type === "flag_card" &&
         nextCardMap.get(flag.card_id ?? "")?.is_active
     );
-    const imageCardIds = [
-      ...new Set(
-        [
-          ...nextDeckCards.map((deckCard: DeckCardRecord) => deckCard.card_id),
-          nextDeck.buddy_card_id,
-          nextFlags.find((flag) => flag.id === nextDeck.flag_id)?.card_id
-        ].filter(Boolean)
-      )
-    ] as string[];
-    const imageResult = await loadCardImagesByCardIds(imageCardIds);
-    if (!imageResult.error) {
-      imageCardIds.forEach((cardId) => loadedImageCardIdsRef.current.add(cardId));
-    }
 
     setDeck(nextDeck);
     setIsNewDeckDraft(false);
@@ -245,7 +233,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     });
     setSearchPage(0);
     setSearchResults([]);
-    setImages(imageResult.error ? [] : imageResult.data ?? []);
     setBattleSupplies(supplyResult.data ?? []);
     setSearchWorlds(searchOptionsResult.worlds);
     setCardSets(searchOptionsResult.sets);
@@ -265,6 +252,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       if (imageDeckIdRef.current !== resolvedDeckId) {
         imageDeckIdRef.current = resolvedDeckId;
         loadedImageCardIdsRef.current.clear();
+        setImages([]);
       }
       setCurrentUserId(profile.id);
       if (resolvedDeckId === "new") {
@@ -608,13 +596,6 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
     let cancelled = false;
     const pendingCardIds = new Set(missingCardIds);
-    const previewCardId = searchPreviewCard?.id;
-    const priorityCardIds = previewCardId && pendingCardIds.has(previewCardId)
-      ? [previewCardId]
-      : [];
-    const backgroundCardIds = missingCardIds.filter(
-      (cardId) => cardId !== previewCardId
-    );
     missingCardIds.forEach((cardId) => loadedImageCardIdsRef.current.add(cardId));
 
     async function loadImageBatch(cardIds: string[]) {
@@ -652,18 +633,13 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       }
     }
 
-    async function loadVisibleImages() {
-      await loadImageBatch(priorityCardIds);
-      if (!cancelled) await loadImageBatch(backgroundCardIds);
-    }
-
-    void loadVisibleImages();
+    void loadImageBatch(missingCardIds);
 
     return () => {
       cancelled = true;
       pendingCardIds.forEach((cardId) => loadedImageCardIdsRef.current.delete(cardId));
     };
-  }, [imagesByCard, searchPreviewCard?.id, visibleImageCardIds]);
+  }, [imagesByCard, visibleImageCardIds]);
 
   async function handleSaveDeck() {
     if (!canEditDeck) {
@@ -838,6 +814,18 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         quantity
       })
     );
+  }
+
+  function addCardAndSelect(card: CardRecord, quantity: number) {
+    if (!canEditDeck || card.id === selectedFlag?.card_id) {
+      setLocalCardQuantity(card, quantity);
+      return;
+    }
+    setSelectedDeckCardId(card.id);
+    setLocalCardQuantity(card, quantity);
+    window.requestAnimationFrame(() => {
+      deckCardButtonRefs.current.get(card.id)?.focus({ preventScroll: true });
+    });
   }
 
   function getImageSelectValue(cardId: string) {
@@ -1046,6 +1034,11 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       }
                     }}
                     onDoubleClick={() => setFlagPickerOpen(true)}
+                    onContextMenu={(event) => {
+                      if (!canEditDeck) return;
+                      event.preventDefault();
+                      setFlagPickerOpen(true);
+                    }}
                   >
                     {selectedFlagCard ? (
                       <CardViewer
@@ -1208,6 +1201,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     <button
                       key={item.cardId}
                       type="button"
+                      ref={(element) => {
+                        if (element) deckCardButtonRefs.current.set(item.cardId, element);
+                        else deckCardButtonRefs.current.delete(item.cardId);
+                      }}
                       className={`dm-deck-visual-card${
                         draggedDeckCardId === item.cardId ? " is-dragging" : ""
                       }${selectedDeckCardId === item.cardId ? " is-selected" : ""}`}
@@ -1217,10 +1214,10 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       onDoubleClick={() => showSearchPreview(card.id)}
                       onKeyDown={(event) => {
                         if (!canEditDeck) return;
-                        if (event.key === "ArrowUp") {
+                        if (event.key === "ArrowLeft") {
                           event.preventDefault();
                           setLocalCardQuantity(card, item.quantity + 1);
-                        } else if (event.key === "ArrowDown") {
+                        } else if (event.key === "ArrowRight") {
                           event.preventDefault();
                           setLocalCardQuantity(card, item.quantity - 1);
                         } else if (event.key === "Delete" || event.key === "Backspace") {
@@ -1284,7 +1281,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     {selectedDeckCard.name} / ×{selectedDeckDraft.quantity}
                   </b>
                   {effectiveSelectedBuddyCardId === selectedDeckCard.id && <span>バディ</span>}
-                  <p className="dm-muted-text">矢印キーで枚数変更、Deleteで削除</p>
+                  <p className="dm-muted-text">←で1枚追加、→で1枚減少、Deleteで削除</p>
                 </div>
               )}
             </AppCard>
@@ -1331,7 +1328,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         onKeyDown={(event) => {
                           if (event.key === "ArrowLeft" && canEditDeck) {
                             event.preventDefault();
-                            setLocalCardQuantity(card, (existing?.quantity ?? 0) + 1);
+                            addCardAndSelect(card, (existing?.quantity ?? 0) + 1);
                             return;
                           }
                           if ((event.key === "Enter" || event.key === " ") && canEditDeck) {
@@ -1410,6 +1407,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                             selectedImageId={activeSearchPreviewImageId || null}
                             className={`dm-deck-search-preview-image${searchPreviewCard.orientation === "horizontal" ? " is-horizontal" : ""}`}
                             preserveOrientation={searchPreviewCard.orientation === "horizontal"}
+                            progressiveImage
                           />
                         </div>
                         <div className="dm-deck-search-preview-thumbnails" aria-label="登録画像">

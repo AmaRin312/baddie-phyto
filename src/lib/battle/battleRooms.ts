@@ -10,8 +10,10 @@ export type BattleRoomRecord = {
   status: BattleRoomStatus;
   host_user_id: string | null;
   host_deck_id: string | null;
+  host_last_seen_at: string | null;
   guest_user_id: string | null;
   guest_deck_id: string | null;
+  guest_last_seen_at: string | null;
   created_at: string;
   updated_at: string;
   disbanded_at: string | null;
@@ -74,6 +76,28 @@ export async function loadBattleRoom(roomId: string) {
   return { data, error: null };
 }
 
+export async function touchBattleRoom(roomId: string, seat: BattlePlayerSeat) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "ログインが必要です。" };
+
+  const seatUserColumn = seat === "player1" ? "host_user_id" : "guest_user_id";
+  const lastSeenColumn = seat === "player1" ? "host_last_seen_at" : "guest_last_seen_at";
+  const { data, error } = await supabase
+    .from("battle_rooms")
+    .update({ [lastSeenColumn]: new Date().toISOString() })
+    .eq("room_id", roomId)
+    .eq(seatUserColumn, userId)
+    .neq("status", "disbanded")
+    .select("room_id")
+    .maybeSingle<{ room_id: string }>();
+
+  if (error) {
+    console.error(error);
+    return { error: error.message };
+  }
+  return data ? { error: null } : { error: "このルームの参加席を確認できません。" };
+}
+
 export async function joinBattleRoom(input: {
   room: BattleRoomRecord;
   deckId?: string;
@@ -112,22 +136,20 @@ export async function joinBattleRoom(input: {
     return { data: { room, seat: "player2" }, error: null };
   }
 
-  if (room.host_user_id == null && room.guest_user_id == null) {
+  if (room.host_user_id == null) {
     const { data, error } = await supabase
       .from("battle_rooms")
       .update({
-        status: "waiting",
+        status: room.guest_user_id ? "playing" : "waiting",
         host_user_id: userId,
         host_deck_id: input.deckId ?? null,
-        guest_user_id: null,
-        guest_deck_id: null,
+        host_last_seen_at: new Date().toISOString(),
         disbanded_at: null,
         expires_at: null
       })
       .eq("room_id", room.room_id)
-      .eq("status", "waiting")
+      .in("status", ["waiting", "playing"])
       .is("host_user_id", null)
-      .is("guest_user_id", null)
       .select("*")
       .single<BattleRoomRecord>();
 
@@ -149,11 +171,12 @@ export async function joinBattleRoom(input: {
       status: "playing",
       guest_user_id: userId,
       guest_deck_id: input.deckId ?? null,
+      guest_last_seen_at: new Date().toISOString(),
       disbanded_at: null,
       expires_at: null
     })
     .eq("room_id", room.room_id)
-    .eq("status", "waiting")
+    .in("status", ["waiting", "playing"])
     .is("guest_user_id", null)
     .select("*")
     .single<BattleRoomRecord>();
@@ -179,8 +202,10 @@ export async function releaseBattleRoom(roomId: string) {
       status: "waiting",
       host_user_id: null,
       host_deck_id: null,
+      host_last_seen_at: null,
       guest_user_id: null,
       guest_deck_id: null,
+      guest_last_seen_at: null,
       disbanded_at: null,
       expires_at: null
     })
@@ -207,7 +232,8 @@ export async function leaveBattleRoomBeforeDeckSelection(
       .update({
         status: "waiting",
         guest_user_id: null,
-        guest_deck_id: null
+        guest_deck_id: null,
+        guest_last_seen_at: null
       })
       .eq("room_id", roomId)
       .eq("guest_user_id", userId)
@@ -246,6 +272,8 @@ export async function disbandBattleRoom(roomId: string) {
     .from("battle_rooms")
     .update({
       status: "disbanded",
+      host_last_seen_at: null,
+      guest_last_seen_at: null,
       disbanded_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString()
     })

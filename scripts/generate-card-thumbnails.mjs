@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
@@ -68,11 +69,12 @@ async function main() {
     sourceBytes += input.byteLength;
     thumbnailBytes += output.byteLength;
 
-    const thumbnailPath = `${row.owner_id}/${row.card_id}/thumbnails/${row.id}.webp`;
+    const thumbnailPath = `${row.owner_id}/${row.card_id}/thumbnails/${randomUUID()}.webp`;
     if (apply) {
       const { error: uploadError } = await supabase.storage.from(BUCKET).upload(thumbnailPath, output, {
         contentType: "image/webp",
-        upsert: true
+        cacheControl: "31536000",
+        upsert: false
       });
       if (uploadError) throw new Error(`サムネイル保存失敗 ${row.id}: ${uploadError.message}`);
       const { error: updateError } = await supabase.from("card_images").update({ thumbnail_path: thumbnailPath }).eq("id", row.id);

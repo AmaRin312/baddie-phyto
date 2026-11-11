@@ -2061,6 +2061,7 @@ select {
 .dm-checkbox-grid,
 .dm-filter-grid {
   display: grid;
+  grid-auto-flow: row;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
@@ -7824,7 +7825,7 @@ body:has(.bf-battle-app) {
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 2.5px;
   width: 100%;
   padding: 4px;
@@ -7838,6 +7839,8 @@ body:has(.bf-battle-app) {
   width: auto;
   height: auto;
   aspect-ratio: 5 / 7;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 148px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -7866,7 +7869,6 @@ body:has(.bf-battle-app) {
 
 @media (min-width: 981px) and (max-width: 1240px) {
   .dm-deck-search-grid {
-    justify-content: flex-start;
     transform: none;
   }
 }
@@ -8451,4 +8453,16 @@ body:has(.bf-battle-app) {
   min-width: 34px;
   min-height: 43px;
   font-size: 8px;
+}
+
+/* Enlarge the flag and buddy thumbnails while keeping their overlap positions. */
+.dm-deck-management-images > div,
+.dm-deck-management-images article {
+  width: 41px;
+  height: 52px;
+}
+
+.dm-deck-management-empty {
+  min-width: 41px;
+  min-height: 52px;
 }

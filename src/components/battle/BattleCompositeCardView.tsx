@@ -72,6 +72,7 @@ function BattleCompositeCardViewComponent({
               selectedImageId={battleCard.selectedImageId}
               faceDown={battleCard.visibility === "face_down"}
               preserveOrientation
+              progressiveImage
             />
           )}
         </div>

@@ -6,5 +6,7 @@ import { BattleStartPanel } from "@/components/battle/BattleStartPanel";
 
 export function BattleRoute() {
   const searchParams = useSearchParams();
-  return searchParams.get("deckId") ? <BattleController /> : <BattleStartPanel />;
+  return searchParams.get("roomId") || searchParams.get("deckId")
+    ? <BattleController />
+    : <BattleStartPanel />;
 }
