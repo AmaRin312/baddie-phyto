@@ -22,6 +22,8 @@ export function sortDeckSearchWorlds(worlds: readonly string[]) {
   );
 }
 
+export const DRAGON_EIN_SEARCH_WORLD = "ドラゴン・アイン";
+
 export type DeckCardEraKey = "first" | "hundred" | "ddd" | "x" | "god";
 
 export const DECK_CARD_ERA_OPTIONS: ReadonlyArray<{
@@ -36,7 +38,6 @@ export const DECK_CARD_ERA_OPTIONS: ReadonlyArray<{
 ];
 
 export type DeckCardAttributeKey =
-  | "dragon"
   | "hyakki"
   | "cornerKing"
   | "chaos"
@@ -50,7 +51,6 @@ export const DECK_CARD_ATTRIBUTE_OPTIONS: ReadonlyArray<{
   value: DeckCardAttributeKey;
   label: string;
 }> = [
-  { value: "dragon", label: "ドラゴン" },
   { value: "hyakki", label: "百鬼" },
   { value: "cornerKing", label: "角王" },
   { value: "chaos", label: "カオス" },
@@ -137,7 +137,7 @@ export async function loadDeckCardSearchOptions() {
 
       const worlds = (worldResult.data as unknown as string[] | null) ?? [];
       const value = {
-        worlds: sortDeckSearchWorlds(worlds),
+        worlds: sortDeckSearchWorlds([...worlds, DRAGON_EIN_SEARCH_WORLD]),
         sets: (setResult.data ?? []).map((set) => ({
           id: set.id,
           setCode: set.set_code,

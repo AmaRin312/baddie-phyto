@@ -8450,6 +8450,19 @@ body:has(.bf-battle-app) {
   height: 52px;
 }
 
+.dm-deck-management-images article,
+.dm-deck-management-images .dm-deck-management-empty {
+  transform: scale(1.2);
+  transform-origin: top center;
+}
+
+.dm-deck-management-images > .is-buddy article,
+.dm-deck-management-images > .is-buddy article img {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .dm-deck-management-empty {
   min-width: 41px;
   min-height: 52px;
