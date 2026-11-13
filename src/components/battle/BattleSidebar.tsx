@@ -161,6 +161,7 @@ const HandCards = memo(function HandCards({
           <button
             type="button"
             className={`bf-hand-card-button${selectedInstanceIds.has(battleCard.instanceId) ? " is-selected" : ""}${isDragging ? " is-dragging" : ""}`}
+            data-battle-card-instance-id={battleCard.instanceId}
             key={battleCard.instanceId}
             draggable={
               self &&
@@ -181,7 +182,7 @@ const HandCards = memo(function HandCards({
                 event.preventDefault();
                 return;
               }
-              setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+              setBattleCardDragImage(event.currentTarget, event.dataTransfer, selectedInstanceIds);
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", battleCard.instanceId);
               onDragStartCard(battleCard, self ? "self" : "opponent");

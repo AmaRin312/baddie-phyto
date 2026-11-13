@@ -96,7 +96,9 @@ export default function NewDeckPage() {
             {flags.map((flag) => (
               <option key={flag.id} value={flag.id}>
                 {flag.name ?? flag.card?.name ?? "名称未設定"}
-                {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
+                {flag.usable_worlds.length === 0 && flag.name !== "ドラゴン・アイン"
+                  ? "（ワールド指定なし）"
+                  : ""}
               </option>
             ))}
           </select>

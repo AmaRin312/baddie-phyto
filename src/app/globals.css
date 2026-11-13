@@ -4326,6 +4326,166 @@ select {
   color: #bfdbfe;
 }
 
+.bf-battle-live-logs {
+  position: fixed;
+  z-index: 80;
+  left: calc(50vw - (var(--bf-right-panel-width) / 2) + 224px);
+  top: 50vh;
+  bottom: auto;
+  width: min(260px, 24vw);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  color: #eff6ff;
+  cursor: default;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.8);
+}
+
+.bf-battle-live-logs > header {
+  width: fit-content;
+  margin: 0 auto 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(191, 219, 254, 0.32);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.74);
+  color: #bfdbfe;
+  font-size: 9px;
+  user-select: none;
+}
+
+.bf-battle-live-logs ol,
+.bf-battle-log-history ol {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bf-battle-live-logs li,
+.bf-battle-log-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1px solid rgba(191, 219, 254, 0.55);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.24);
+  color: #f8fafc;
+  font-size: 10px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.bf-battle-live-logs li {
+  animation: bf-battle-log-enter 160ms ease-out;
+}
+
+.bf-battle-live-logs time,
+.bf-battle-log-history time {
+  color: #bfdbfe;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bf-battle-live-logs li > span,
+.bf-battle-log-history li > span {
+  display: grid;
+  gap: 2px;
+}
+
+.bf-battle-live-logs li > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bf-battle-live-logs small,
+.bf-battle-log-history small {
+  color: #bfdbfe;
+  font-size: 9px;
+}
+
+.bf-battle-log-history-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.bf-battle-log-history {
+  display: grid;
+  width: min(620px, 90vw);
+  max-height: 82vh;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #93c5fd;
+  border-radius: 16px;
+  background: #f8fbff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.32);
+  color: #172554;
+}
+
+.bf-battle-log-history > header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.bf-battle-log-history > header strong {
+  font-size: 16px;
+}
+
+.bf-battle-log-history > header span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.bf-battle-log-history > header button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 7px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: white;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+
+.bf-battle-log-history ol {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.bf-battle-log-history li {
+  border-color: #dbeafe;
+  background: white;
+  box-shadow: none;
+  color: #1e293b;
+}
+
+@keyframes bf-battle-log-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 700px) {
+  .bf-battle-live-logs {
+    left: 50vw;
+    top: 50vh;
+    width: min(260px, 44vw);
+  }
+}
+
 .bf-deck-change-popup {
   display: grid;
   gap: 14px;
@@ -7821,11 +7981,9 @@ body:has(.bf-battle-app) {
 }
 
 .dm-deck-search-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: flex-start;
-  align-items: flex-start;
-  justify-content: flex-start;
   gap: 2.5px;
   width: 100%;
   padding: 4px;
@@ -7834,7 +7992,6 @@ body:has(.bf-battle-app) {
 .dm-deck-search-grid > .dm-deck-search-card {
   position: relative;
   display: grid;
-  flex: 0 0 calc((100% - 23px) * 0.185625);
   place-items: center;
   width: auto;
   height: auto;

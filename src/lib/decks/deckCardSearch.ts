@@ -22,7 +22,12 @@ export function sortDeckSearchWorlds(worlds: readonly string[]) {
   );
 }
 
-export const DRAGON_EIN_SEARCH_WORLD = "ドラゴン・アイン";
+export type DeckCardSpecialFlagKey = "dragonEin";
+
+export const DECK_CARD_SPECIAL_FLAG_OPTIONS: ReadonlyArray<{
+  value: DeckCardSpecialFlagKey;
+  label: string;
+}> = [{ value: "dragonEin", label: "ドラゴン・アイン" }];
 
 export type DeckCardEraKey = "first" | "hundred" | "ddd" | "x" | "god";
 
@@ -70,6 +75,7 @@ export type DeckCardSearchFilters = {
   name: string;
   cardText: string;
   worlds: string[];
+  specialFlags: DeckCardSpecialFlagKey[];
   cardTypes: CardType[];
   sizes: DeckCardSizeFilter[];
   races: string[];
@@ -83,6 +89,7 @@ export const EMPTY_DECK_CARD_SEARCH_FILTERS: DeckCardSearchFilters = {
   name: "",
   cardText: "",
   worlds: [],
+  specialFlags: [],
   cardTypes: [],
   sizes: [],
   races: [],
@@ -137,7 +144,7 @@ export async function loadDeckCardSearchOptions() {
 
       const worlds = (worldResult.data as unknown as string[] | null) ?? [];
       const value = {
-        worlds: sortDeckSearchWorlds([...worlds, DRAGON_EIN_SEARCH_WORLD]),
+        worlds: sortDeckSearchWorlds(worlds),
         sets: (setResult.data ?? []).map((set) => ({
           id: set.id,
           setCode: set.set_code,
@@ -197,6 +204,7 @@ export async function searchDeckCards(input: {
       p_original_mode: input.filters.originalMode,
       p_attributes: [
         ...input.filters.attributes,
+        ...input.filters.specialFlags.map((flag) => `special_flag:${flag}`),
         ...input.filters.sizes.map((size) => `size:${size}`)
       ],
       p_preferred_worlds: input.preferredWorlds,

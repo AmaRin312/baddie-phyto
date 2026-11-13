@@ -5,6 +5,7 @@ import { Button } from "@/components/common/button";
 import {
   DECK_CARD_ATTRIBUTE_OPTIONS,
   DECK_CARD_ERA_OPTIONS,
+  DECK_CARD_SPECIAL_FLAG_OPTIONS,
   EMPTY_DECK_CARD_SEARCH_FILTERS,
   deckSearchWorldLabel,
   sortDeckSearchWorlds,
@@ -27,10 +28,11 @@ type DeckCardSearchPanelProps = {
   onChange: (filters: DeckCardSearchFilters) => void;
 };
 
-type DetailSectionKey = "worlds" | "cardTypes" | "eras" | "attributes";
+type DetailSectionKey = "worlds" | "specialFlags" | "cardTypes" | "eras" | "attributes";
 
 const DETAIL_SECTION_LABELS: Record<DetailSectionKey, string> = {
   worlds: "ワールド",
+  specialFlags: "特殊フラッグ",
   cardTypes: "カードタイプ",
   eras: "年代・収録弾",
   attributes: "属性"
@@ -71,6 +73,7 @@ function DeckCardSearchPanelComponent({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Record<DetailSectionKey, boolean>>({
     worlds: false,
+    specialFlags: false,
     cardTypes: false,
     eras: false,
     attributes: false
@@ -163,6 +166,17 @@ function DeckCardSearchPanelComponent({
       key: `world:${world}`,
       label: deckSearchWorldLabel(world),
       onRemove: () => setArray("worlds", filters.worlds.filter((value) => value !== world))
+    })),
+    ...filters.specialFlags.map((specialFlag) => ({
+      key: `special-flag:${specialFlag}`,
+      label:
+        DECK_CARD_SPECIAL_FLAG_OPTIONS.find((option) => option.value === specialFlag)?.label ??
+        specialFlag,
+      onRemove: () =>
+        setArray(
+          "specialFlags",
+          filters.specialFlags.filter((value) => value !== specialFlag)
+        )
     })),
     ...filters.cardTypes.map((cardType) => ({
       key: `type:${cardType}`,
@@ -314,6 +328,30 @@ function DeckCardSearchPanelComponent({
                         onChange={() => setArray("worlds", toggleValue(filters.worlds, world))}
                       />
                       {deckSearchWorldLabel(world)}
+                    </label>
+                  ))}
+                </div>
+              </SearchSection>
+
+              <SearchSection
+                sectionKey="specialFlags"
+                open={openSections.specialFlags}
+                onToggle={() => toggleSection("specialFlags")}
+              >
+                <div className="dm-checkbox-grid">
+                  {DECK_CARD_SPECIAL_FLAG_OPTIONS.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={filters.specialFlags.includes(option.value)}
+                        onChange={() =>
+                          setArray(
+                            "specialFlags",
+                            toggleValue(filters.specialFlags, option.value)
+                          )
+                        }
+                      />
+                      {option.label}
                     </label>
                   ))}
                 </div>

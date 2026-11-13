@@ -610,10 +610,10 @@ function buildGroupsWithoutDb(
     imageFiles: groupRowsForName.map((row) => row.image_file),
     skippedExistingImageFiles: [],
     abilityBehaviorKey: groupRowsForName[0]?.ability ?? null,
-    issues: issues.filter((item) =>
-      item.rowNumber == null
-        ? true
-        : groupRowsForName.some((row) => row.rowNumber === item.rowNumber)
+    issues: issues.filter(
+      (item) =>
+        item.rowNumber != null &&
+        groupRowsForName.some((row) => row.rowNumber === item.rowNumber)
     )
   }));
 }

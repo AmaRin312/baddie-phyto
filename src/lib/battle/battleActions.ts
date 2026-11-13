@@ -695,6 +695,12 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
 
   const movedFromGauge = located.zoneId === "gauge" && input.toZone !== "gauge";
+  const shouldRestMovedCard =
+    movedFromGauge &&
+    (input.toZone === "center" ||
+      input.toZone === "left" ||
+      input.toZone === "right" ||
+      input.toZone === "item");
   const compositeId = getCompositeId(located.card);
   const handOpenActive =
     input.toZone === "hand" &&
@@ -754,7 +760,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                     visibility,
                     meta: {
                       ...movedMeta(card),
-                      isRested: movedFromGauge
+                      isRested: shouldRestMovedCard
                     }
                   }),
                   stackId,
@@ -771,7 +777,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
                   visibility,
                   meta: {
                     ...movedMeta(card),
-                    isRested: movedFromGauge
+                    isRested: shouldRestMovedCard
                   }
                 })
               )
@@ -801,7 +807,7 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     visibility,
     meta: {
       ...movedMeta(removedCard),
-      isRested: movedFromGauge
+      isRested: shouldRestMovedCard
     }
   };
   const revealNormalizedMovedCard =

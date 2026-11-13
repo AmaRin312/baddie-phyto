@@ -414,8 +414,14 @@ export function BattleController() {
   const [viewerPinned, setViewerPinned] = useState(false);
   const [battleMenuOpen, setBattleMenuOpen] = useState(false);
   const [battleLogsOpen, setBattleLogsOpen] = useState(false);
-  const [battleLogsVisible, setBattleLogsVisible] = useState(false);
-  const [battleLogDisplayCount, setBattleLogDisplayCount] = useState(10);
+  const [battleLogsVisible, setBattleLogsVisible] = useState(true);
+  const [battleLogDisplayCount, setBattleLogDisplayCount] = useState(4);
+  const [recentBattleLogs, setRecentBattleLogs] = useState<BattleActivityLogEntry[]>([]);
+  const [battleLogHistoryOpen, setBattleLogHistoryOpen] = useState(false);
+  const [battleLogCenter, setBattleLogCenter] = useState<{ left: number; top: number } | null>(null);
+  const battleLogSeenIdsRef = useRef<Set<string> | null>(null);
+  const battleLogTimersRef = useRef<Map<string, number>>(new Map());
+  const battleLogHistoryListRef = useRef<HTMLOListElement | null>(null);
   const [pendingLogSettings, setPendingLogSettings] =
     useState<"visibility" | "count" | null>(null);
   const [logCountInput, setLogCountInput] = useState("10");
@@ -3194,9 +3200,69 @@ export function BattleController() {
     () => Object.values(battleState?.players ?? {})
       .flatMap((player) => player.activityLogs ?? [])
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-      .slice(-battleLogDisplayCount),
-    [battleLogDisplayCount, battleState]
+      .slice(-60),
+    [battleState]
   );
+
+  useEffect(() => {
+    const seenIds = battleLogSeenIdsRef.current;
+    if (!seenIds) {
+      if (!isBattleLoaded) return;
+      battleLogSeenIdsRef.current = new Set(battleActivityLogs.map((log) => log.id));
+      return;
+    }
+
+    const newLogs = battleActivityLogs.filter((log) => !seenIds.has(log.id));
+    battleActivityLogs.forEach((log) => seenIds.add(log.id));
+    if (!battleLogsVisible || newLogs.length === 0) return;
+
+    setRecentBattleLogs((current) => [...current, ...newLogs].slice(-4));
+    newLogs.forEach((log) => {
+      const timerId = window.setTimeout(() => {
+        setRecentBattleLogs((current) => current.filter((item) => item.id !== log.id));
+        battleLogTimersRef.current.delete(log.id);
+      }, 5000);
+      battleLogTimersRef.current.set(log.id, timerId);
+    });
+  }, [battleActivityLogs, battleLogsVisible, isBattleLoaded]);
+
+  useLayoutEffect(() => {
+    if (!battleLogHistoryOpen || !battleLogHistoryListRef.current) return;
+    battleLogHistoryListRef.current.scrollTop = battleLogHistoryListRef.current.scrollHeight;
+  }, [battleLogHistoryOpen]);
+
+  useLayoutEffect(() => {
+    if (!isBattleLoaded) return;
+    const zones = Array.from(
+      document.querySelectorAll<HTMLElement>(".bf-player-board > .bf-zone-resolution")
+    );
+    if (zones.length < 2) return;
+
+    const updateCenter = () => {
+      const first = zones[0].getBoundingClientRect();
+      const second = zones[1].getBoundingClientRect();
+      setBattleLogCenter({
+        left: ((first.left + first.right) / 2 + (second.left + second.right) / 2) / 2,
+        top: ((first.top + first.bottom) / 2 + (second.top + second.bottom) / 2) / 2
+      });
+    };
+
+    updateCenter();
+    const observer = new ResizeObserver(updateCenter);
+    zones.forEach((zone) => observer.observe(zone));
+    const stage = document.querySelector<HTMLElement>(".bf-board-stage");
+    if (stage) observer.observe(stage);
+    window.addEventListener("resize", updateCenter);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateCenter);
+    };
+  }, [battleState?.id, isBattleLoaded]);
+
+  useEffect(() => () => {
+    battleLogTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    battleLogTimersRef.current.clear();
+  }, []);
 
   if (loading) {
     return <main className="bf-battle-loading">Battleを準備しています。</main>;
@@ -3282,6 +3348,71 @@ export function BattleController() {
       className={`bf-battle-app${battleMenuOpen ? " is-menu-open" : " is-menu-closed"}`}
       onClick={handleBattleBackgroundClick}
     >
+      {battleLogsVisible && <section
+        className="bf-battle-live-logs"
+        style={battleLogCenter ?? undefined}
+        aria-label="直近の対戦ログ。ダブルクリックで履歴を表示"
+        title="ダブルクリックで直近のログ履歴を表示"
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          setBattleLogHistoryOpen(true);
+        }}
+      >
+        <header>操作ログ · ダブルクリックで履歴</header>
+        {recentBattleLogs.length > 0 && (
+          <ol>
+            {recentBattleLogs.map((log) => (
+              <li key={log.id}>
+                <time dateTime={log.createdAt}>
+                  {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                  })}
+                </time>
+                <span><small>{log.actorName}</small>{log.message}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>}
+      {battleLogsVisible && battleLogHistoryOpen && (
+        <div
+          className="bf-battle-log-history-backdrop"
+          onClick={(event) => {
+            event.stopPropagation();
+            setBattleLogHistoryOpen(false);
+          }}
+        >
+          <section
+            className="bf-battle-log-history"
+            role="dialog"
+            aria-modal="true"
+            aria-label="対戦ログ履歴"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <strong>対戦ログ履歴</strong>
+              <span>最新15件を初期表示 · スクロールで過去のログを確認</span>
+              <button type="button" onClick={() => setBattleLogHistoryOpen(false)}>閉じる</button>
+            </header>
+            <ol ref={battleLogHistoryListRef}>
+              {battleActivityLogs.map((log) => (
+                <li key={log.id}>
+                  <time dateTime={log.createdAt}>
+                    {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit"
+                    })}
+                  </time>
+                  <span><small>{log.actorName}</small>{log.message}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      )}
       {selectedUnitCount > 1 && (
         <div className="bf-selection-count-badge" aria-live="polite">
           選択中 {selectedUnitCount}枚
@@ -3391,7 +3522,7 @@ export function BattleController() {
           {battleLogsVisible && battleLogsOpen && (
             <ol className="bf-battle-log-list" aria-label="対戦操作ログ">
               {battleActivityLogs.length > 0 ? (
-                [...battleActivityLogs].reverse().map((log) => (
+                battleActivityLogs.slice(-battleLogDisplayCount).reverse().map((log) => (
                   <li key={log.id}>
                     <time dateTime={log.createdAt}>
                       {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
@@ -3495,6 +3626,7 @@ export function BattleController() {
                   onClick={() => {
                     setBattleLogsVisible(false);
                     setBattleLogsOpen(false);
+                    setBattleLogHistoryOpen(false);
                     setPendingLogSettings(null);
                   }}
                 >

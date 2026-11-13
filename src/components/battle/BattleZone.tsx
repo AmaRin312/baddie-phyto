@@ -497,6 +497,7 @@ function BattleZoneComponent({
               <button
                 type="button"
                 className={`bf-card-button bf-resolution-card${card.orientation === "horizontal" ? " is-native-horizontal" : ""}${isResolutionSelected ? " is-selected" : ""}${isResolutionDragging ? " is-dragging" : ""}`}
+                data-battle-card-instance-id={battleCard.instanceId}
                 key={battleCard.instanceId}
                 draggable={canDragBattleCard({ card: battleCard, playerId })}
                 onDragStart={(event) => {
@@ -505,7 +506,7 @@ function BattleZoneComponent({
                     event.preventDefault();
                     return;
                   }
-                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer, selectedInstanceIds);
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", battleCard.instanceId);
                   onDragStartCard(battleCard, playerId);
@@ -583,6 +584,7 @@ function BattleZoneComponent({
               <button
                 type="button"
                 className={`bf-card-button bf-area-stack-card${attachedCards.length > 0 ? " has-soul-preview" : ""}${areaIsRested ? " is-rested" : ""}${areaIsNativeHorizontal && !isHyakuganComposite ? " is-native-horizontal" : ""}${isHyakuganComposite ? " is-hyakugan-composite" : ""}${areaIsSelected ? " is-selected" : ""}${areaIsDragging ? " is-dragging" : ""}${hasAreaStackCards && canDrop && dropTargetStackId === areaStack.stackId ? " is-drop-target" : ""}${heldStackId === areaStack.stackId ? " is-new-slot-target" : ""}`}
+                  data-battle-card-instance-id={areaTopCard.instanceId}
                 key={areaStack.stackId}
                 style={
                   zoneId === "item"
@@ -640,7 +642,7 @@ function BattleZoneComponent({
                     event.preventDefault();
                     return;
                   }
-                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                  setBattleCardDragImage(event.currentTarget, event.dataTransfer, selectedInstanceIds);
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", areaTopCard.instanceId);
                   onDragStartCard(areaTopCard, playerId);
@@ -779,6 +781,7 @@ function BattleZoneComponent({
                 <button
                   type="button"
                   className={`bf-card-button is-gauge-card${rotateCard ? " is-rotated" : ""}${gaugeIsSelected ? " is-selected" : ""}${gaugeIsDragging ? " is-dragging" : ""}`}
+                  data-battle-card-instance-id={gaugeCard.instanceId}
                   draggable={canDragBattleCard({ card: gaugeCard, playerId })}
                   key={gaugeCard.instanceId}
                   style={gaugeStyle}
@@ -788,7 +791,7 @@ function BattleZoneComponent({
                       event.preventDefault();
                       return;
                     }
-                    setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                    setBattleCardDragImage(event.currentTarget, event.dataTransfer, selectedInstanceIds);
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", gaugeCard.instanceId);
                     onDragStartCard(gaugeCard, playerId);
@@ -846,6 +849,7 @@ function BattleZoneComponent({
             <button
               type="button"
               className={`bf-card-button${isRested ? " is-rested" : ""}${isNativeHorizontal ? " is-native-horizontal" : ""}${isSelected ? " is-selected" : ""}${draggedSingleCard?.instanceId === topCard.instanceId ? " is-dragging" : ""}`}
+              data-battle-card-instance-id={topCard.instanceId}
               draggable={canDragBattleCard({ card: topCard, playerId })}
               onDragStart={(event) => {
                 event.stopPropagation();
@@ -853,7 +857,7 @@ function BattleZoneComponent({
                   event.preventDefault();
                   return;
                 }
-                setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                setBattleCardDragImage(event.currentTarget, event.dataTransfer, selectedInstanceIds);
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", topCard.instanceId);
                 onDragStartCard(topCard, playerId);
