@@ -176,16 +176,12 @@ function parseIntegerValue(
   return Number.parseInt(normalized, 10);
 }
 
-function normalizeWorlds(row: RawRow, issues: ExcelZipImportIssue[], requireWorld: boolean) {
+function normalizeWorlds(row: RawRow, issues: ExcelZipImportIssue[]) {
   const worlds = ["world1", "world2", "world3"]
     .map((column) => normalizeImportText(row.values[column as ExcelZipImportColumn]))
     .filter(Boolean)
     .map((world) => WORLD_ALIASES[normalizeLookupKey(world)] ?? world);
   const duplicate = worlds.find((world, index) => worlds.indexOf(world) !== index);
-
-  if (requireWorld && worlds.length === 0) {
-    pushIssue(issues, row.rowNumber, "world1", "ワールドを1つ以上入力してください。");
-  }
 
   if (duplicate) {
     pushIssue(issues, row.rowNumber, "world1", `ワールドが重複しています: ${duplicate}`);
@@ -234,7 +230,7 @@ export function normalizeExcelZipRow(row: RawRow): {
     pushIssue(issues, row.rowNumber, "orientation", `向きを認識できません: ${orientationInput}`);
   }
 
-  const worlds = normalizeWorlds(row, issues, cardType !== "flag_card");
+  const worlds = normalizeWorlds(row, issues);
   const races = normalizeRaces(row, issues);
   const size = parseIntegerValue(row.rowNumber, "size", value("size"), issues);
   const power = parseIntegerValue(row.rowNumber, "power", value("power"), issues);

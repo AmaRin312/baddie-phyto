@@ -22,12 +22,15 @@ export function sortDeckSearchWorlds(worlds: readonly string[]) {
   );
 }
 
-export type DeckCardSpecialFlagKey = "dragonEin";
+export type DeckCardSpecialFlagKey = "dragonEin" | "hyakki";
 
 export const DECK_CARD_SPECIAL_FLAG_OPTIONS: ReadonlyArray<{
   value: DeckCardSpecialFlagKey;
   label: string;
-}> = [{ value: "dragonEin", label: "ドラゴン・アイン" }];
+}> = [
+  { value: "dragonEin", label: "ドラゴン・アイン" },
+  { value: "hyakki", label: "百鬼" }
+];
 
 export type DeckCardEraKey = "first" | "hundred" | "ddd" | "x" | "god";
 
@@ -43,7 +46,6 @@ export const DECK_CARD_ERA_OPTIONS: ReadonlyArray<{
 ];
 
 export type DeckCardAttributeKey =
-  | "hyakki"
   | "cornerKing"
   | "chaos"
   | "generic"
@@ -56,7 +58,6 @@ export const DECK_CARD_ATTRIBUTE_OPTIONS: ReadonlyArray<{
   value: DeckCardAttributeKey;
   label: string;
 }> = [
-  { value: "hyakki", label: "百鬼" },
   { value: "cornerKing", label: "角王" },
   { value: "chaos", label: "カオス" },
   { value: "generic", label: "ジェネリック" },
@@ -204,7 +205,9 @@ export async function searchDeckCards(input: {
       p_original_mode: input.filters.originalMode,
       p_attributes: [
         ...input.filters.attributes,
-        ...input.filters.specialFlags.map((flag) => `special_flag:${flag}`),
+        ...input.filters.specialFlags.map((flag) =>
+          flag === "hyakki" ? "hyakki" : `special_flag:${flag}`
+        ),
         ...input.filters.sizes.map((size) => `size:${size}`)
       ],
       p_preferred_worlds: input.preferredWorlds,
