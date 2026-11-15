@@ -4726,6 +4726,13 @@ select {
   padding: 12px;
 }
 
+.dm-deck-search-special-flags {
+  display: grid;
+  gap: 10px;
+  border-top: 1px dashed #bfdbfe;
+  padding-top: 12px;
+}
+
 .dm-deck-search-sizes {
   display: grid;
   gap: 8px;

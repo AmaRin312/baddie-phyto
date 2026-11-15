@@ -32,6 +32,7 @@ import {
   resolveDeckSearchWorlds,
   searchDeckCards,
   type DeckCardSearchFilters,
+  type DeckCardSpecialFlagKey,
   type DeckCardSetOption
 } from "@/lib/decks/deckCardSearch";
 import {
@@ -80,6 +81,17 @@ function getFlagSearchWorlds(
     if (matched.length > 0) return matched;
   }
   return [];
+}
+
+function getFlagSearchSpecialFlags(
+  flag?: FlagRecord | null,
+  card?: CardRecord | null
+): DeckCardSpecialFlagKey[] {
+  const isHyakkiFlag =
+    flag?.name?.includes("百鬼") ||
+    flag?.usable_race_keywords?.some((keyword) => keyword.includes("百鬼")) ||
+    card?.is_hyakki;
+  return isHyakkiFlag ? ["hyakki"] : [];
 }
 
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
@@ -229,6 +241,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       worlds: nextDeck.flag_id
         ? getFlagSearchWorlds(searchOptionsResult.worlds, deckFlag, deckFlagCard)
         : resolveDeckSearchWorlds(searchOptionsResult.worlds, requestedWorld ? [requestedWorld] : []),
+      specialFlags: getFlagSearchSpecialFlags(deckFlag, deckFlagCard),
       races: deckFlag?.usable_race_keywords ?? []
     });
     setSearchPage(0);
@@ -1521,6 +1534,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   setSearchFilters((current) => ({
                     ...current,
                     worlds: [],
+                    specialFlags: [],
                     races: []
                   }));
                   setSearchPage(0);
@@ -1548,6 +1562,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       setSearchFilters((current) => ({
                         ...current,
                         worlds: getFlagSearchWorlds(searchWorlds, flag, flagCard),
+                        specialFlags: getFlagSearchSpecialFlags(flag, flagCard),
                         races: flag.usable_race_keywords ?? []
                       }));
                       setSearchPage(0);

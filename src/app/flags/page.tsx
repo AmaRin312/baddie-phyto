@@ -7,7 +7,7 @@ import { Button } from "@/components/common/button";
 import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
-import { loadFlags, setFlagActive } from "@/lib/flags/flagActions";
+import { deleteFlag, loadFlags, setFlagActive } from "@/lib/flags/flagActions";
 import type { FlagWithCardRecord } from "@/types/baddiePhyto";
 
 function getFlagDisplayName(flag: FlagWithCardRecord) {
@@ -58,6 +58,29 @@ export default function FlagsPage() {
     if (error) {
       console.error(error);
       setMessage(`フラッグの無効化に失敗しました。${error.message}`);
+      return;
+    }
+
+    await reload();
+  }
+
+  async function handleDelete(flag: FlagWithCardRecord) {
+    if (!window.confirm(`「${getFlagDisplayName(flag)}」を完全に削除しますか？この操作は取り消せません。`)) {
+      return;
+    }
+
+    setDeletingId(flag.id);
+    setMessage("");
+    const { error } = await deleteFlag(flag.id);
+    setDeletingId("");
+
+    if (error) {
+      console.error(error);
+      setMessage(
+        error.code === "23503"
+          ? "このフラッグを使用中のデッキがあるため削除できません。先に各デッキのフラッグを変更してください。"
+          : `フラッグの削除に失敗しました。${error.message}`
+      );
       return;
     }
 
@@ -127,6 +150,14 @@ export default function FlagsPage() {
                       無効化
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    loading={deletingId === flag.id}
+                    onClick={() => handleDelete(flag)}
+                  >
+                    削除
+                  </Button>
                 </span>
               </div>
             ))}

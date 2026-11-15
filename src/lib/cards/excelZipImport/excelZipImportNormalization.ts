@@ -1,4 +1,5 @@
 import type { CardOrientation, CardRecord, CardType, DeckEraKey } from "@/types/baddiePhyto";
+import { normalizeWorldValue } from "@/lib/cards/import/cardCsvNormalization";
 import type {
   ExcelZipImportColumn,
   ExcelZipImportIssue,
@@ -318,9 +319,14 @@ type ComparableField = {
 };
 
 function normalizeWorldsForCompare(value: unknown) {
-  return Array.isArray(value)
-    ? [...value].map(String).sort((left, right) => left.localeCompare(right, "ja"))
-    : [];
+  if (!Array.isArray(value)) return [];
+
+  const worlds = value.map((world) => {
+    const normalized = normalizeImportText(world);
+    return normalizeWorldValue(normalized) ?? normalized;
+  });
+
+  return [...new Set(worlds)].sort((left, right) => left.localeCompare(right, "ja"));
 }
 
 function normalizeRacesForCompare(value: unknown) {
@@ -408,8 +414,8 @@ export function isSameExcelZipCardRecord(
   return (
     normalizeImportText(card.name) === row.name &&
     card.card_type === row.card_type &&
-    JSON.stringify([...(card.worlds ?? [])].sort()) ===
-      JSON.stringify([...row.worlds].sort()) &&
+    JSON.stringify(normalizeWorldsForCompare(card.worlds)) ===
+      JSON.stringify(normalizeWorldsForCompare(row.worlds)) &&
     JSON.stringify(card.races ?? []) === JSON.stringify(row.races) &&
     card.orientation === row.orientation &&
     card.size === row.size &&

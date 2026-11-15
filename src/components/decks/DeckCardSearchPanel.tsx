@@ -28,11 +28,10 @@ type DeckCardSearchPanelProps = {
   onChange: (filters: DeckCardSearchFilters) => void;
 };
 
-type DetailSectionKey = "worlds" | "specialFlags" | "cardTypes" | "eras" | "attributes";
+type DetailSectionKey = "worlds" | "cardTypes" | "eras" | "attributes";
 
 const DETAIL_SECTION_LABELS: Record<DetailSectionKey, string> = {
   worlds: "ワールド",
-  specialFlags: "特殊フラッグ",
   cardTypes: "カードタイプ",
   eras: "年代・収録弾",
   attributes: "属性"
@@ -73,7 +72,6 @@ function DeckCardSearchPanelComponent({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Record<DetailSectionKey, boolean>>({
     worlds: false,
-    specialFlags: false,
     cardTypes: false,
     eras: false,
     attributes: false
@@ -331,29 +329,25 @@ function DeckCardSearchPanelComponent({
                     </label>
                   ))}
                 </div>
-              </SearchSection>
-
-              <SearchSection
-                sectionKey="specialFlags"
-                open={openSections.specialFlags}
-                onToggle={() => toggleSection("specialFlags")}
-              >
-                <div className="dm-checkbox-grid">
-                  {DECK_CARD_SPECIAL_FLAG_OPTIONS.map((option) => (
-                    <label key={option.value}>
-                      <input
-                        type="checkbox"
-                        checked={filters.specialFlags.includes(option.value)}
-                        onChange={() =>
-                          setArray(
-                            "specialFlags",
-                            toggleValue(filters.specialFlags, option.value)
-                          )
-                        }
-                      />
-                      {option.label}
-                    </label>
-                  ))}
+                <div className="dm-deck-search-special-flags">
+                  <b>特殊フラッグ</b>
+                  <div className="dm-checkbox-grid">
+                    {DECK_CARD_SPECIAL_FLAG_OPTIONS.map((option) => (
+                      <label key={option.value}>
+                        <input
+                          type="checkbox"
+                          checked={filters.specialFlags.includes(option.value)}
+                          onChange={() =>
+                            setArray(
+                              "specialFlags",
+                              toggleValue(filters.specialFlags, option.value)
+                            )
+                          }
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </SearchSection>
 

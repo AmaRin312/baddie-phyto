@@ -227,3 +227,12 @@ export async function setFlagActive(flagId: string, isActive: boolean) {
   }
   return result;
 }
+
+export async function deleteFlag(flagId: string) {
+  const result = await supabase.from("flags").delete().eq("id", flagId);
+  if (!result.error) {
+    clearFlagLiteCache();
+    flagDetailCache.delete(flagId);
+  }
+  return result;
+}
