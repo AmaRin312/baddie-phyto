@@ -44,7 +44,7 @@ function createCardInsertPayload(cardId: string, row: NormalizedExcelZipCardRow)
     power: row.power,
     defense: row.defense,
     critical: row.critical,
-    card_text: row.card_text,
+    card_text: row.card_text ?? "",
     card_type: row.card_type,
     is_dragon: row.is_dragon,
     is_hyakki: row.is_hyakki,
@@ -424,10 +424,10 @@ export async function executeExcelZipCardImport(
         if (flagResult.error) throw new Error(`フラッグ設定の登録に失敗しました: ${flagResult.error.message}`);
       }
 
-      if (!createdNewCard && card.card_text !== firstRow.card_text) {
+      if (!createdNewCard && card.card_text !== (firstRow.card_text ?? "")) {
         const { error: updateError } = await supabase
           .from("cards")
-          .update({ card_text: firstRow.card_text })
+          .update({ card_text: firstRow.card_text ?? "" })
           .eq("id", card.id);
         if (updateError) throw new Error(`カードテキストの更新に失敗しました: ${updateError.message}`);
       }
