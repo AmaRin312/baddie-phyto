@@ -1,5 +1,8 @@
 import type { CardOrientation, CardRecord, CardType, DeckEraKey } from "@/types/baddiePhyto";
-import { normalizeWorldValue } from "@/lib/cards/import/cardCsvNormalization";
+import {
+  hasCornerKingKeyword,
+  normalizeWorldValue
+} from "@/lib/cards/import/cardCsvNormalization";
 import type {
   ExcelZipImportColumn,
   ExcelZipImportIssue,
@@ -238,6 +241,13 @@ export function normalizeExcelZipRow(row: RawRow): {
   const defense = parseIntegerValue(row.rowNumber, "defense", value("defense"), issues);
   const critical = parseIntegerValue(row.rowNumber, "critical", value("critical"), issues);
   const ability = normalizeImportText(value("ability")) || null;
+  const cardText = normalizeImportCardText(value("card_text")) || null;
+  const parsedCornerKing = parseBooleanValue(
+    row.rowNumber,
+    "is_kakuoh",
+    value("is_kakuoh"),
+    issues
+  );
   const setCode = normalizeImportText(value("set_code")) || null;
   const setName = normalizeImportText(value("set_name")) || null;
   const eraInput = normalizeImportText(value("era_key")).toLowerCase();
@@ -254,7 +264,10 @@ export function normalizeExcelZipRow(row: RawRow): {
   const booleans = {
     is_dragon: parseBooleanValue(row.rowNumber, "is_dragon", value("is_dragon"), issues),
     is_hyakki: parseBooleanValue(row.rowNumber, "is_hyakki", value("is_hyakki"), issues),
-    is_corner_king: parseBooleanValue(row.rowNumber, "is_kakuoh", value("is_kakuoh"), issues),
+    is_corner_king: {
+      ...parsedCornerKing,
+      value: parsedCornerKing.value || hasCornerKingKeyword(cardText)
+    },
     is_chaos: parseBooleanValue(row.rowNumber, "is_chaos", value("is_chaos"), issues),
     is_generic: parseBooleanValue(row.rowNumber, "is_generic", value("is_generic"), issues),
     is_heaven: parseBooleanValue(row.rowNumber, "is_heaven", value("is_heaven"), issues),
@@ -277,7 +290,7 @@ export function normalizeExcelZipRow(row: RawRow): {
       power,
       defense,
       critical,
-      card_text: normalizeImportCardText(value("card_text")) || null,
+      card_text: cardText,
       ability,
       image_file: imageFile,
       card_type: cardType,

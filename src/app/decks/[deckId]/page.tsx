@@ -94,6 +94,14 @@ function getFlagSearchSpecialFlags(
   return isHyakkiFlag ? ["hyakki"] : [];
 }
 
+function canRunDeckCardSearch(filters: DeckCardSearchFilters) {
+  return (
+    filters.worlds.length > 0 ||
+    filters.attributes.length > 0 ||
+    filters.specialFlags.length > 0
+  );
+}
+
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const router = useRouter();
   const [deck, setDeck] = useState<DeckRecord | null>(null);
@@ -494,11 +502,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   }, [deferredSearchFilters, safeSearchPage]);
 
   useEffect(() => {
-    if (
-      deferredSearchFilters.worlds.length === 0 &&
-      deferredSearchFilters.attributes.length === 0 &&
-      deferredSearchFilters.specialFlags.length === 0
-    ) {
+    if (!canRunDeckCardSearch(deferredSearchFilters)) {
       setSearchResults([]);
       setSearchTotalCount(0);
       setSearchLoading(false);
@@ -1374,9 +1378,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                     );
                   })}
                 </div>
-                {searchFilters.worlds.length === 0 &&
-                searchFilters.attributes.length === 0 &&
-                searchFilters.specialFlags.length === 0 ? (
+                {!canRunDeckCardSearch(searchFilters) ? (
                   <p className="dm-muted-text">詳細検索からワールド、特殊フラッグまたは属性を選択してください。</p>
                 ) : searchError ? (
                   <p className="dm-form-message">{searchError}</p>

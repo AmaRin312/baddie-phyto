@@ -17,6 +17,10 @@ export function normalizeCardTextValue(value: string) {
   return normalizeLineBreaks(value).replace(/^\uFEFF/, "").trim();
 }
 
+export function hasCornerKingKeyword(cardText: string | null | undefined) {
+  return /^\s*『角王』/u.test(normalizeCardTextValue(cardText ?? ""));
+}
+
 export function normalizeListValue(value: string) {
   const seen = new Set<string>();
   const values: string[] = [];

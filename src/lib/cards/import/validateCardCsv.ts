@@ -6,6 +6,7 @@ import {
 } from "@/lib/cards/import/cardCsvConstants";
 import {
   normalizeCardTextValue,
+  hasCornerKingKeyword,
   normalizeListValue,
   normalizeTextValue,
   normalizeWorldListValue
@@ -171,6 +172,8 @@ export function normalizeCardCsvRow(row: CardCsvRawRow): {
     });
   });
 
+  const cardText = normalizeCardTextValue(value("card_text")) || null;
+
   if (errors.length > 0 || !cardType || !orientation) {
     return { row: null, errors };
   }
@@ -187,12 +190,13 @@ export function normalizeCardCsvRow(row: CardCsvRawRow): {
       power: power.value,
       defense: defense.value,
       critical: critical.value,
-      card_text: normalizeCardTextValue(value("card_text")) || null,
+      card_text: cardText,
       ability: normalizeTextValue(value("ability")) || null,
       orientation,
       is_dragon: booleans.is_dragon.value,
       is_hyakki: booleans.is_hyakki.value,
-      is_corner_king: booleans.is_kakuoh.value,
+      is_corner_king:
+        booleans.is_kakuoh.value || hasCornerKingKeyword(cardText),
       is_chaos: booleans.is_chaos.value,
       is_generic: booleans.is_generic.value,
       is_heaven: booleans.is_heaven.value,
