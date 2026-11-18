@@ -10,6 +10,7 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
+import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
 import {
   createDraftDeck,
   copyDeck,
@@ -67,6 +68,21 @@ function getFlagName(flag?: FlagRecord | null, card?: CardRecord | null) {
   return flag?.name || card?.name || "未選択";
 }
 
+function getHyakuganHalfRole(
+  card?: CardRecord | null,
+  abilityMap?: Map<string, string[]>
+): "heaven" | "earth" | null {
+  const behaviorKeys = abilityMap?.get(card?.id ?? "") ?? [];
+  if (behaviorKeys.includes("ten_no_hanshin_composite")) return "heaven";
+  if (behaviorKeys.includes("chi_no_hanshin_composite")) return "earth";
+  const text = `${card?.name ?? ""} ${card?.card_text ?? ""}`
+    .normalize("NFKC")
+    .replace(/[\s・･]/gu, "");
+  if (text.includes("天の半身")) return "heaven";
+  if (text.includes("地の半身")) return "earth";
+  return null;
+}
+
 function getFlagSearchWorlds(
   availableWorlds: string[],
   flag?: FlagRecord | null,
@@ -87,11 +103,25 @@ function getFlagSearchSpecialFlags(
   flag?: FlagRecord | null,
   card?: CardRecord | null
 ): DeckCardSpecialFlagKey[] {
+  const isDragonEinFlag = [flag?.name, card?.name].some((name) =>
+    name
+      ?.normalize("NFKC")
+      .replace(/[\s・･]/g, "")
+      .includes("ドラゴンアイン")
+  );
   const isHyakkiFlag =
     flag?.name?.includes("百鬼") ||
     flag?.usable_race_keywords?.some((keyword) => keyword.includes("百鬼")) ||
     card?.is_hyakki;
-  return isHyakkiFlag ? ["hyakki"] : [];
+  return [
+    ...(isDragonEinFlag ? (["dragonEin"] as const) : []),
+    ...(isHyakkiFlag ? (["hyakki"] as const) : [])
+  ];
+}
+
+function getFlagSearchRaceKeywords(flag?: FlagRecord | null, card?: CardRecord | null) {
+  const hasDragonEinCondition = getFlagSearchSpecialFlags(flag, card).includes("dragonEin");
+  return hasDragonEinCondition ? [] : flag?.usable_race_keywords ?? [];
 }
 
 function canRunDeckCardSearch(filters: DeckCardSearchFilters) {
@@ -119,6 +149,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [currentUserId, setCurrentUserId] = useState("");
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [cardAbilityBehaviorMap, setCardAbilityBehaviorMap] = useState<Map<string, string[]>>(new Map());
   const [searchResults, setSearchResults] = useState<CardRecord[]>([]);
   const [searchTotalCount, setSearchTotalCount] = useState(0);
   const [searchWorlds, setSearchWorlds] = useState<string[]>([]);
@@ -207,6 +238,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       setLoading(false);
       return;
     }
+    const abilityMapResult = await loadCardAbilityBehaviorKeyMap(nextCardIds);
+    setCardAbilityBehaviorMap(abilityMapResult.error ? new Map() : abilityMapResult.data);
     const nextCards = (cardResult.data ?? []) as unknown as CardRecord[];
     const nextCardMap = new Map(nextCards.map((card) => [card.id, card]));
     const nextFlags = ((flagResult.data ?? []) as FlagRecord[]).filter(
@@ -250,7 +283,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         ? getFlagSearchWorlds(searchOptionsResult.worlds, deckFlag, deckFlagCard)
         : resolveDeckSearchWorlds(searchOptionsResult.worlds, requestedWorld ? [requestedWorld] : []),
       specialFlags: getFlagSearchSpecialFlags(deckFlag, deckFlagCard),
-      races: deckFlag?.usable_race_keywords ?? []
+      races: getFlagSearchRaceKeywords(deckFlag, deckFlagCard)
     });
     setSearchPage(0);
     setSearchResults([]);
@@ -341,6 +374,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setSearchPage(0);
         setFlags(nextFlags);
         setCards(nextCards);
+        setCardAbilityBehaviorMap(new Map());
         setSearchResults([]);
         setImages([]);
         setBattleSupplies(supplyResult.data ?? []);
@@ -406,6 +440,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const selectedBuddyCard = effectiveSelectedBuddyCardId
     ? cardMap.get(effectiveSelectedBuddyCardId) ?? null
     : null;
+  const selectedBuddyComposite = useMemo(() => {
+    const role = getHyakuganHalfRole(selectedBuddyCard, cardAbilityBehaviorMap);
+    if (!role) return null;
+    const pair = draftDeckCards
+      .map((draft) => cardMap.get(draft.cardId))
+      .filter((card): card is CardRecord => Boolean(card?.is_active));
+    const heaven = role === "heaven"
+      ? selectedBuddyCard
+      : pair.find((card) => getHyakuganHalfRole(card, cardAbilityBehaviorMap) === "heaven") ?? null;
+    const earth = role === "earth"
+      ? selectedBuddyCard
+      : pair.find((card) => getHyakuganHalfRole(card, cardAbilityBehaviorMap) === "earth") ?? null;
+    return heaven && earth ? { heaven, earth } : null;
+  }, [cardAbilityBehaviorMap, cardMap, draftDeckCards, selectedBuddyCard]);
   const sleeveSupplies = useMemo(
     () => battleSupplies.filter((supply) => supply.supply_type === "sleeve"),
     [battleSupplies]
@@ -905,8 +953,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedDeckCardId(cardId);
   }
 
-  function setAsBuddy(cardId: string) {
-    if (!canEditDeck) return;
+  async function setAsBuddy(cardId: string) {
+    if (!canEditDeck) return false;
     const card = cardMap.get(cardId);
     if (
       !draftDeckCardMap.has(cardId) ||
@@ -915,13 +963,34 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       card.card_type === "flag_card"
     ) {
       setMessage("バディにはデッキ内の有効なカードを選択してください。");
-      return;
+      return false;
     }
-    setSelectedBuddyCardId(cardId);
-    if (selectedBuddyCardId !== cardId) {
+    const behaviorResult = await loadCardAbilityBehaviorKeyMap(
+      draftDeckCards.map((draft) => draft.cardId)
+    );
+    const nextBehaviorMap = new Map(cardAbilityBehaviorMap);
+    for (const [id, keys] of behaviorResult.data) nextBehaviorMap.set(id, keys);
+    if (!behaviorResult.error) setCardAbilityBehaviorMap(nextBehaviorMap);
+    const halfRole = getHyakuganHalfRole(card, nextBehaviorMap);
+    let buddyCardId = cardId;
+    if (halfRole) {
+      const partner = draftDeckCards
+        .map((draft) => cardMap.get(draft.cardId))
+        .find((candidate) => getHyakuganHalfRole(candidate, nextBehaviorMap) === (halfRole === "heaven" ? "earth" : "heaven"));
+      if (!partner) {
+        setMessage("ヒャクガンヤミゲドウの天・地の半身を両方デッキに入れてください。");
+        return false;
+      }
+      buddyCardId = halfRole === "heaven" ? card.id : partner.id;
+    }
+    setSelectedBuddyCardId(buddyCardId);
+    if (selectedBuddyCardId !== buddyCardId) {
       setSelectedBuddyImageId("");
     }
-    setMessage("バディを選択しました。保存ボタンで反映されます。");
+    setMessage(halfRole
+      ? "天・地の半身を複合バディに設定しました。保存ボタンで反映されます。"
+      : "バディを選択しました。保存ボタンで反映されます。");
+    return true;
   }
 
   function closeCardDetail() {
@@ -1095,11 +1164,28 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                       if (!canEditDeck || !cardId) return;
                       event.preventDefault();
                       event.stopPropagation();
-                      setAsBuddy(cardId);
+                      void setAsBuddy(cardId);
                       setDraggedDeckCardId(null);
                     }}
                   >
-                    {selectedBuddyCard ? (
+                    {selectedBuddyComposite ? (
+                      <div className="dm-deck-buddy-composite" aria-label="ヒャクガンヤミゲドウ複合バディ">
+                        {[selectedBuddyComposite.heaven, selectedBuddyComposite.earth].map((card) => {
+                          const draft = draftDeckCardMap.get(card.id);
+                          return (
+                            <CardViewer
+                              key={card.id}
+                              card={card}
+                              images={imagesByCard.get(card.id) ?? []}
+                              selectedImageId={card.id === selectedBuddyComposite.heaven.id ? selectedBuddyImageId || draft?.selectedImageId : draft?.selectedImageId}
+                              variant="compact"
+                              className="dm-deck-buddy-composite-piece"
+                              preserveOrientation
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : selectedBuddyCard ? (
                       <CardViewer
                         card={selectedBuddyCard}
                         images={imagesByCard.get(selectedBuddyCard.id) ?? []}
@@ -1301,7 +1387,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   <b>
                     {selectedDeckCard.name} / ×{selectedDeckDraft.quantity}
                   </b>
-                  {effectiveSelectedBuddyCardId === selectedDeckCard.id && <span>バディ</span>}
+                  {(effectiveSelectedBuddyCardId === selectedDeckCard.id ||
+                    (selectedBuddyComposite &&
+                      [selectedBuddyComposite.heaven.id, selectedBuddyComposite.earth.id].includes(selectedDeckCard.id))) && <span>バディ</span>}
                   <p className="dm-muted-text">←で1枚追加、→で1枚減少、Deleteで削除</p>
                 </div>
               )}
@@ -1565,7 +1653,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         ...current,
                         worlds: getFlagSearchWorlds(searchWorlds, flag, flagCard),
                         specialFlags: getFlagSearchSpecialFlags(flag, flagCard),
-                        races: flag.usable_race_keywords ?? []
+                        races: getFlagSearchRaceKeywords(flag, flagCard)
                       }));
                       setSearchPage(0);
                       setFlagPickerOpen(false);
@@ -1647,13 +1735,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   key={card.id}
                   type="button"
                   className={`dm-deck-picker-option${
-                    effectiveSelectedBuddyCardId === card.id ? " is-selected" : ""
+                    effectiveSelectedBuddyCardId === card.id ||
+                    (selectedBuddyComposite &&
+                      [selectedBuddyComposite.heaven.id, selectedBuddyComposite.earth.id].includes(card.id))
+                      ? " is-selected"
+                      : ""
                   }`}
                   disabled={!canEditDeck}
                   onClick={() => {
-                    setSelectedBuddyCardId(card.id);
-                    setSelectedBuddyImageId("");
-                    setBuddyPickerOpen(false);
+                    void setAsBuddy(card.id).then((success) => {
+                      if (success) setBuddyPickerOpen(false);
+                    });
                   }}
                 >
                   <CardViewer

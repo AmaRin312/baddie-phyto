@@ -1467,6 +1467,24 @@ select {
   min-height: 126px;
 }
 
+.dm-deck-buddy-composite {
+  display: flex;
+  flex-direction: column;
+  width: 86px;
+  height: 120px;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.dm-deck-buddy-composite-piece {
+  flex: 1 1 50%;
+  width: 86px !important;
+  height: 60px !important;
+  min-height: 0;
+  border-radius: 0 !important;
+}
+
 .dm-deck-flag-picker:not(:has(article)) {
   min-height: 126px;
   border-style: dashed;

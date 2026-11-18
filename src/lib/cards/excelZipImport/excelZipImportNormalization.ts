@@ -1,6 +1,7 @@
 import type { CardOrientation, CardRecord, CardType, DeckEraKey } from "@/types/baddiePhyto";
 import {
   hasCornerKingKeyword,
+  normalizeCardOrientation,
   normalizeWorldValue
 } from "@/lib/cards/import/cardCsvNormalization";
 import type {
@@ -285,7 +286,7 @@ export function normalizeExcelZipRow(row: RawRow): {
       name,
       worlds,
       races,
-      orientation,
+      orientation: normalizeCardOrientation(name, orientation),
       size,
       power,
       defense,

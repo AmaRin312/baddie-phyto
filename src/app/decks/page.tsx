@@ -38,6 +38,8 @@ type DeckSection = {
 };
 
 const DECKS_PER_PAGE = 30;
+const DECK_ERA_FILTER_STORAGE_KEY = "baddie-phyto:deck-list-era-filter";
+const DEFAULT_DECK_ERA_FILTER = DECK_ERA_OPTIONS[DECK_ERA_OPTIONS.length - 1]?.value ?? "god";
 
 function findDisplayImageId(
   imagesByCard: Map<string, CardImageRecord[]>,
@@ -65,6 +67,7 @@ export default function DecksPage() {
   const [loadingPageAssets, setLoadingPageAssets] = useState(false);
   const [message, setMessage] = useState("");
   const [eraFilter, setEraFilter] = useState<DeckEraKey | "">("");
+  const [eraFilterReady, setEraFilterReady] = useState(false);
   const [flagFilter, setFlagFilter] = useState("");
   const [sectionPages, setSectionPages] = useState<Record<string, number>>({});
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
@@ -75,6 +78,27 @@ export default function DecksPage() {
   const [deletingDeck, setDeletingDeck] = useState(false);
   const requestedImageCardIds = useRef(new Set<string>());
   const lastDeckRefreshAt = useRef(0);
+
+  useEffect(() => {
+    try {
+      const savedEra = window.localStorage.getItem(DECK_ERA_FILTER_STORAGE_KEY);
+      const isKnownEra = DECK_ERA_OPTIONS.some((option) => option.value === savedEra);
+      setEraFilter(isKnownEra ? savedEra as DeckEraKey : DEFAULT_DECK_ERA_FILTER);
+    } catch {
+      setEraFilter(DEFAULT_DECK_ERA_FILTER);
+    } finally {
+      setEraFilterReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!eraFilterReady || !eraFilter) return;
+    try {
+      window.localStorage.setItem(DECK_ERA_FILTER_STORAGE_KEY, eraFilter);
+    } catch {
+      // Keep the current selection for this page when browser storage is unavailable.
+    }
+  }, [eraFilter, eraFilterReady]);
 
   const flagMap = useMemo(() => new Map(flags.map((flag) => [flag.id, flag])), [flags]);
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
@@ -157,7 +181,7 @@ export default function DecksPage() {
   }, []);
 
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!currentUserId || !eraFilterReady) return;
     let cancelled = false;
     if (!loading) setLoadingPageAssets(true);
     void loadDeckListPages({
@@ -215,7 +239,7 @@ export default function DecksPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [currentUserId, eraFilter, flagFilter, pageRefreshKey, sectionPages]);
+  }, [currentUserId, eraFilter, eraFilterReady, flagFilter, pageRefreshKey, sectionPages]);
 
   useEffect(() => {
     if (loading || !currentUserId) return;

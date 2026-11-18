@@ -205,6 +205,7 @@ export async function searchDeckCards(input: {
       p_original_mode: input.filters.originalMode,
       p_attributes: [
         ...input.filters.attributes,
+        ...(input.filters.specialFlags.includes("dragonEin") ? ["dragon"] : []),
         ...input.filters.specialFlags.map((flag) =>
           flag === "hyakki" ? "hyakki" : `special_flag:${flag}`
         ),

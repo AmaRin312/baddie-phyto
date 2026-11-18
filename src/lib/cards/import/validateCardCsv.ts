@@ -6,6 +6,7 @@ import {
 } from "@/lib/cards/import/cardCsvConstants";
 import {
   normalizeCardTextValue,
+  normalizeCardOrientation,
   hasCornerKingKeyword,
   normalizeListValue,
   normalizeTextValue,
@@ -192,7 +193,7 @@ export function normalizeCardCsvRow(row: CardCsvRawRow): {
       critical: critical.value,
       card_text: cardText,
       ability: normalizeTextValue(value("ability")) || null,
-      orientation,
+      orientation: normalizeCardOrientation(name, orientation),
       is_dragon: booleans.is_dragon.value,
       is_hyakki: booleans.is_hyakki.value,
       is_corner_king:

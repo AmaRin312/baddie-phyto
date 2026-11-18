@@ -17,6 +17,16 @@ export function normalizeCardTextValue(value: string) {
   return normalizeLineBreaks(value).replace(/^\uFEFF/, "").trim();
 }
 
+export function normalizeCardOrientation(
+  name: string,
+  orientation: "vertical" | "horizontal" | "mixed"
+) {
+  const normalizedName = normalizeTextValue(name).replace(/[\s・･]/gu, "");
+  return normalizedName.includes("災禍の大邪神ヒャクガンヤミゲドウ")
+    ? "horizontal"
+    : orientation;
+}
+
 export function hasCornerKingKeyword(cardText: string | null | undefined) {
   return /^\s*『角王』/u.test(normalizeCardTextValue(cardText ?? ""));
 }
@@ -92,7 +102,7 @@ export function createCardIdentityKey(row: NormalizedCardCsvRow, options?: {
     defense: row.defense,
     critical: row.critical,
     card_text: row.card_text == null ? null : normalizeCardTextValue(row.card_text),
-    orientation: row.orientation,
+    orientation: normalizeCardOrientation(row.name, row.orientation),
     is_dragon: row.is_dragon,
     is_hyakki: row.is_hyakki,
     is_corner_king: row.is_corner_king,
