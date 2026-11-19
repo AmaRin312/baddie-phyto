@@ -265,10 +265,7 @@ export function normalizeExcelZipRow(row: RawRow): {
   const booleans = {
     is_dragon: parseBooleanValue(row.rowNumber, "is_dragon", value("is_dragon"), issues),
     is_hyakki: parseBooleanValue(row.rowNumber, "is_hyakki", value("is_hyakki"), issues),
-    is_corner_king: {
-      ...parsedCornerKing,
-      value: parsedCornerKing.value || hasCornerKingKeyword(cardText)
-    },
+    is_corner_king: parsedCornerKing || hasCornerKingKeyword(cardText),
     is_chaos: parseBooleanValue(row.rowNumber, "is_chaos", value("is_chaos"), issues),
     is_generic: parseBooleanValue(row.rowNumber, "is_generic", value("is_generic"), issues),
     is_heaven: parseBooleanValue(row.rowNumber, "is_heaven", value("is_heaven"), issues),
