@@ -5104,7 +5104,7 @@ select {
 
 .dm-deck-management-section .dm-app-card {
   min-height: 0;
-  height: 152px;
+  height: 144px;
   box-sizing: border-box;
   align-content: start;
   gap: 4px;
@@ -5193,7 +5193,7 @@ select {
 }
 
 .dm-deck-management-images.is-hyakugan {
-  height: 91px;
+  height: 84px;
 }
 
 .dm-deck-management-images > div {
@@ -5242,11 +5242,6 @@ select {
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.dm-deck-management-images > .is-buddy > .dm-deck-management-hyakugan-buddy {
-  transform: scale(1.1);
-  transform-origin: top center;
 }
 
 .dm-deck-management-hyakugan-buddy {
@@ -7776,6 +7771,7 @@ body:has(.bf-battle-app) {
   width: 100%;
   height: 100%;
   margin-top: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 

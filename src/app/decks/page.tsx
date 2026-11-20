@@ -583,7 +583,7 @@ export default function DecksPage() {
     return (
       <div
         key={deck.id}
-        className="dm-deck-management-item"
+        className={`dm-deck-management-item${isHyakuganBuddy ? " is-hyakugan" : ""}`}
       >
         <AppCard title={deck.name}>
           <button

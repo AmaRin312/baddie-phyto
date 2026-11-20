@@ -124,8 +124,10 @@ function getFlagSearchSpecialFlags(
 }
 
 function getFlagSearchRaceKeywords(flag?: FlagRecord | null, card?: CardRecord | null) {
-  const hasDragonEinCondition = getFlagSearchSpecialFlags(flag, card).includes("dragonEin");
-  return hasDragonEinCondition ? [] : flag?.usable_race_keywords ?? [];
+  const hasSpecialFlagRaceCondition = getFlagSearchSpecialFlags(flag, card).some(
+    (specialFlag) => specialFlag === "dragonEin" || specialFlag === "hyakki"
+  );
+  return hasSpecialFlagRaceCondition ? [] : flag?.usable_race_keywords ?? [];
 }
 
 function canRunDeckCardSearch(filters: DeckCardSearchFilters) {
