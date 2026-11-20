@@ -1013,6 +1013,17 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     return true;
   }
 
+  function setAsKeyCard(cardId: string) {
+    if (!canEditDeck) return;
+    const card = cardMap.get(cardId);
+    if (!draftDeckCardMap.has(cardId) || !card?.is_active || card.card_type === "flag_card") {
+      setMessage("キーカードにはデッキ内の有効なカードを選択してください。");
+      return;
+    }
+    setSelectedKeyCardId(cardId);
+    setMessage("");
+  }
+
   function closeCardDetail() {
     setDetailCardId("");
     setDetailImageContext("deck");
@@ -1222,24 +1233,52 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                 <div className="dm-deck-key-card-setting">
                   <span>キーカード（任意）</span>
-                  <button
-                    type="button"
-                    className="dm-button secondary"
-                    onClick={() => setKeyCardPickerOpen(true)}
-                    disabled={!canEditDeck}
-                  >
-                    {selectedKeyCard?.name ?? "キーカードを選択"}
-                  </button>
-                  {selectedKeyCard && (
+                  <div className="dm-deck-key-card-slot">
                     <button
                       type="button"
-                      className="dm-button secondary"
-                      onClick={() => setSelectedKeyCardId("")}
+                      className="dm-deck-linked-card is-mini dm-deck-key-drop-target"
+                      title={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "デッキ内カードをドロップしてキーカードに設定"}
+                      aria-label={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "キーカードのドロップ先"}
                       disabled={!canEditDeck}
+                      onClick={() => setKeyCardPickerOpen(true)}
+                      onDragOver={(event) => {
+                        if (!canEditDeck || !event.dataTransfer.types.includes(DECK_CARD_DRAG_TYPE)) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(event) => {
+                        const cardId = event.dataTransfer.getData(DECK_CARD_DRAG_TYPE);
+                        if (!canEditDeck || !cardId) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setAsKeyCard(cardId);
+                        setDraggedDeckCardId(null);
+                      }}
                     >
-                      選択解除
+                      {selectedKeyCard ? (
+                        <CardViewer
+                          card={selectedKeyCard}
+                          images={imagesByCard.get(selectedKeyCard.id) ?? []}
+                          selectedImageId={getImageSelectValue(selectedKeyCard.id) || null}
+                          variant="compact"
+                        />
+                      ) : (
+                        <span>キーカードを選択</span>
+                      )}
                     </button>
-                  )}
+                    {selectedKeyCard && (
+                      <button
+                        type="button"
+                        className="dm-deck-key-card-clear"
+                        aria-label="キーカードを解除"
+                        title="キーカードを解除"
+                        disabled={!canEditDeck}
+                        onClick={() => setSelectedKeyCardId("")}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <button

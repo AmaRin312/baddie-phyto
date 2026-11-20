@@ -8699,7 +8699,36 @@ body:has(.bf-battle-app) {
 .dm-deck-management-images > .is-buddy {
   left: 25%;
   top: 12px;
+  height: 70px;
   z-index: 3;
+}
+
+.dm-deck-management-images > .is-buddy > article {
+  transform: scale(1.32);
+  transform-origin: top center;
+}
+
+.dm-deck-management-images > .is-buddy > .dm-deck-management-hyakugan-buddy {
+  transform: scale(1.1);
+  transform-origin: top center;
+}
+
+.dm-deck-management-hyakugan-buddy {
+  width: 49px;
+  height: 70px;
+  overflow: visible;
+}
+
+.dm-deck-management-images .dm-deck-management-hyakugan-piece {
+  flex: 0 0 35px;
+  width: 49px !important;
+  height: 35px !important;
+  min-height: 0;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .dm-deck-key-card-setting,
@@ -8712,6 +8741,46 @@ body:has(.bf-battle-app) {
 .dm-deck-key-card-setting > span {
   font-size: 13px;
   font-weight: 600;
+}
+
+.dm-deck-key-card-slot {
+  position: relative;
+  width: 92px;
+  min-width: 0;
+}
+
+.dm-deck-key-drop-target {
+  min-height: 126px;
+}
+
+.dm-deck-key-drop-target:not(:has(article)) {
+  border-style: dashed;
+  color: var(--dm-muted);
+}
+
+.dm-deck-key-card-clear {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  color: #fff;
+  background: #dc2626;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.3);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dm-deck-key-card-clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .dm-deck-supply-open small {
