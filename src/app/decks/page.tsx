@@ -63,6 +63,10 @@ function findDisplayImageId(
   return images.find((image) => image.is_default)?.id ?? null;
 }
 
+function isHyakuganYamigedoCard(card: CardRecord | null | undefined) {
+  return card?.name.normalize("NFKC").replace(/[\s・･]/gu, "").includes("ヒャクガンヤミゲドウ") ?? false;
+}
+
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckRecord[]>([]);
@@ -309,7 +313,8 @@ export default function DecksPage() {
     const hasHyakuganBuddy = Boolean(
       hyakuganCompositeCardIds && visibleDecks.some((deck) =>
         deck.buddy_card_id === hyakuganCompositeCardIds.heavenCardId ||
-        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId
+        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId ||
+        isHyakuganYamigedoCard(deck.buddy_card_id ? cardMap.get(deck.buddy_card_id) : null)
       )
     );
     const cardIds = [...new Set([
@@ -559,7 +564,8 @@ export default function DecksPage() {
     const isHyakuganBuddy = Boolean(
       hyakuganCompositeCardIds &&
       (deck.buddy_card_id === hyakuganCompositeCardIds.heavenCardId ||
-        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId)
+        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId ||
+        isHyakuganYamigedoCard(buddyCard))
     );
     const hyakuganHeavenCard = isHyakuganBuddy && hyakuganCompositeCardIds
       ? cardMap.get(hyakuganCompositeCardIds.heavenCardId) ?? null
@@ -594,7 +600,7 @@ export default function DecksPage() {
             }}
             title="ダブルクリックしてデッキ内容を表示"
           >
-            <div className="dm-deck-management-images">
+            <div className={`dm-deck-management-images${isHyakuganBuddy ? " is-hyakugan" : ""}`}>
               <div className="is-flag">
                 {flagCard ? (
                   <CardViewer

@@ -5097,7 +5097,7 @@ select {
 }
 
 .dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, 150px);
+  grid-template-columns: repeat(auto-fill, 135px);
   justify-content: start;
   gap: 6px;
 }
@@ -5107,15 +5107,16 @@ select {
   height: 152px;
   box-sizing: border-box;
   align-content: start;
-  gap: 5px;
+  gap: 4px;
   border-radius: 16px;
-  padding: 8px 9px;
+  overflow: hidden;
+  padding: 6px 8px;
 }
 
 .dm-deck-management-section .dm-app-card h2 {
-  font-size: 13px;
-  line-height: 1.2;
-  min-height: 2.4em;
+  min-height: 2.2em;
+  font-size: 12px;
+  line-height: 1.1;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -5125,9 +5126,9 @@ select {
 
 .dm-deck-management-section .dm-app-card p,
 .dm-deck-management-section .dm-muted-text {
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 1.25;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.1;
 }
 
 .dm-section-heading {
@@ -5159,6 +5160,7 @@ select {
 .dm-deck-management-card {
   display: grid;
   gap: 4px;
+  overflow: hidden;
 }
 
 .dm-deck-management-click-card {
@@ -5167,6 +5169,7 @@ select {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  overflow: hidden;
   padding: 0;
   text-align: left;
 }
@@ -5183,51 +5186,118 @@ select {
 
 .dm-deck-management-images {
   position: relative;
-  width: 68px;
-  height: 72px;
+  width: 99px;
+  height: 82.65px;
   margin: 0 auto;
+  overflow: visible;
+}
+
+.dm-deck-management-images.is-hyakugan {
+  height: 91px;
 }
 
 .dm-deck-management-images > div {
   position: absolute;
-  width: 38px;
-  height: 54px;
+  top: 0;
   display: flex;
+  width: 41px;
+  height: 52px;
   align-items: center;
   justify-content: center;
 }
 
 .dm-deck-management-images > .is-flag {
   left: 0;
-  top: 0;
   z-index: 1;
 }
 
 .dm-deck-management-images > .is-buddy {
+  top: 12px;
   left: 25%;
-  top: 25%;
-  z-index: 2;
+  height: 70px;
+  z-index: 3;
+}
+
+.dm-deck-management-images > .is-key {
+  left: 50%;
+  z-index: 1;
 }
 
 .dm-deck-management-images article {
-  width: 38px;
-  height: 54px;
-  border-radius: 8px;
+  width: 41px;
+  height: 52px;
   border: 0;
+  border-radius: 8px;
   box-shadow: 0 5px 10px rgba(15, 23, 42, 0.12);
+  transform: scale(1.2);
+  transform-origin: top center;
+}
+
+.dm-deck-management-images > .is-buddy > article {
+  transform: scale(1.32);
+}
+
+.dm-deck-management-images > .is-buddy article,
+.dm-deck-management-images > .is-buddy article img {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dm-deck-management-images > .is-buddy > .dm-deck-management-hyakugan-buddy {
+  transform: scale(1.1);
+  transform-origin: top center;
+}
+
+.dm-deck-management-hyakugan-buddy {
+  display: flex;
+  width: 49px;
+  height: 70px;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.dm-deck-management-images .dm-deck-management-hyakugan-piece {
+  flex: 0 0 35px;
+  width: 49px !important;
+  height: 35px !important;
+  min-height: 0;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.dm-deck-management-images .dm-deck-management-hyakugan-piece img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 35px !important;
+  height: 49px !important;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center;
+  object-fit: contain;
 }
 
 .dm-deck-management-empty {
-  min-width: 38px;
-  min-height: 54px;
+  display: grid;
+  width: 41px;
+  height: 52px;
+  place-items: center;
   border: 0;
   border-radius: 8px;
-  display: grid;
-  place-items: center;
   color: var(--dm-muted);
   background: rgba(239, 246, 255, 0.62);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 850;
+  transform: scale(1.2);
+  transform-origin: top center;
 }
 
 .dm-deck-pagination {
@@ -6587,20 +6657,6 @@ body:has(.bf-battle-app) {
 
 /* Final battle/deck-start stabilization.
    Keep these rules last so older incremental overrides do not leak through. */
-.dm-deck-management-card,
-.dm-deck-management-click-card,
-.dm-deck-management-images {
-  overflow: hidden;
-}
-
-.dm-deck-management-section .dm-app-card {
-  overflow: hidden;
-}
-
-.dm-deck-management-images {
-  overflow: visible;
-}
-
 .dm-new-deck-supply-field {
   display: grid;
   gap: 6px;
@@ -8584,169 +8640,6 @@ body:has(.bf-battle-app) {
 .dm-admin-update-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dm-site-update-notice button { padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 9px; background: white; cursor: pointer; }
 .dm-site-update-notice button:first-child { color: white; background: #2563eb; }
-
-/* Compact deck tiles: reduce the outer frame by 10% horizontally and 20% vertically. */
-.dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, 135px);
-}
-
-.dm-deck-management-section .dm-app-card {
-  height: 122px;
-  padding: 6px 8px;
-  gap: 4px;
-}
-
-.dm-deck-management-section .dm-app-card h2 {
-  min-height: 2.2em;
-  font-size: 12px;
-  line-height: 1.1;
-}
-
-.dm-deck-management-section .dm-app-card p,
-.dm-deck-management-section .dm-muted-text {
-  margin-top: 2px;
-  font-size: 10px;
-}
-
-.dm-deck-management-images {
-  width: 61px;
-  height: 58px;
-}
-
-.dm-deck-management-images > div,
-.dm-deck-management-images article {
-  width: 34px;
-  height: 43px;
-}
-
-.dm-deck-management-empty {
-  min-width: 34px;
-  min-height: 43px;
-  font-size: 8px;
-}
-
-/* Enlarge the flag and buddy thumbnails while keeping their overlap positions. */
-.dm-deck-management-images > div,
-.dm-deck-management-images article {
-  width: 41px;
-  height: 52px;
-}
-
-.dm-deck-management-images article,
-.dm-deck-management-images .dm-deck-management-empty {
-  transform: scale(1.2);
-  transform-origin: top center;
-}
-
-.dm-deck-management-images > .is-buddy article,
-.dm-deck-management-images > .is-buddy article img {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.dm-deck-management-hyakugan-buddy {
-  display: flex;
-  flex-direction: column;
-  width: 41px;
-  height: 52px;
-  gap: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-}
-
-.dm-deck-management-images .dm-deck-management-hyakugan-piece {
-  flex: 0 0 26px;
-  width: 41px !important;
-  height: 26px !important;
-  min-height: 0;
-  border: 0;
-  border-radius: 0 !important;
-  background: transparent;
-  box-shadow: none;
-  transform: none;
-}
-
-.dm-deck-management-empty {
-  min-width: 41px;
-  min-height: 52px;
-}
-
-/* Flag and key card flank the foreground buddy, with both set slightly higher. */
-.dm-deck-management-images {
-  width: 99px;
-  height: 82.65px;
-}
-
-.dm-deck-management-images:has(.dm-deck-management-hyakugan-buddy) {
-  height: 91px;
-}
-
-.dm-deck-management-images > div {
-  position: absolute;
-  top: 0;
-  width: 41px;
-  height: 52px;
-}
-
-.dm-deck-management-images > .is-flag {
-  left: 0;
-  z-index: 1;
-}
-
-.dm-deck-management-images > .is-key {
-  left: 50%;
-  z-index: 1;
-}
-
-.dm-deck-management-images > .is-buddy {
-  left: 25%;
-  top: 12px;
-  height: 70px;
-  z-index: 3;
-}
-
-.dm-deck-management-images > .is-buddy > article {
-  transform: scale(1.32);
-  transform-origin: top center;
-}
-
-.dm-deck-management-images > .is-buddy > .dm-deck-management-hyakugan-buddy {
-  transform: scale(1.1);
-  transform-origin: top center;
-}
-
-.dm-deck-management-hyakugan-buddy {
-  width: 49px;
-  height: 70px;
-  overflow: visible;
-}
-
-.dm-deck-management-images .dm-deck-management-hyakugan-piece {
-  flex: 0 0 35px;
-  width: 49px !important;
-  height: 35px !important;
-  min-height: 0;
-  border: 0;
-  border-radius: 0 !important;
-  background: transparent;
-  box-shadow: none;
-  transform: none;
-}
-
-.dm-deck-management-images .dm-deck-management-hyakugan-piece img {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 35px !important;
-  height: 49px !important;
-  max-width: none;
-  max-height: none;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center;
-  object-fit: contain;
-}
 
 .dm-deck-key-card-setting,
 .dm-deck-supply-open {
