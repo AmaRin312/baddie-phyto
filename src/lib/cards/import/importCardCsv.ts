@@ -159,7 +159,9 @@ export async function previewCardCsvImport(input: {
 
   const existingCards = cardsResult.data ?? [];
   const activeAbilityKeys = new Set(
-    (abilitiesResult.data ?? []).map((ability) => ability.behavior_key)
+    (abilitiesResult.data ?? [])
+      .map((ability) => ability.behavior_key)
+      .filter((behaviorKey): behaviorKey is string => Boolean(behaviorKey))
   );
   const setId = setsResult.data?.id ?? null;
   const printingsResult = setId
@@ -446,10 +448,10 @@ export async function loadCardImportLogs(input: {
   return { logs: data ?? [], count: count ?? 0, error: null };
 }
 
-export type CsvAbilityOption = Pick<
-  AbilityRecord,
-  "id" | "name" | "behavior_key" | "description"
->;
+export type CsvAbilityOption = Omit<
+  Pick<AbilityRecord, "id" | "name" | "behavior_key" | "description">,
+  "behavior_key"
+> & { behavior_key: string };
 
 export async function loadAvailableCsvAbilities(): Promise<{
   abilities: CsvAbilityOption[];

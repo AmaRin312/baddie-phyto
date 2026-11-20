@@ -73,7 +73,7 @@ function findAbility(abilities: AbilityRecord[], value: string | null) {
   return (
     abilities.find(
       (ability) =>
-        normalizeImportText(ability.behavior_key).toLowerCase() === normalized ||
+        (ability.behavior_key && normalizeImportText(ability.behavior_key).toLowerCase() === normalized) ||
         normalizeImportText(ability.name).toLowerCase() === normalized
     ) ?? null
   );

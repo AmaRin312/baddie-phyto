@@ -287,7 +287,9 @@ async function extractZipEntries(file: File, issues: ExcelZipImportIssue[]) {
 function buildAbilityLookup(abilities: AbilityRecord[]) {
   const lookup = new Map<string, AbilityRecord>();
   abilities.forEach((ability) => {
-    lookup.set(normalizeImportText(ability.behavior_key).toLowerCase(), ability);
+    if (ability.behavior_key) {
+      lookup.set(normalizeImportText(ability.behavior_key).toLowerCase(), ability);
+    }
     lookup.set(normalizeImportText(ability.name).toLowerCase(), ability);
   });
   return lookup;

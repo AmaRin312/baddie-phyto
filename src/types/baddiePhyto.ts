@@ -99,7 +99,7 @@ export type SiteSupplySettingsRecord = {
 export type AbilityRecord = {
   id: string;
   name: string;
-  behavior_key: string;
+  behavior_key: string | null;
   description: string | null;
   params: Record<string, unknown>;
   is_active: boolean;

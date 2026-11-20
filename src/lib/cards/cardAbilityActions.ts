@@ -129,15 +129,33 @@ export async function loadAvailableAbilities() {
     .from("abilities")
     .select("id,name,behavior_key,description,params,is_active,created_at,updated_at")
     .eq("is_active", true)
-    .order("behavior_key")
+    .order("name")
     .returns<AbilityRecord[]>();
+}
+
+export async function createAbility(input: {
+  name: string;
+  behaviorKey?: string | null;
+  description?: string | null;
+}) {
+  return await supabase
+    .from("abilities")
+    .insert({
+      name: input.name.trim(),
+      behavior_key: input.behaviorKey?.trim() || null,
+      description: input.description?.trim() || null,
+      params: {},
+      is_active: true
+    })
+    .select("id,name,behavior_key,description,params,is_active,created_at,updated_at")
+    .single<AbilityRecord>();
 }
 
 export async function loadCardAbilityLinks(cardId: string) {
   const result = await supabase
     .from("card_abilities")
     .select(
-      "id,card_id,ability_id,params,sort_order,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
+      "id,card_id,ability_id,sort_order,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
     )
     .eq("card_id", cardId)
     .order("sort_order")
@@ -150,7 +168,7 @@ export async function loadCardAbilityLinks(cardId: string) {
   return await supabase
     .from("card_abilities")
     .select(
-      "id,card_id,ability_id,params,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
+      "id,card_id,ability_id,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
     )
     .eq("card_id", cardId)
     .returns<CardAbilityWithAbilityRecord[]>();
@@ -175,17 +193,20 @@ export async function addCardAbilityLink(input: {
     .select("id")
     .single<{ id: string }>();
 
-  if (!insertResult.error || !isMissingColumnError(insertResult.error, "sort_order")) {
+  if (!insertResult.error) {
+    return insertResult;
+  }
+
+  if (
+    !isMissingColumnError(insertResult.error, "params") &&
+    !isMissingColumnError(insertResult.error, "sort_order")
+  ) {
     return insertResult;
   }
 
   return await supabase
     .from("card_abilities")
-    .insert({
-      card_id: input.cardId,
-      ability_id: input.abilityId,
-      params: {}
-    })
+    .insert({ card_id: input.cardId, ability_id: input.abilityId })
     .select("id")
     .single<{ id: string }>();
 }
