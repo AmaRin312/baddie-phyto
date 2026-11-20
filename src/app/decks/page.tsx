@@ -9,6 +9,7 @@ import { AppShell } from "@/components/common/layout/AppShell";
 import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
+import { loadHyakuganCompositeCardIds } from "@/lib/cards/cardAbilityActions";
 import {
   copyDeck,
   deleteDeck,
@@ -16,6 +17,7 @@ import {
   loadDeckCards,
   type DeckListSection
 } from "@/lib/decks/deckActions";
+import { loadManagedCardSets } from "@/lib/decks/deckCardSearch";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { getPublicSupplyImageUrl, loadBattleSupplies } from "@/lib/supplies/supplyActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
@@ -39,7 +41,14 @@ type DeckSection = {
 
 const DECKS_PER_PAGE = 30;
 const DECK_ERA_FILTER_STORAGE_KEY = "baddie-phyto:deck-list-era-filter";
-const DEFAULT_DECK_ERA_FILTER = DECK_ERA_OPTIONS[DECK_ERA_OPTIONS.length - 1]?.value ?? "god";
+const LAST_AVAILABLE_DECK_ERA = DECK_ERA_OPTIONS[DECK_ERA_OPTIONS.length - 1]?.value ?? "god";
+
+function getLatestRegisteredEra(eraKeys: readonly (DeckEraKey | null | undefined)[]) {
+  const registeredEras = new Set(eraKeys.filter((era): era is DeckEraKey => Boolean(era)));
+  return [...DECK_ERA_OPTIONS]
+    .reverse()
+    .find((option) => registeredEras.has(option.value))?.value ?? LAST_AVAILABLE_DECK_ERA;
+}
 
 function findDisplayImageId(
   imagesByCard: Map<string, CardImageRecord[]>,
@@ -61,6 +70,10 @@ export default function DecksPage() {
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [hyakuganCompositeCardIds, setHyakuganCompositeCardIds] = useState<{
+    heavenCardId: string;
+    earthCardId: string;
+  } | null>(null);
   const [supplies, setSupplies] = useState<BattleSupplyRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -80,15 +93,40 @@ export default function DecksPage() {
   const lastDeckRefreshAt = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
+    let savedEra: DeckEraKey | null = null;
     try {
-      const savedEra = window.localStorage.getItem(DECK_ERA_FILTER_STORAGE_KEY);
-      const isKnownEra = DECK_ERA_OPTIONS.some((option) => option.value === savedEra);
-      setEraFilter(isKnownEra ? savedEra as DeckEraKey : DEFAULT_DECK_ERA_FILTER);
+      const storedEra = window.localStorage.getItem(DECK_ERA_FILTER_STORAGE_KEY);
+      if (DECK_ERA_OPTIONS.some((option) => option.value === storedEra)) {
+        savedEra = storedEra as DeckEraKey;
+      }
     } catch {
-      setEraFilter(DEFAULT_DECK_ERA_FILTER);
-    } finally {
-      setEraFilterReady(true);
+      // Fall back to the newest registered era when browser storage is unavailable.
     }
+
+    void loadManagedCardSets().then((result) => {
+      if (cancelled) return;
+      const registeredEras = result.error
+        ? []
+        : (result.data ?? []).map((set) => set.era_key ?? "first");
+      const latestRegisteredEra = getLatestRegisteredEra(registeredEras);
+      setEraFilter(
+        savedEra && registeredEras.includes(savedEra)
+          ? savedEra
+          : latestRegisteredEra
+      );
+      setEraFilterReady(true);
+    }).catch((error) => {
+      console.warn("Registered card eras failed to load.", error);
+      if (!cancelled) {
+        setEraFilter(savedEra ?? LAST_AVAILABLE_DECK_ERA);
+        setEraFilterReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -181,6 +219,22 @@ export default function DecksPage() {
   }, []);
 
   useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    void loadHyakuganCompositeCardIds().then((result) => {
+      if (cancelled) return;
+      if (result.error) {
+        console.warn("Hyakugan buddy card metadata failed to load.", result.error);
+        return;
+      }
+      setHyakuganCompositeCardIds(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (!currentUserId || !eraFilterReady) return;
     let cancelled = false;
     if (!loading) setLoadingPageAssets(true);
@@ -252,9 +306,19 @@ export default function DecksPage() {
     const flagCardIds = visibleDecks
       .map((deck) => flags.find((flag) => flag.id === deck.flag_id)?.card_id)
       .filter((id): id is string => Boolean(id));
+    const hasHyakuganBuddy = Boolean(
+      hyakuganCompositeCardIds && visibleDecks.some((deck) =>
+        deck.buddy_card_id === hyakuganCompositeCardIds.heavenCardId ||
+        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId
+      )
+    );
     const cardIds = [...new Set([
       ...flagCardIds,
-      ...visibleDecks.map((deck) => deck.buddy_card_id).filter((id): id is string => Boolean(id))
+      ...visibleDecks.map((deck) => deck.buddy_card_id).filter((id): id is string => Boolean(id)),
+      ...visibleDecks.map((deck) => deck.key_card_id).filter((id): id is string => Boolean(id)),
+      ...(hasHyakuganBuddy && hyakuganCompositeCardIds
+        ? [hyakuganCompositeCardIds.heavenCardId, hyakuganCompositeCardIds.earthCardId]
+        : [])
     ])];
     const missingCardIds = cardIds.filter((id) => !cardMap.has(id));
     const missingImageIds = cardIds.filter((id) => !requestedImageCardIds.current.has(id));
@@ -300,7 +364,7 @@ export default function DecksPage() {
         missingImageIds.forEach((id) => requestedImageCardIds.current.delete(id));
       }
     };
-  }, [cardMap, flags, loading, visibleDecks]);
+  }, [cardMap, flags, hyakuganCompositeCardIds, loading, visibleDecks]);
 
   useEffect(() => {
     if (loading) return;
@@ -354,7 +418,8 @@ export default function DecksPage() {
       const cardIds = [...new Set([
         ...nextDeckCards.map(item => item.card_id),
         flag?.card_id,
-        selectedDeckForAction.buddy_card_id
+        selectedDeckForAction.buddy_card_id,
+        selectedDeckForAction.key_card_id
       ].filter((id): id is string => Boolean(id)))];
       const missingCardIds = cardIds.filter(id => !cardMap.has(id));
       const missingImageIds = cardIds.filter(id => !requestedImageCardIds.current.has(id));
@@ -477,6 +542,7 @@ export default function DecksPage() {
     const flag = deck.flag_id ? flagMap.get(deck.flag_id) : null;
     const flagCard = flag?.card_id ? cardMap.get(flag.card_id) ?? null : null;
     const buddyCard = deck.buddy_card_id ? cardMap.get(deck.buddy_card_id) ?? null : null;
+    const keyCard = deck.key_card_id ? cardMap.get(deck.key_card_id) ?? null : null;
     const buddyDeckCard = (deckCardMap.get(deck.id) ?? []).find(
       (deckCard) => deckCard.card_id === deck.buddy_card_id
     );
@@ -490,6 +556,23 @@ export default function DecksPage() {
       buddyCard?.id,
       deck.selected_buddy_image_id ?? buddyDeckCard?.selected_image_id
     );
+    const isHyakuganBuddy = Boolean(
+      hyakuganCompositeCardIds &&
+      (deck.buddy_card_id === hyakuganCompositeCardIds.heavenCardId ||
+        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId)
+    );
+    const hyakuganHeavenCard = isHyakuganBuddy && hyakuganCompositeCardIds
+      ? cardMap.get(hyakuganCompositeCardIds.heavenCardId) ?? null
+      : null;
+    const hyakuganEarthCard = isHyakuganBuddy && hyakuganCompositeCardIds
+      ? cardMap.get(hyakuganCompositeCardIds.earthCardId) ?? null
+      : null;
+    const getDeckSelectedImageId = (cardId: string, fallbackId?: string | null) => {
+      const selectedId = (deckCardMap.get(deck.id) ?? []).find(
+        (deckCard) => deckCard.card_id === cardId
+      )?.selected_image_id;
+      return findDisplayImageId(imagesByCard, cardId, selectedId ?? fallbackId);
+    };
 
     return (
       <div
@@ -527,7 +610,24 @@ export default function DecksPage() {
                 )}
               </div>
               <div className="is-buddy">
-                {buddyCard ? (
+                {hyakuganHeavenCard && hyakuganEarthCard ? (
+                  <div className="dm-deck-management-hyakugan-buddy" aria-label="ヒャクガンヤミゲドウのバディ">
+                    {[hyakuganHeavenCard, hyakuganEarthCard].map((card) => (
+                      <CardViewer
+                        key={card.id}
+                        card={card}
+                        images={imagesByCard.get(card.id) ?? []}
+                        selectedImageId={getDeckSelectedImageId(
+                          card.id,
+                          card.id === buddyCard?.id ? buddyImageId : null
+                        )}
+                        variant="compact"
+                        className="dm-deck-management-hyakugan-piece"
+                        preserveOrientation
+                      />
+                    ))}
+                  </div>
+                ) : buddyCard ? (
                   <CardViewer
                     card={buddyCard}
                     images={imagesByCard.get(buddyCard.id) ?? []}
@@ -539,6 +639,18 @@ export default function DecksPage() {
                 ) : (
                   <span className="dm-deck-management-empty">未選択</span>
                 )}
+              </div>
+              <div className="is-key">
+                {keyCard ? (
+                  <CardViewer
+                    card={keyCard}
+                    images={imagesByCard.get(keyCard.id) ?? []}
+                    selectedImageId={getDeckSelectedImageId(keyCard.id)}
+                    variant="compact"
+                    className="dm-deck-management-image"
+                    forcePortrait
+                  />
+                ) : null}
               </div>
             </div>
             <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>

@@ -83,6 +83,10 @@ function getHyakuganHalfRole(
   return null;
 }
 
+function isHyakuganYamigedoCard(card?: CardRecord | null) {
+  return card?.name.normalize("NFKC").replace(/[\s・･]/gu, "").includes("ヒャクガンヤミゲドウ") ?? false;
+}
+
 function getFlagSearchWorlds(
   availableWorlds: string[],
   flag?: FlagRecord | null,
@@ -141,6 +145,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
   const [selectedBuddyCardId, setSelectedBuddyCardId] = useState("");
   const [selectedBuddyImageId, setSelectedBuddyImageId] = useState("");
+  const [selectedKeyCardId, setSelectedKeyCardId] = useState("");
   const [selectedSleeveSupplyId, setSelectedSleeveSupplyId] = useState("");
   const [selectedPlaymatSupplyId, setSelectedPlaymatSupplyId] = useState("");
   const [saveVisibilities, setSaveVisibilities] = useState<DeckVisibility[]>(["private"]);
@@ -180,6 +185,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [draggedSearchCardId, setDraggedSearchCardId] = useState<string | null>(null);
   const [flagPickerOpen, setFlagPickerOpen] = useState(false);
   const [buddyPickerOpen, setBuddyPickerOpen] = useState(false);
+  const [keyCardPickerOpen, setKeyCardPickerOpen] = useState(false);
+  const [supplyPickerOpen, setSupplyPickerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [searchPage, setSearchPage] = useState(0);
   const searchResultsRef = useRef<HTMLDivElement | null>(null);
@@ -229,6 +236,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const nextCardIds = [...new Set([
       ...nextDeckCards.map((deckCard) => deckCard.card_id),
       nextDeck.buddy_card_id,
+      nextDeck.key_card_id,
       ...((flagResult.data ?? []) as FlagRecord[]).map((flag) => flag.card_id).filter(Boolean)
     ].filter(Boolean))] as string[];
     const cardResult = await loadCardsByIds(nextCardIds);
@@ -258,6 +266,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
     setSelectedBuddyImageId(nextDeck.selected_buddy_image_id ?? "");
+    setSelectedKeyCardId(nextDeck.key_card_id ?? "");
     const defaultSleeveId = siteSupplySettingsResult.data?.sleeve_supply_id ?? "";
     setSiteDefaultSleeveSupplyId(defaultSleeveId);
     setSelectedSleeveSupplyId(
@@ -362,6 +371,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setSelectedFlagImageId("");
         setSelectedBuddyCardId("");
         setSelectedBuddyImageId("");
+        setSelectedKeyCardId("");
         const defaultSleeveId = siteSupplySettingsResult.data?.sleeve_supply_id ?? "";
         setSiteDefaultSleeveSupplyId(defaultSleeveId);
         setSelectedSleeveSupplyId("");
@@ -439,6 +449,9 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       : "";
   const selectedBuddyCard = effectiveSelectedBuddyCardId
     ? cardMap.get(effectiveSelectedBuddyCardId) ?? null
+    : null;
+  const selectedKeyCard = selectedKeyCardId && cardMap.get(selectedKeyCardId)?.is_active
+    ? cardMap.get(selectedKeyCardId) ?? null
     : null;
   const selectedBuddyComposite = useMemo(() => {
     const role = getHyakuganHalfRole(selectedBuddyCard, cardAbilityBehaviorMap);
@@ -608,6 +621,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           ...(flagPickerOpen ? flags.map((flag) => flag.card_id) : []),
           selectedFlagCard?.id,
           selectedBuddyCard?.id,
+          selectedKeyCard?.id,
           detailCard?.id
         ].filter(Boolean)
       )
@@ -619,6 +633,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     visibleFilteredCards,
     selectedFlagCard?.id,
     selectedBuddyCard?.id,
+    selectedKeyCard?.id,
     detailCard?.id
   ]);
   const mainDeckTotal = activeDraftDeckCards.reduce((sum, item) => sum + item.quantity, 0);
@@ -633,6 +648,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           selectedFlagId ||
           selectedFlagImageId ||
           effectiveSelectedBuddyCardId ||
+          selectedKeyCardId ||
           selectedBuddyImageId ||
           selectedSleeveSupplyId ||
           selectedPlaymatSupplyId ||
@@ -645,6 +661,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         selectedFlagId !== (deck.flag_id ?? "") ||
         selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
         effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
+        selectedKeyCardId !== (deck.key_card_id ?? "") ||
         selectedBuddyImageId !== (deck.selected_buddy_image_id ?? "") ||
         (selectedSleeveSupplyId || siteDefaultSleeveSupplyId) !==
           (deck.sleeve_supply_id ?? "") ||
@@ -757,6 +774,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       name: deckName.trim() || "無題のデッキ",
       flagId: selectedFlagId || null,
       buddyCardId: effectiveSelectedBuddyCardId || null,
+      keyCardId: selectedKeyCardId || null,
       selectedFlagImageId: selectedFlagImageId || null,
       selectedBuddyImageId: selectedBuddyImageId || null,
       sleeveSupplyId: selectedSleeveSupplyId || null,
@@ -829,6 +847,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           name: deckName.trim() || "無題のデッキ",
           flagId: selectedFlagId || null,
           buddyCardId: effectiveSelectedBuddyCardId || null,
+          keyCardId: selectedKeyCardId || null,
           selectedFlagImageId: selectedFlagImageId || null,
           selectedBuddyImageId: selectedBuddyImageId || null,
           sleeveSupplyId: selectedSleeveSupplyId || null,
@@ -873,6 +892,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setSelectedBuddyCardId("");
         setSelectedBuddyImageId("");
       }
+      if (selectedKeyCardId === card.id) setSelectedKeyCardId("");
       if (selectedDeckCardId === card.id) {
         setSelectedDeckCardId("");
       }
@@ -1191,7 +1211,8 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                         images={imagesByCard.get(selectedBuddyCard.id) ?? []}
                         selectedImageId={selectedBuddyImageId || null}
                         variant="compact"
-                        forcePortrait
+                        preserveOrientation={isHyakuganYamigedoCard(selectedBuddyCard)}
+                        forcePortrait={!isHyakuganYamigedoCard(selectedBuddyCard)}
                       />
                     ) : (
                       <span>バディカード</span>
@@ -1199,23 +1220,40 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </button>
                 </div>
 
-                {renderSupplySelect({
-                  label: "スリーブ",
-                  value: selectedSleeveSupplyId,
-                  supplies: sleeveSupplies,
-                  fallbackText: "サイト共通のデフォルトを使う",
-                  defaultSupplyId: siteDefaultSleeveSupplyId,
-                  defaultLabel: "カード",
-                  onChange: setSelectedSleeveSupplyId
-                })}
+                <div className="dm-deck-key-card-setting">
+                  <span>キーカード（任意）</span>
+                  <button
+                    type="button"
+                    className="dm-button secondary"
+                    onClick={() => setKeyCardPickerOpen(true)}
+                    disabled={!canEditDeck}
+                  >
+                    {selectedKeyCard?.name ?? "キーカードを選択"}
+                  </button>
+                  {selectedKeyCard && (
+                    <button
+                      type="button"
+                      className="dm-button secondary"
+                      onClick={() => setSelectedKeyCardId("")}
+                      disabled={!canEditDeck}
+                    >
+                      選択解除
+                    </button>
+                  )}
+                </div>
 
-                {renderSupplySelect({
-                  label: "プレイマット",
-                  value: selectedPlaymatSupplyId,
-                  supplies: playmatSupplies,
-                  fallbackText: "プレイマットなし",
-                  onChange: setSelectedPlaymatSupplyId
-                })}
+                <button
+                  type="button"
+                  className="dm-button secondary dm-deck-supply-open"
+                  onClick={() => setSupplyPickerOpen(true)}
+                  disabled={!canEditDeck}
+                >
+                  サプライを選択
+                  <small>
+                    スリーブ: {sleeveSupplies.find((item) => item.id === selectedSleeveSupplyId)?.name ?? "カード"}
+                    ／プレイマット: {playmatSupplies.find((item) => item.id === selectedPlaymatSupplyId)?.name ?? "なし"}
+                  </small>
+                </button>
 
                 <label>
                   年代
@@ -1763,6 +1801,65 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
               {buddyCandidates.length === 0 && (
                 <p className="dm-muted-text">バディ候補はデッキへカードを追加すると表示されます。</p>
               )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {keyCardPickerOpen && (
+        <div className="dm-card-detail-modal-backdrop" role="presentation" onClick={() => setKeyCardPickerOpen(false)}>
+          <section
+            className="dm-card-detail-modal dm-deck-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-key-card-picker-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div><p className="dm-kicker">KEY CARD</p><h2 id="deck-key-card-picker-title">キーカードを選択</h2></div>
+              <button type="button" className="dm-dialog-close" onClick={() => setKeyCardPickerOpen(false)}>×</button>
+            </header>
+            <div className="dm-deck-picker-list">
+              <button
+                type="button"
+                className={`dm-deck-picker-option${!selectedKeyCardId ? " is-selected" : ""}`}
+                disabled={!canEditDeck}
+                onClick={() => { setSelectedKeyCardId(""); setKeyCardPickerOpen(false); }}
+              ><span><b>未選択</b><small>キーカードなし</small></span></button>
+              {buddyCandidates.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={`dm-deck-picker-option${selectedKeyCardId === card.id ? " is-selected" : ""}`}
+                  disabled={!canEditDeck}
+                  onClick={() => { setSelectedKeyCardId(card.id); setKeyCardPickerOpen(false); }}
+                >
+                  <CardViewer card={card} images={imagesByCard.get(card.id) ?? []} selectedImageId={getImageSelectValue(card.id) || null} variant="compact" />
+                  <span><b>{card.name}</b><small>{getCardTypeLabel(card.card_type)}</small></span>
+                </button>
+              ))}
+              {buddyCandidates.length === 0 && <p className="dm-muted-text">キーカード候補はデッキへカードを追加すると表示されます。</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {supplyPickerOpen && (
+        <div className="dm-card-detail-modal-backdrop" role="presentation" onClick={() => setSupplyPickerOpen(false)}>
+          <section
+            className="dm-card-detail-modal dm-deck-supply-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deck-supply-picker-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="dm-card-detail-modal-header">
+              <div><p className="dm-kicker">SUPPLY</p><h2 id="deck-supply-picker-title">サプライを選択</h2></div>
+              <button type="button" className="dm-dialog-close" onClick={() => setSupplyPickerOpen(false)}>×</button>
+            </header>
+            <div className="dm-deck-supply-modal-fields">
+              {renderSupplySelect({ label: "スリーブ", value: selectedSleeveSupplyId, supplies: sleeveSupplies, fallbackText: "サイト共通のデフォルトを使う", defaultSupplyId: siteDefaultSleeveSupplyId, defaultLabel: "カード", onChange: setSelectedSleeveSupplyId })}
+              {renderSupplySelect({ label: "プレイマット", value: selectedPlaymatSupplyId, supplies: playmatSupplies, fallbackText: "プレイマットなし", onChange: setSelectedPlaymatSupplyId })}
             </div>
           </section>
         </div>

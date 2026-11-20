@@ -12,6 +12,7 @@ const DECK_SELECT_COLUMNS = [
   "name",
   "flag_id",
   "buddy_card_id",
+  "key_card_id",
   "selected_flag_image_id",
   "selected_buddy_image_id",
   "sleeve_supply_id",
@@ -21,9 +22,13 @@ const DECK_SELECT_COLUMNS = [
   "created_at",
   "updated_at"
 ].join(",");
-const DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE = DECK_SELECT_COLUMNS
+const DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD = DECK_SELECT_COLUMNS
   .split(",")
-  .filter((column) => column !== "selected_buddy_image_id")
+  .filter((column) => column !== "key_card_id")
+  .join(",");
+const DECK_SELECT_COLUMNS_LEGACY = DECK_SELECT_COLUMNS
+  .split(",")
+  .filter((column) => column !== "key_card_id" && column !== "selected_buddy_image_id")
   .join(",");
 
 const DECK_CARD_SELECT_COLUMNS = [
@@ -139,10 +144,17 @@ export async function loadDecks(options?: { fresh?: boolean }) {
         .select(DECK_SELECT_COLUMNS)
         .order("updated_at", { ascending: false })
         .returns<DeckRecord[]>();
+      if (result.error && isMissingColumnError(result.error, "key_card_id")) {
+        result = await supabase
+          .from("decks")
+          .select(DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD)
+          .order("updated_at", { ascending: false })
+          .returns<DeckRecord[]>();
+      }
       if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
         result = await supabase
           .from("decks")
-          .select(DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE)
+          .select(DECK_SELECT_COLUMNS_LEGACY)
           .order("updated_at", { ascending: false })
           .returns<DeckRecord[]>();
       }
@@ -343,10 +355,17 @@ export async function loadDeck(deckId: string) {
         .select(DECK_SELECT_COLUMNS)
         .eq("id", deckId)
         .maybeSingle<DeckRecord>();
+      if (result.error && isMissingColumnError(result.error, "key_card_id")) {
+        result = await supabase
+          .from("decks")
+          .select(DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD)
+          .eq("id", deckId)
+          .maybeSingle<DeckRecord>();
+      }
       if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
         result = await supabase
           .from("decks")
-          .select(DECK_SELECT_COLUMNS_WITHOUT_BUDDY_IMAGE)
+          .select(DECK_SELECT_COLUMNS_LEGACY)
           .eq("id", deckId)
           .maybeSingle<DeckRecord>();
       }
@@ -492,6 +511,7 @@ export async function updateDeckSettings(input: {
   name: string;
   flagId: string | null;
   buddyCardId: string | null;
+  keyCardId: string | null;
   selectedFlagImageId: string | null;
   selectedBuddyImageId: string | null;
   sleeveSupplyId: string | null;
@@ -503,6 +523,7 @@ export async function updateDeckSettings(input: {
     name: input.name,
     flag_id: input.flagId,
     buddy_card_id: input.buddyCardId,
+    key_card_id: input.keyCardId,
     selected_flag_image_id: input.selectedFlagImageId,
     deck_visibility: input.deckVisibility,
     era_key: input.eraKey
@@ -607,19 +628,21 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
     .insert({
       ...baseInsert,
       selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null,
+      key_card_id: sourceDeck.key_card_id ?? null,
       sleeve_supply_id: sourceDeck.sleeve_supply_id ?? null,
       playmat_supply_id: sourceDeck.playmat_supply_id ?? null
     })
     .select("id")
     .single<{ id: string }>();
 
-  const insertResult =
-    !insertWithBuddyImage.error ||
-    !(
+  const canUseLegacyInsert = Boolean(insertWithBuddyImage.error && !sourceDeck.key_card_id && (
       isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id") ||
+      isMissingColumnError(insertWithBuddyImage.error, "key_card_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "sleeve_supply_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "playmat_supply_id")
-    )
+    ));
+  const insertResult =
+    !insertWithBuddyImage.error || !canUseLegacyInsert
       ? insertWithBuddyImage
       : await supabase
           .from("decks")

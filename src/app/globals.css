@@ -8645,7 +8645,83 @@ body:has(.bf-battle-app) {
   box-shadow: none;
 }
 
+.dm-deck-management-hyakugan-buddy {
+  display: flex;
+  flex-direction: column;
+  width: 41px;
+  height: 52px;
+  gap: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+}
+
+.dm-deck-management-images .dm-deck-management-hyakugan-piece {
+  flex: 0 0 26px;
+  width: 41px !important;
+  height: 26px !important;
+  min-height: 0;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
 .dm-deck-management-empty {
   min-width: 41px;
   min-height: 52px;
+}
+
+/* Flag and key card flank the foreground buddy, with both set slightly higher. */
+.dm-deck-management-images {
+  width: 99px;
+  height: 75px;
+}
+
+.dm-deck-management-images > div {
+  position: absolute;
+  top: 0;
+  width: 41px;
+  height: 52px;
+}
+
+.dm-deck-management-images > .is-flag {
+  left: 0;
+  z-index: 1;
+}
+
+.dm-deck-management-images > .is-key {
+  left: 50%;
+  z-index: 1;
+}
+
+.dm-deck-management-images > .is-buddy {
+  left: 25%;
+  top: 12px;
+  z-index: 3;
+}
+
+.dm-deck-key-card-setting,
+.dm-deck-supply-open {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.dm-deck-key-card-setting > span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dm-deck-supply-open small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.dm-deck-supply-modal-fields {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
 }

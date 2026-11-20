@@ -19,6 +19,60 @@ type CardAbilityBehaviorRow = {
   } | null;
 };
 
+export type HyakuganCompositeCardIds = {
+  heavenCardId: string;
+  earthCardId: string;
+};
+
+let hyakuganCompositeCardIdsRequest: Promise<{
+  data: HyakuganCompositeCardIds | null;
+  error: Error | null;
+}> | null = null;
+
+export function loadHyakuganCompositeCardIds() {
+  if (hyakuganCompositeCardIdsRequest) return hyakuganCompositeCardIdsRequest;
+  hyakuganCompositeCardIdsRequest = (async () => {
+    const abilitiesResult = await supabase
+      .from("abilities")
+      .select("id,behavior_key")
+      .in("behavior_key", ["ten_no_hanshin_composite", "chi_no_hanshin_composite"])
+      .returns<Array<{ id: string; behavior_key: string }>>();
+    if (abilitiesResult.error) {
+      return { data: null, error: new Error(abilitiesResult.error.message) };
+    }
+
+    const heavenAbilityId = abilitiesResult.data.find(
+      (ability) => ability.behavior_key === "ten_no_hanshin_composite"
+    )?.id;
+    const earthAbilityId = abilitiesResult.data.find(
+      (ability) => ability.behavior_key === "chi_no_hanshin_composite"
+    )?.id;
+    if (!heavenAbilityId || !earthAbilityId) {
+      return { data: null, error: null };
+    }
+
+    const linksResult = await supabase
+      .from("card_abilities")
+      .select("card_id,ability_id")
+      .in("ability_id", [heavenAbilityId, earthAbilityId])
+      .returns<Array<{ card_id: string; ability_id: string }>>();
+    if (linksResult.error) {
+      return { data: null, error: new Error(linksResult.error.message) };
+    }
+
+    const heavenCardId = linksResult.data.find(
+      (link) => link.ability_id === heavenAbilityId
+    )?.card_id;
+    const earthCardId = linksResult.data.find(
+      (link) => link.ability_id === earthAbilityId
+    )?.card_id;
+    return heavenCardId && earthCardId
+      ? { data: { heavenCardId, earthCardId }, error: null }
+      : { data: null, error: null };
+  })();
+  return hyakuganCompositeCardIdsRequest;
+}
+
 function isMissingColumnError(error: { code?: string; message?: string }, columnName: string) {
   return error.code === "42703" || Boolean(error.message?.includes(columnName));
 }

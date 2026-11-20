@@ -105,7 +105,7 @@ function shouldShowFace(card: BattleCard) {
 }
 
 function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
-  return ["center", "left", "right", "item", "set", "resolution"].includes(
+  return ["center", "left", "right", "item", "set", "resolution", "buddy"].includes(
     zoneId
   );
 }

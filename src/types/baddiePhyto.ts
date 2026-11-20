@@ -127,6 +127,7 @@ export type DeckRecord = {
   name: string;
   flag_id: string | null;
   buddy_card_id: string | null;
+    key_card_id?: string | null;
   selected_flag_image_id: string | null;
   selected_buddy_image_id?: string | null;
   sleeve_supply_id?: string | null;

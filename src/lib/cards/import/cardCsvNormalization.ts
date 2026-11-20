@@ -22,7 +22,7 @@ export function normalizeCardOrientation(
   orientation: "vertical" | "horizontal" | "mixed"
 ) {
   const normalizedName = normalizeTextValue(name).replace(/[\s・･]/gu, "");
-  return normalizedName.includes("災禍の大邪神ヒャクガンヤミゲドウ")
+  return normalizedName.includes("ヒャクガンヤミゲドウ")
     ? "horizontal"
     : orientation;
 }
