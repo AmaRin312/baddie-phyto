@@ -8676,7 +8676,11 @@ body:has(.bf-battle-app) {
 /* Flag and key card flank the foreground buddy, with both set slightly higher. */
 .dm-deck-management-images {
   width: 99px;
-  height: 75px;
+  height: 82.65px;
+}
+
+.dm-deck-management-images:has(.dm-deck-management-hyakugan-buddy) {
+  height: 91px;
 }
 
 .dm-deck-management-images > div {
@@ -8787,6 +8791,10 @@ body:has(.bf-battle-app) {
   display: block;
   font-size: 11px;
   font-weight: 400;
+}
+
+.dm-deck-supply-open {
+  border-radius: 10px;
 }
 
 .dm-deck-supply-modal-fields {
