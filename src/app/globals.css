@@ -8735,6 +8735,19 @@ body:has(.bf-battle-app) {
   transform: none;
 }
 
+.dm-deck-management-images .dm-deck-management-hyakugan-piece img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 35px !important;
+  height: 49px !important;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center;
+  object-fit: contain;
+}
+
 .dm-deck-key-card-setting,
 .dm-deck-supply-open {
   display: grid;
