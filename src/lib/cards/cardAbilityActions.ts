@@ -155,7 +155,7 @@ export async function loadCardAbilityLinks(cardId: string) {
   const result = await supabase
     .from("card_abilities")
     .select(
-      "id,card_id,ability_id,sort_order,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
+      "id,card_id,ability_id,sort_order,ability:abilities(id,name,behavior_key,description,is_active)"
     )
     .eq("card_id", cardId)
     .order("sort_order")
@@ -168,7 +168,7 @@ export async function loadCardAbilityLinks(cardId: string) {
   return await supabase
     .from("card_abilities")
     .select(
-      "id,card_id,ability_id,created_at,updated_at,ability:abilities(id,name,behavior_key,description,is_active)"
+      "id,card_id,ability_id,ability:abilities(id,name,behavior_key,description,is_active)"
     )
     .eq("card_id", cardId)
     .returns<CardAbilityWithAbilityRecord[]>();
