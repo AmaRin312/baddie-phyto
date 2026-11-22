@@ -1329,6 +1329,7 @@ export function BattleController() {
       : null;
     const entries: BattleActivityLogEntry[] = [];
     if (
+      command.source !== "drag_drop" &&
       movementIds.some((instanceId) =>
         getPreviousCard(instanceId)?.zoneId === "deck"
       )
@@ -2462,10 +2463,17 @@ export function BattleController() {
     });
   }
 
-  function handlePopupDragStartCard(card: BattleCard) {
+  function handlePopupDragStartCard(
+    card: BattleCard,
+    selectedInstanceIds?: string[]
+  ) {
+    const compositeInstanceIds = getBattleSelectionUnitInstanceIds(battleState, card);
     setDragSelection({
       sourceCard: card,
-      instanceIds: getBattleSelectionUnitInstanceIds(battleState, card)
+      instanceIds:
+        selectedInstanceIds && selectedInstanceIds.length > 1
+          ? selectedInstanceIds
+          : compositeInstanceIds
     });
   }
 
@@ -4017,9 +4025,13 @@ export function BattleController() {
           title="ドロップゾーン"
           description="ドロップゾーンのカード一覧です。"
           mode="browse"
+          className="is-drop-browser"
+          pageSize={20}
+          enableShiftSelection={dropBrowserPlayerId === "self"}
           canDragCards={dropBrowserPlayerId === "self"}
           onDragStartCard={handlePopupDragStartCard}
           onDragEndCard={handleDragEndCard}
+          onDoubleClickCard={(card) => setViewer(card.instanceId, { force: true })}
           onExecute={() => undefined}
           onClose={() => setDropBrowserPlayerId(null)}
         />

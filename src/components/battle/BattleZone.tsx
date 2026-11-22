@@ -679,6 +679,7 @@ function BattleZoneComponent({
                       aria-hidden="true"
                       className="bf-attached-soul-card"
                       key={soulCard.instanceId}
+                      data-soul-order={soulIndex + 1}
                       style={
                         {
                           "--bf-soul-layer": soulIndex + 1,

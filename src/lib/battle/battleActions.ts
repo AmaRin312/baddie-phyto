@@ -265,13 +265,13 @@ export type MoveSoulToSoulInput = {
 };
 
 function getVisibilityForZone(zoneId: BattleZoneId): BattleCard["visibility"] {
-  if (zoneId === "deck") return "face_down";
+  if (zoneId === "deck" || zoneId === "gauge") return "face_down";
   if (zoneId === "hand") return "private";
   return "public";
 }
 
 function getVisibilityForSoulMove(zoneId: BattleZoneId): BattleCard["visibility"] {
-  if (zoneId === "deck") return "face_down";
+  if (zoneId === "deck" || zoneId === "gauge") return "face_down";
   if (zoneId === "hand") return "private";
   return "public";
 }
@@ -706,10 +706,8 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     input.toZone === "hand" &&
     state.players[located.playerId].activeEffectIds?.includes("text-command:hand_open");
   const visibility =
-    movedFromGauge
-      ? "face_down"
-      : input.visibility ??
-        (handOpenActive ? "public" : getVisibilityForZone(input.toZone));
+    input.visibility ??
+    (handOpenActive ? "public" : getVisibilityForZone(input.toZone));
   const movedMeta = (card: BattleCard) => {
     const meta = { ...card.meta };
     delete meta.handOpenExposed;
@@ -916,8 +914,7 @@ export function stackCardOnAreaCard(
     withoutDeckRevealData({
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
-      visibility:
-        located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
+      visibility: getVisibilityForZone(input.toZone),
       meta: {
         ...removedCard.meta,
         isRested: located.zoneId === "gauge"
@@ -971,8 +968,7 @@ export function placeCardInAreaSlot(
             withoutDeckRevealData({
               ...resetMovedCard(card),
               zoneId: input.toZone,
-              visibility:
-                located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
+              visibility: getVisibilityForZone(input.toZone),
               meta: { ...card.meta, isRested: located.zoneId === "gauge" }
             }),
             stackId,
@@ -1005,8 +1001,7 @@ export function placeCardInAreaSlot(
     withoutDeckRevealData({
       ...resetMovedCard(removedCard),
       zoneId: input.toZone,
-      visibility:
-        located.zoneId === "gauge" ? "face_down" : getVisibilityForZone(input.toZone),
+      visibility: getVisibilityForZone(input.toZone),
       meta: {
         ...removedCard.meta,
         isRested: located.zoneId === "gauge"

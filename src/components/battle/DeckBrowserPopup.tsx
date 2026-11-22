@@ -32,12 +32,15 @@ type DeckBrowserPopupProps = {
   description?: string;
   mode?: DeckBrowserMode;
   className?: string;
+  pageSize?: number;
+  enableShiftSelection?: boolean;
   allowedDestinations?: ReadonlyArray<BattleDestination>;
   onExecute: (requests: DeckBrowserRequest[]) => void;
   onClose: () => void;
   canDragCards?: boolean;
-  onDragStartCard?: (card: BattleCard) => void;
+  onDragStartCard?: (card: BattleCard, selectedInstanceIds?: string[]) => void;
   onDragEndCard?: () => void;
+  onDoubleClickCard?: (card: BattleCard) => void;
 };
 
 export const DECK_BROWSER_PAGE_SIZE = 12;
@@ -55,12 +58,15 @@ export function DeckBrowserPopup({
   description = "山札上から下の順に表示しています。カードを選び、下側で移動先を設定します。",
   mode = "move",
   className,
+  pageSize = DECK_BROWSER_PAGE_SIZE,
+  enableShiftSelection = false,
   allowedDestinations = DEFAULT_DECK_BROWSER_DESTINATIONS,
   onExecute,
   onClose,
   canDragCards = false,
   onDragStartCard,
-  onDragEndCard
+  onDragEndCard,
+  onDoubleClickCard
 }: DeckBrowserPopupProps) {
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -70,7 +76,7 @@ export function DeckBrowserPopup({
     Record<string, DeckBrowserDraftAction>
   >({});
 
-  const canSelectCards = mode !== "browse";
+  const canSelectCards = mode !== "browse" || enableShiftSelection;
   const canEditDestinations = mode === "move" || mode === "look" || mode === "ability";
   const canExecute = canEditDestinations;
   const normalizedAllowedDestinations = allowedDestinations.includes("none")
@@ -79,14 +85,14 @@ export function DeckBrowserPopup({
   const availableDestinations = getBattleDestinationDefinitions(
     normalizedAllowedDestinations
   );
-  const pageCount = Math.max(1, Math.ceil(cards.length / DECK_BROWSER_PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(cards.length / pageSize));
   const pageCards = useMemo(
     () =>
       cards.slice(
-        page * DECK_BROWSER_PAGE_SIZE,
-        page * DECK_BROWSER_PAGE_SIZE + DECK_BROWSER_PAGE_SIZE
+        page * pageSize,
+        page * pageSize + pageSize
       ),
-    [cards, page]
+    [cards, page, pageSize]
   );
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedCards = cards.filter((card) => selectedIdSet.has(card.instanceId));
@@ -131,6 +137,24 @@ export function DeckBrowserPopup({
         }
       };
     });
+  }
+
+  function handleCardClick(instanceId: string, shiftKey: boolean) {
+    if (!enableShiftSelection) {
+      toggleCard(instanceId);
+      return;
+    }
+
+    if (!shiftKey) {
+      setSelectedIds([instanceId]);
+      return;
+    }
+
+    setSelectedIds((currentIds) =>
+      currentIds.includes(instanceId)
+        ? currentIds.filter((id) => id !== instanceId)
+        : [...currentIds, instanceId]
+    );
   }
 
   function updateAction(
@@ -247,6 +271,7 @@ export function DeckBrowserPopup({
                 type="button"
                 className={`bf-deck-browser-card${isSelected ? " is-selected" : ""}${!canSelectCards ? " is-readonly" : ""}`}
                 key={battleCard.instanceId}
+                data-battle-card-instance-id={battleCard.instanceId}
                 draggable={canDragCards && Boolean(onDragStartCard)}
                 onDragStart={(event) => {
                   if (!canDragCards || !onDragStartCard) {
@@ -254,16 +279,26 @@ export function DeckBrowserPopup({
                     return;
                   }
                   event.stopPropagation();
-                  setBattleCardDragImage(event.currentTarget, event.dataTransfer);
+                  const dragInstanceIds = enableShiftSelection && isSelected
+                    ? selectedIds
+                    : [battleCard.instanceId];
+                  setBattleCardDragImage(
+                    event.currentTarget,
+                    event.dataTransfer,
+                    new Set(dragInstanceIds)
+                  );
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", battleCard.instanceId);
-                  onDragStartCard(battleCard);
+                  onDragStartCard(battleCard, dragInstanceIds);
                 }}
                 onDragEnd={onDragEndCard}
-                onClick={() => toggleCard(battleCard.instanceId)}
+                onClick={(event) =>
+                  handleCardClick(battleCard.instanceId, event.shiftKey)
+                }
+                onDoubleClick={() => onDoubleClickCard?.(battleCard)}
               >
                 <span className="bf-deck-browser-order">
-                  {page * DECK_BROWSER_PAGE_SIZE + index + 1}
+                  {page * pageSize + index + 1}
                 </span>
                 <BoardCard
                   card={card}

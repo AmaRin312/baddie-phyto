@@ -790,11 +790,19 @@ export default function DecksPage() {
                       type="button"
                       className="dm-button primary dm-deck-action-edit"
                       onClick={() => router.push(`/decks/${selectedDeckForAction.id}`)}
-                      disabled={deletingDeck}
+                      disabled={deletingDeck || copyingDeck}
                     >
                       編集する
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="dm-button dm-deck-action-edit"
+                    onClick={() => void handleCopySelectedDeck()}
+                    disabled={copyingDeck || deletingDeck}
+                  >
+                    {copyingDeck ? "コピー中..." : "コピーする"}
+                  </button>
                   {renderDeckContentList(selectedDeckForAction)}
                 </div>
               </AppCard>
@@ -827,18 +835,7 @@ export default function DecksPage() {
                     </button>
                   </div>
                 )
-              ) : (
-                <div className="dm-dialog-actions">
-                  <button
-                    type="button"
-                    className="dm-button primary"
-                    onClick={() => void handleCopySelectedDeck()}
-                    disabled={copyingDeck}
-                  >
-                    {copyingDeck ? "コピー中..." : "コピーして保存"}
-                  </button>
-                </div>
-              )}
+              ) : null}
             </div>
           </section>
         </div>
