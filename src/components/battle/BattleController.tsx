@@ -25,6 +25,7 @@ import {
 } from "@/lib/battle/battleActions";
 import { isBattleShortcutBlocked } from "@/lib/battle/battleShortcutBlocker";
 import {
+  BATTLE_TEXT_COMMANDS,
   getBattleTextCommandSuggestions,
   parseBattleTextCommand,
   type BattleTextCommandId
@@ -140,6 +141,7 @@ const MULTI_SELECT_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
   "right",
   "resolution"
 ]);
+const FRAG_NEW_SUCCESS_MESSAGE = "選択したカードをフラッグに重ねました。";
 
 const HYAKUGAN_PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
   "center",
@@ -189,6 +191,7 @@ type PendingBattleActionPopup = {
 type PendingDeckCountPopup = {
   x: number;
   y: number;
+  purpose: "look" | "move";
 };
 
 type DeckContextMenuPosition = {
@@ -393,6 +396,7 @@ export function BattleController() {
   const [selectionMode, setSelectionMode] = useState<BattleSelectionMode>(null);
   const [pendingDeckCountPopup, setPendingDeckCountPopup] =
     useState<PendingDeckCountPopup | null>(null);
+  const [pendingDeckDragCount, setPendingDeckDragCount] = useState<number | null>(null);
   const [deckContextMenu, setDeckContextMenu] =
     useState<DeckContextMenuPosition | null>(null);
   const [deckViewerOpen, setDeckViewerOpen] = useState(false);
@@ -427,6 +431,7 @@ export function BattleController() {
   const [logCountInput, setLogCountInput] = useState("10");
   const [commandInputOpen, setCommandInputOpen] = useState(false);
   const [commandInput, setCommandInput] = useState("");
+  const [commandListOpen, setCommandListOpen] = useState(false);
   const [specialCommandMessage, setSpecialCommandMessage] = useState("");
   const [pendingTextCommandSelection, setPendingTextCommandSelection] =
     useState<"frag_new" | "quenatar" | "hyakugan-heaven" | "hyakugan-earth" | null>(null);
@@ -885,6 +890,18 @@ export function BattleController() {
   }
 
   useEffect(() => {
+    if (specialCommandMessage !== FRAG_NEW_SUCCESS_MESSAGE) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSpecialCommandMessage((current) =>
+        current === FRAG_NEW_SUCCESS_MESSAGE ? "" : current
+      );
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [specialCommandMessage]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadBattle();
     }, 0);
@@ -1260,31 +1277,29 @@ export function BattleController() {
       return [entry(`山札から${count}枚を公開`)];
     }
 
-    if (command.type === "DRAW_CARD") {
-      const movedCount = Math.max(
-        0,
-        previousState.players[command.payload.playerId].zones.deck.cards.length -
-          nextState.players[command.payload.playerId].zones.deck.cards.length
-      );
-      return movedCount > 0
-        ? [entry(`山札から手札にカードが移動（${movedCount}枚）`)]
-        : [];
-    }
-
     let movementIds: string[] = [];
     let destinationZone: BattleZoneId | null = null;
-    let targetInstanceId: string | null = null;
+    let sourceIsSoul = false;
+    let destinationIsSoul = false;
     if (command.type === "MOVE_TOP_DECK_CARD") {
       const topCard = previousState.players[command.payload.playerId].zones.deck.cards[0];
       movementIds = topCard ? [topCard.instanceId] : [];
       destinationZone = command.payload.toZone;
+    } else if (command.type === "DRAW_CARD") {
+      const player = previousState.players[command.payload.playerId];
+      const movedCount = Math.max(
+        0,
+        player.zones.deck.cards.length -
+          nextState.players[command.payload.playerId].zones.deck.cards.length
+      );
+      movementIds = player.zones.deck.cards
+        .slice(0, movedCount)
+        .map((card) => card.instanceId);
+      destinationZone = "hand";
     } else
     if (command.type === "MOVE_CARD" || command.type === "MOVE_REVEALED_CARD") {
       movementIds = [command.payload.instanceId];
       destinationZone = command.payload.toZone;
-      if (command.type === "MOVE_REVEALED_CARD") {
-        targetInstanceId = command.payload.targetInstanceId ?? null;
-      }
     } else if (command.type === "MOVE_CARDS") {
       movementIds = command.payload.instanceIds;
       destinationZone = command.payload.toZone;
@@ -1295,9 +1310,6 @@ export function BattleController() {
     ) {
       movementIds = [command.payload.instanceId];
       destinationZone = command.payload.toZone;
-      if (command.type !== "PLACE_AREA_SLOT") {
-        targetInstanceId = command.payload.targetInstanceId ?? null;
-      }
     } else if (
       command.type === "PLACE_AS_FLAG" ||
       command.type === "PLACE_QUENATAR_CARD"
@@ -1307,10 +1319,19 @@ export function BattleController() {
     } else if (command.type === "MOVE_SOUL_CARD") {
       movementIds = [command.payload.soulInstanceId];
       destinationZone = command.payload.toZone;
-      targetInstanceId = command.payload.targetInstanceId ?? null;
+      sourceIsSoul = true;
     } else if (command.type === "MOVE_SOUL_CARDS") {
       movementIds = command.payload.soulInstanceIds;
       destinationZone = command.payload.toZone;
+      sourceIsSoul = true;
+    } else if (
+      command.type === "MOVE_SOUL_TO_SOUL_FACE_UP" ||
+      command.type === "MOVE_SOUL_TO_SOUL_FACE_DOWN"
+    ) {
+      movementIds = [command.payload.soulInstanceId];
+      destinationZone = getNextCard(command.payload.targetInstanceId)?.zoneId ?? null;
+      sourceIsSoul = true;
+      destinationIsSoul = true;
     } else if (
       command.type === "ADD_SOUL_FACE_UP" ||
       command.type === "ADD_SOUL_FACE_DOWN"
@@ -1318,50 +1339,32 @@ export function BattleController() {
       movementIds = [command.payload.instanceId];
       const target = getNextCard(command.payload.targetInstanceId);
       destinationZone = target?.zoneId ?? null;
-      targetInstanceId = command.payload.targetInstanceId;
+      destinationIsSoul = true;
     } else {
       return [];
     }
 
     if (!destinationZone) return [];
-    const targetName = targetInstanceId
-      ? cardName(targetInstanceId, true)
-      : null;
     const entries: BattleActivityLogEntry[] = [];
-    if (
-      command.source !== "drag_drop" &&
-      movementIds.some((instanceId) =>
-        getPreviousCard(instanceId)?.zoneId === "deck"
-      )
-    ) {
-      entries.push(entry("デッキをサーチ"));
-    }
     movementIds.forEach((instanceId, index) => {
       const source = getPreviousCard(instanceId);
       const destination = getNextCard(instanceId);
-      if (!source || !destination || source.zoneId === destination.zoneId) return;
-      if (source.zoneId !== "deck" && destination.zoneId !== "hand") return;
-
-      const movedCardName = cardName(instanceId);
-      const isPublicDestination =
-        destination.zoneId !== "deck" &&
-        destination.zoneId !== "hand" &&
-        destination.card.visibility === "public";
-      let message: string;
-      if (targetInstanceId) {
-        message = isPublicDestination && movedCardName
-          ? targetName
-            ? `「${movedCardName}」が「${targetName}」の下に移動`
-            : "カードの下に公開カードが移動"
-          : targetName
-            ? `「${targetName}」の下にカードが移動`
-            : "カードの下にカードが移動";
-      } else if (isPublicDestination && movedCardName) {
-        message = `${zoneLabel(source.playerId, source.zoneId)}から${zoneLabel(destination.playerId, destination.zoneId)}に「${movedCardName}」が移動`;
-      } else {
-        message = `${zoneLabel(source.playerId, source.zoneId)}から${zoneLabel(destination.playerId, destination.zoneId)}にカードが移動`;
-      }
-      entries.push(entry(message, index + 1));
+      if (
+        !source ||
+        !destination ||
+        (source.zoneId === destination.zoneId && !sourceIsSoul && !destinationIsSoul)
+      ) return;
+      const movedCardName = source.card.visibility === "public" || destination.card.visibility === "public"
+        ? cardName(instanceId, true) ?? "カード"
+        : "カード";
+      const sourceLabel = zoneLabel(source.playerId, source.zoneId);
+      const destinationLabel = zoneLabel(destination.playerId, destination.zoneId);
+      entries.push(
+        entry(
+          `${movedCardName} : ${sourceLabel}${sourceIsSoul ? "（ソウル）" : ""} → ${destinationLabel}${destinationIsSoul ? "（ソウル）" : ""}`,
+          index + 1
+        )
+      );
     });
     return entries;
   }
@@ -1566,6 +1569,7 @@ export function BattleController() {
     setPendingActionPopup(null);
     setSelectionMode(null);
     setPendingDeckCountPopup(null);
+    setPendingDeckDragCount(null);
     setPendingBiriKinataPopup(null);
     setPendingFaceDownSoulPopup(null);
     setPendingTextCommandSelection(null);
@@ -2104,6 +2108,7 @@ export function BattleController() {
 
       event.preventDefault();
       setCommandInputOpen((open) => !open);
+      setCommandListOpen(false);
       setSpecialCommandMessage("");
     }
 
@@ -2268,16 +2273,23 @@ export function BattleController() {
         return;
       }
 
+      if (
+        pendingTextCommandSelection === "frag_new" &&
+        (playerId !== "self" || card.zoneId !== "hand")
+      ) {
+        setSpecialCommandMessage("フラッグに重ねるカードは自分の手札から選択してください。");
+        return;
+      }
+
       const command: BattleCommand =
         pendingTextCommandSelection === "frag_new"
           ? {
-              type: "MOVE_CARD",
+              type: "PLACE_AS_FLAG",
               payload: {
                 instanceId: card.instanceId,
-                fromZone: card.zoneId,
-                toZone: "flag",
-                index: 0
-              }
+                fromZone: "hand"
+              },
+              source: "ability"
             }
           : {
               type: "PLACE_QUENATAR_CARD",
@@ -2304,7 +2316,7 @@ export function BattleController() {
       setPendingTextCommandSelection(null);
       setSpecialCommandMessage(
         completedCommand === "frag_new"
-          ? "選択したカードをフラッグに重ねました。"
+          ? FRAG_NEW_SUCCESS_MESSAGE
           : "選択したカードを裏向きでセンターに出しました。"
       );
       handleClearSelection();
@@ -2401,9 +2413,19 @@ export function BattleController() {
     event: MouseEvent<HTMLElement>,
     playerId: BattlePlayerId
   ) {
-    if (zoneId !== "drop" || playerId !== "self") return;
+    if (playerId !== "self") return;
     event.stopPropagation();
-    setDropBrowserPlayerId(playerId);
+    if (zoneId === "drop") {
+      setDropBrowserPlayerId(playerId);
+      return;
+    }
+    if (zoneId === "deck" && (battleState?.players.self.zones.deck.cards.length ?? 0) > 0) {
+      setPendingDeckCountPopup({
+        x: Math.max(8, Math.min(event.clientX, window.innerWidth - 228)),
+        y: Math.max(8, Math.min(event.clientY, window.innerHeight - 154)),
+        purpose: "move"
+      });
+    }
   }
 
   function openDeckContextMenu(
@@ -2438,7 +2460,8 @@ export function BattleController() {
     if (!position) return;
     setPendingDeckCountPopup({
       x: position.x,
-      y: position.y
+      y: position.y,
+      purpose: "look"
     });
   }
 
@@ -2448,8 +2471,28 @@ export function BattleController() {
   ) {
     if (playerId !== "self") return;
 
+    if (card.zoneId === "deck" && pendingDeckDragCount != null) {
+      const deckCards = battleState?.players.self.zones.deck.cards ?? [];
+      const instanceIds = deckCards
+        .slice(0, pendingDeckDragCount)
+        .map((deckCard) => deckCard.instanceId);
+      setDragSelection({
+        sourceCard: card,
+        instanceIds: instanceIds.length > 0 ? instanceIds : [card.instanceId]
+      });
+      setPendingDeckDragCount(null);
+      return;
+    }
+    if (pendingDeckDragCount != null) setPendingDeckDragCount(null);
+
     const isSelectedDrag =
       selection.zoneId === card.zoneId && selection.instanceIds.includes(card.instanceId);
+    const selectedInSameZone = isSelectedDrag
+      ? selection.instanceIds.filter((instanceId) => {
+          const selectedCard = battleCardLookup.get(instanceId);
+          return selectedCard?.playerId === playerId && selectedCard.card.zoneId === card.zoneId;
+        })
+      : [];
     const compositeInstanceIds = getBattleSelectionUnitInstanceIds(battleState, card);
 
     setDragSelection({
@@ -2457,8 +2500,8 @@ export function BattleController() {
       instanceIds:
         compositeInstanceIds.length > 1
           ? compositeInstanceIds
-          : isSelectedDrag
-            ? selection.instanceIds
+          : selectedInSameZone.length > 0
+            ? selectedInSameZone
             : [card.instanceId]
     });
   }
@@ -2554,12 +2597,17 @@ export function BattleController() {
     const isSelectedSoulDrag =
       soulSelection.parentInstanceId === parentCard.instanceId &&
       soulSelection.instanceIds.includes(soulCard.instanceId);
+    const selectedInSameSoul = isSelectedSoulDrag
+      ? soulSelection.instanceIds.filter((instanceId) =>
+          parentCard.soul.some((card) => card.instanceId === instanceId)
+        )
+      : [];
 
     setSoulDragSelection({
       parentCard,
       sourceSoulCard: soulCard,
-      instanceIds: isSelectedSoulDrag
-        ? soulSelection.instanceIds
+      instanceIds: selectedInSameSoul.length > 0
+        ? selectedInSameSoul
         : [soulCard.instanceId]
     });
   }
@@ -2701,7 +2749,8 @@ export function BattleController() {
             payload: {
               instanceIds,
               toZone,
-              deckPosition
+              deckPosition,
+              preserveInputOrder: toZone === "deck"
             },
             source: "drag_drop"
           }
@@ -2777,7 +2826,8 @@ export function BattleController() {
               parentInstanceId,
               soulInstanceIds: instanceIds,
               toZone,
-              deckPosition
+              deckPosition,
+              preserveInputOrder: toZone === "deck"
             },
             source: "drag_drop"
           }
@@ -2816,6 +2866,20 @@ export function BattleController() {
     }
 
     applyCardDrop("deck", deckPosition, pendingDeckDrop);
+  }
+
+  function movePendingDeckDropCard(index: number, offset: -1 | 1) {
+    setPendingDeckDrop((current) => {
+      if (!current) return current;
+      const targetIndex = index + offset;
+      if (targetIndex < 0 || targetIndex >= current.instanceIds.length) return current;
+      const instanceIds = [...current.instanceIds];
+      [instanceIds[index], instanceIds[targetIndex]] = [
+        instanceIds[targetIndex],
+        instanceIds[index]
+      ];
+      return { ...current, instanceIds };
+    });
   }
 
   useEscapeToClose({
@@ -2966,6 +3030,12 @@ export function BattleController() {
 
   function handleDeckCountSubmit(count: number) {
     if (!pendingDeckCountPopup) return;
+
+    if (pendingDeckCountPopup.purpose === "move") {
+      setPendingDeckDragCount(count);
+      setPendingDeckCountPopup(null);
+      return;
+    }
 
     executeCommand({
       type: "LOOK_TOP_DECK",
@@ -3359,25 +3429,18 @@ export function BattleController() {
       {battleLogsVisible && <section
         className="bf-battle-live-logs"
         style={battleLogCenter ?? undefined}
-        aria-label="直近の対戦ログ。ダブルクリックで履歴を表示"
-        title="ダブルクリックで直近のログ履歴を表示"
+        aria-label="操作ログ"
+        title="操作ログ"
         onDoubleClick={(event) => {
           event.stopPropagation();
           setBattleLogHistoryOpen(true);
         }}
       >
-        <header>操作ログ · ダブルクリックで履歴</header>
+        <header>操作ログ</header>
         {recentBattleLogs.length > 0 && (
           <ol>
             {recentBattleLogs.map((log) => (
               <li key={log.id}>
-                <time dateTime={log.createdAt}>
-                  {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit"
-                  })}
-                </time>
                 <span><small>{log.actorName}</small>{log.message}</span>
               </li>
             ))}
@@ -3407,13 +3470,6 @@ export function BattleController() {
             <ol ref={battleLogHistoryListRef}>
               {battleActivityLogs.map((log) => (
                 <li key={log.id}>
-                  <time dateTime={log.createdAt}>
-                    {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit"
-                    })}
-                  </time>
                   <span><small>{log.actorName}</small>{log.message}</span>
                 </li>
               ))}
@@ -3435,7 +3491,7 @@ export function BattleController() {
       {pendingTextCommandSelection && (
         <div className="bf-placement-mode-banner is-frag-selection" role="status">
           {pendingTextCommandSelection === "frag_new"
-            ? "フラッグに新たに重ねる自分のカードを選択してください。"
+            ? "フラッグに重ねるカードを自分の手札から選択してください。"
             : pendingTextCommandSelection === "quenatar"
               ? "裏向きでセンターに出す自分のカードを選択してください。"
               : pendingTextCommandSelection === "hyakugan-heaven"
@@ -3532,12 +3588,6 @@ export function BattleController() {
               {battleActivityLogs.length > 0 ? (
                 battleActivityLogs.slice(-battleLogDisplayCount).reverse().map((log) => (
                   <li key={log.id}>
-                    <time dateTime={log.createdAt}>
-                      {new Date(log.createdAt).toLocaleTimeString("ja-JP", {
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      })}
-                    </time>
                     <span className="bf-battle-log-copy">
                       <small>{log.actorName}</small>
                       <span>{log.message}</span>
@@ -3563,22 +3613,34 @@ export function BattleController() {
               event.preventDefault();
               setCommandInputOpen(false);
               setCommandInput("");
+              setCommandListOpen(false);
               setSpecialCommandMessage("");
             }
           }}
         >
-          <input
-            id="bf-special-command-input"
-            autoFocus
-            value={commandInput}
-            onChange={(event) => setCommandInput(event.target.value)}
-            placeholder="frag_new / frag_reverse / Laevateinn / Quenatar"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {commandSuggestions.length > 0 && (
+          <div className="bf-command-input-row">
+            <input
+              id="bf-special-command-input"
+              autoFocus
+              value={commandInput}
+              onChange={(event) => setCommandInput(event.target.value)}
+              placeholder="frag_new / frag_reverse / Laevateinn / Quenatar"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="bf-command-list-toggle"
+              aria-label="コマンド一覧を表示"
+              aria-expanded={commandListOpen}
+              onClick={() => setCommandListOpen((open) => !open)}
+            >
+              ▾
+            </button>
+          </div>
+          {(commandListOpen || commandSuggestions.length > 0) && (
             <div className="bf-command-suggestions" role="listbox" aria-label="コマンド候補">
-              {commandSuggestions.map((suggestion) => (
+              {(commandListOpen ? BATTLE_TEXT_COMMANDS : commandSuggestions).map((suggestion) => (
                 <button
                   type="button"
                   role="option"
@@ -3587,6 +3649,7 @@ export function BattleController() {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     setCommandInput(suggestion.label);
+                    setCommandListOpen(false);
                     setSpecialCommandMessage("");
                   }}
                 >
@@ -3925,6 +3988,41 @@ export function BattleController() {
           >
             <h2 id="bf-deck-drop-dialog-title">山札へ置く位置を選択</h2>
             <p>{pendingDeckDrop.instanceIds.length}枚のカードを移動します。</p>
+            {pendingDeckDrop.instanceIds.length > 1 &&
+              typeof pendingDeckDrop.sourceCard.meta.compositeId !== "string" && (
+                <div className="bf-deck-drop-order">
+                  <p>一覧の上から順に並びます。矢印で順番を変更できます。</p>
+                  <ol>
+                    {pendingDeckDrop.instanceIds.map((instanceId, index) => {
+                      const cardId = battleCardLookup.get(instanceId)?.card.cardId;
+                      const name = cardId ? cardMap.get(cardId)?.name ?? "カード" : "カード";
+                      return (
+                        <li key={instanceId}>
+                          <span>{name}</span>
+                          <div>
+                            <button
+                              type="button"
+                              aria-label={`${name}を前へ移動`}
+                              disabled={index === 0}
+                              onClick={() => movePendingDeckDropCard(index, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`${name}を後ろへ移動`}
+                              disabled={index === pendingDeckDrop.instanceIds.length - 1}
+                              onClick={() => movePendingDeckDropCard(index, 1)}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              )}
             <div className="bf-deck-drop-dialog-actions">
               <button type="button" onClick={() => handleDeckDropChoice("top")}>
                 山札の上へ置く
@@ -3986,7 +4084,11 @@ export function BattleController() {
 
       {pendingDeckCountPopup && (
         <DeckCountPopup
-          title="上を見る"
+          title={
+            pendingDeckCountPopup.purpose === "move"
+              ? "山札から移動する枚数"
+              : "上を見る"
+          }
           maxCount={battleState.players.self.zones.deck.cards.length}
           x={pendingDeckCountPopup.x}
           y={pendingDeckCountPopup.y}

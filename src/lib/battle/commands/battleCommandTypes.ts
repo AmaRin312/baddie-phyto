@@ -66,6 +66,7 @@ export type MoveCardsCommand = {
     toZone: BattleZoneId;
     index?: number;
     deckPosition?: DeckPosition;
+    preserveInputOrder?: boolean;
   };
 };
 
@@ -197,6 +198,7 @@ export type MoveSoulCardsCommand = {
     soulInstanceIds: string[];
     toZone: BattleZoneId;
     deckPosition?: DeckPosition;
+    preserveInputOrder?: boolean;
   };
 };
 

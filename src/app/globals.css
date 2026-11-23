@@ -3475,6 +3475,8 @@ select {
   height: calc(100% - 32px);
   display: grid;
   place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .bf-viewer {
@@ -3674,6 +3676,59 @@ select {
   color: #475569;
   font-size: 14px;
   font-weight: 800;
+}
+
+.bf-deck-drop-order {
+  display: grid;
+  gap: 6px;
+}
+
+.bf-deck-drop-order > p {
+  font-size: 12px;
+}
+
+.bf-deck-drop-order ol {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bf-deck-drop-order li {
+  min-height: 34px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #1e3a8a;
+  background: white;
+  font-size: 13px;
+}
+
+.bf-deck-drop-order li div {
+  display: flex;
+  gap: 4px;
+}
+
+.bf-deck-drop-order li button {
+  width: 28px;
+  height: 26px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  cursor: pointer;
+}
+
+.bf-deck-drop-order li button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .bf-deck-drop-dialog-actions {
@@ -4329,9 +4384,7 @@ select {
 }
 
 .bf-battle-log-list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  display: block;
   padding: 6px 2px;
   border-bottom: 1px solid rgba(191, 219, 254, 0.16);
   color: #eff6ff;
@@ -4342,11 +4395,6 @@ select {
 
 .bf-battle-log-list li:last-child {
   border-bottom: 0;
-}
-
-.bf-battle-log-list time {
-  color: #bfdbfe;
-  font-variant-numeric: tabular-nums;
 }
 
 .bf-battle-log-copy {
@@ -4402,9 +4450,7 @@ select {
 
 .bf-battle-live-logs li,
 .bf-battle-log-history li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  display: block;
   padding: 5px 7px;
   border: 1px solid rgba(191, 219, 254, 0.55);
   border-radius: 9px;
@@ -4418,13 +4464,6 @@ select {
 
 .bf-battle-live-logs li {
   animation: bf-battle-log-enter 160ms ease-out;
-}
-
-.bf-battle-live-logs time,
-.bf-battle-log-history time {
-  color: #bfdbfe;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .bf-battle-live-logs li > span,
@@ -7193,8 +7232,15 @@ body:has(.bf-battle-app) {
   transform-origin: top left;
 }
 
+.bf-command-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 5px;
+}
+
 .bf-special-command-inline input {
   width: 100%;
+  min-width: 0;
   min-height: 38px;
   border: 1px solid #93c5fd;
   border-radius: 7px;
@@ -7202,6 +7248,17 @@ body:has(.bf-battle-app) {
   color: #172554;
   background: white;
   font: inherit;
+}
+
+.bf-special-command-inline .bf-command-list-toggle {
+  min-width: 34px;
+  min-height: 38px;
+  border: 1px solid #93c5fd;
+  border-radius: 7px;
+  color: #1e3a8a;
+  background: white;
+  font: inherit;
+  cursor: pointer;
 }
 
 .bf-special-command-inline p {
@@ -8288,11 +8345,16 @@ body:has(.bf-battle-app) {
 
 .bf-player-board > .bf-zone-left > .bf-area-stack-zone,
 .bf-player-board > .bf-zone-center > .bf-area-stack-zone,
-.bf-player-board > .bf-zone-right > .bf-area-stack-zone,
 .bf-player-board > .bf-zone-item > .bf-set-area-scroll,
 .bf-player-board > .bf-zone-set > .bf-set-area-scroll {
   min-height: var(--bf-battle-card-h) !important;
   overflow-y: clip;
+}
+
+.bf-player-board > .bf-zone-left > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-center > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-right > .bf-area-stack-zone {
+  overflow: visible !important;
 }
 
 .bf-player-board > .bf-zone-item > .bf-set-area-scroll,

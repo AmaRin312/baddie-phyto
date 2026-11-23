@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEscapeToClose } from "@/hooks/useEscapeToClose";
 
@@ -38,6 +39,24 @@ export function BattlePopup({
     enabled: closeOnEscape,
     onClose
   });
+
+  useEffect(() => {
+    const clearCardDraggingState = () => {
+      document
+        .querySelectorAll(".bf-battle-popup-backdrop.is-card-dragging")
+        .forEach((backdrop) => backdrop.classList.remove("is-card-dragging"));
+    };
+
+    document.addEventListener("dragend", clearCardDraggingState, true);
+    document.addEventListener("drop", clearCardDraggingState, true);
+    window.addEventListener("blur", clearCardDraggingState);
+
+    return () => {
+      document.removeEventListener("dragend", clearCardDraggingState, true);
+      document.removeEventListener("drop", clearCardDraggingState, true);
+      window.removeEventListener("blur", clearCardDraggingState);
+    };
+  }, []);
 
   return (
     <div

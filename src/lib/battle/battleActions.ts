@@ -105,6 +105,7 @@ export type MoveCardsInput = {
   toZone: BattleZoneId;
   index?: number;
   deckPosition?: DeckPosition;
+  preserveInputOrder?: boolean;
 };
 
 export type StackCardOnAreaCardInput = {
@@ -164,6 +165,7 @@ export type MoveSoulCardsInput = {
   soulInstanceIds: string[];
   toZone: BattleZoneId;
   deckPosition?: DeckPosition;
+  preserveInputOrder?: boolean;
 };
 
 export type AddSoulCardInput = {
@@ -693,6 +695,12 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   if (!located) return state;
   if (input.fromZone && located.zoneId !== input.fromZone) return state;
   if (!canMoveFromZone(located.zoneId) || !canMoveToZone(input.toZone)) return state;
+  if (
+    located.zoneId === input.toZone &&
+    (input.toZone === "hand" || input.toZone === "gauge")
+  ) {
+    return state;
+  }
 
   const movedFromGauge = located.zoneId === "gauge" && input.toZone !== "gauge";
   const shouldRestMovedCard =
@@ -1182,13 +1190,22 @@ export function addSoulCard(
   );
   if (!targetCard) return state;
 
+  const carriedSoul = removedCard.soul ?? [];
+  const movedCard = withoutCompositeData(withoutAreaStackData({
+    ...resetMovedCard(withoutDeckRevealData(removedCard)),
+    zoneId: target.zoneId,
+    visibility: input.visibility,
+    soul: [],
+    meta: { ...withoutDeckRevealData(removedCard).meta }
+  }));
   targetCard.soul.push(
-    withoutCompositeData(withoutAreaStackData({
-      ...resetMovedCard(withoutDeckRevealData(removedCard)),
-      zoneId: target.zoneId,
-      visibility: input.visibility,
-      meta: { ...withoutDeckRevealData(removedCard).meta }
-    }))
+    movedCard,
+    ...carriedSoul.map((soulCard) =>
+      withoutCompositeData(withoutAreaStackData({
+        ...soulCard,
+        zoneId: target.zoneId
+      }))
+    )
   );
 
   if (located.zoneId === "deck") {
@@ -1402,9 +1419,11 @@ export function moveSoulCards(
 
   const requestedIds = new Set(input.soulInstanceIds);
   const parentSoul = firstLocated.parentCard.soul;
-  const orderedSoulCards = parentSoul.filter((card) =>
-    requestedIds.has(card.instanceId)
-  );
+  const orderedSoulCards = input.preserveInputOrder
+    ? input.soulInstanceIds
+        .map((instanceId) => parentSoul.find((card) => card.instanceId === instanceId))
+        .filter((card): card is BattleCard => card != null)
+    : parentSoul.filter((card) => requestedIds.has(card.instanceId));
   if (orderedSoulCards.length === 0) return state;
 
   const nextState = cloneBattleState(state);
@@ -1430,7 +1449,11 @@ export function moveSoulCards(
 }
 
 export function moveCards(state: BattleState, input: MoveCardsInput): BattleState {
-  const locatedCards = getLocatedCardsInBattleOrder(state, input.instanceIds);
+  const locatedCards = input.preserveInputOrder
+    ? input.instanceIds
+        .map((instanceId) => findBattleCard(state, instanceId))
+        .filter((card): card is LocatedBattleCard => card != null)
+    : getLocatedCardsInBattleOrder(state, input.instanceIds);
 
   return locatedCards.reduce(
     (current, locatedCard, offset) => {
@@ -1648,7 +1671,7 @@ export function placeAsFlag(
   const [removedCard] = fromCards.splice(fromIndex, 1);
   if (!removedCard) return state;
 
-  player.zones.flag.cards.push(
+  player.zones.flag.cards.unshift(
     withoutAreaStackData(
       withoutDeckRevealData({
       ...removedCard,

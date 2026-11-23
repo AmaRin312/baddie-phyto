@@ -464,7 +464,6 @@ function BattleZoneComponent({
       onDrop={handleZoneDrop}
       onDoubleClick={(event) => {
         if (event.defaultPrevented) return;
-        if (zoneId === "deck") return;
         onDoubleClickZone?.(zoneId, event, playerId);
       }}
       onContextMenu={(event) => {
@@ -571,10 +570,7 @@ function BattleZoneComponent({
             const isWideSetCard =
               (areaIsNativeHorizontal && !isHyakuganComposite) || isHyakuganComposite;
             const setSlotIndex = areaStack.areaSlot % setCardsPerColumn;
-            const visibleSoulCards =
-              areaTopCard.soul.length > 5
-                ? areaTopCard.soul.slice(0, 1)
-                : areaTopCard.soul;
+            const visibleSoulCards = areaTopCard.soul.slice(0, 2);
             const attachedCards = [
               ...areaStack.cards.slice(0, -1),
               ...visibleSoulCards
@@ -875,11 +871,10 @@ function BattleZoneComponent({
               }}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                if (zoneId === "drop") {
+                if (zoneId === "drop" || zoneId === "deck") {
                   onDoubleClickZone?.(zoneId, event, playerId);
                   return;
                 }
-                if (zoneId === "deck") return;
                 onDoubleClickCard(topCard, { playerId });
               }}
               onContextMenu={(event) => onContextMenuCard(topCard, event, playerId)}

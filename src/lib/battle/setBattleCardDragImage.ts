@@ -15,11 +15,18 @@ export function setBattleCardDragImage(
   const isQuarterTurn = Math.abs(Math.abs(rotationDegrees) - 90) < 1;
   const cardWidth = isQuarterTurn ? bounds.height : bounds.width;
   const cardHeight = isQuarterTurn ? bounds.width : bounds.height;
+  const dragTargetInstanceId = dragTarget.dataset.battleCardInstanceId;
+  const isSelectedDrag = Boolean(
+    dragTargetInstanceId &&
+      selectedInstanceIds?.has(dragTargetInstanceId) &&
+      dragTarget.classList.contains("is-selected")
+  );
   const selectedButtons = selectedInstanceIds
+    && isSelectedDrag
     ? Array.from(document.querySelectorAll<HTMLElement>("[data-battle-card-instance-id]"))
         .filter((button) => {
           const id = button.dataset.battleCardInstanceId;
-          return id !== dragTarget.dataset.battleCardInstanceId &&
+          return id !== dragTargetInstanceId &&
             Boolean(id && selectedInstanceIds.has(id)) &&
             button.classList.contains("is-selected");
         })
