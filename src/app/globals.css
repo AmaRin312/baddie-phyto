@@ -8727,6 +8727,19 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area .bf-area-stack-card {
   top: calc(-1 * var(--bf-set-soul-layers, 0) * var(--bf-battle-card-h) * 0.085);
 }
+
+/* Let the staggered soul previews extend beyond the card without scrolling. */
+.bf-player-board > .bf-zone-left,
+.bf-player-board > .bf-zone-center,
+.bf-player-board > .bf-zone-right,
+.bf-player-board > .bf-zone-item,
+.bf-player-board > .bf-zone-left > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-center > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-right > .bf-area-stack-zone,
+.bf-player-board > .bf-zone-item .bf-area-stack-zone {
+  overflow-y: visible !important;
+}
+
 .dm-site-update-notice {
   position: fixed;
   right: 20px;

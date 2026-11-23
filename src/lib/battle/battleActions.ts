@@ -690,6 +690,41 @@ function resetMovedCard(card: BattleCard): BattleCard {
   };
 }
 
+function detachSoulCards(card: BattleCard): BattleCard[] {
+  const detached: BattleCard[] = [];
+  const visit = (current: BattleCard) => {
+    const { soul, ...cardWithoutSoul } = current;
+    detached.push({ ...cardWithoutSoul, soul: [] });
+    (soul ?? []).forEach(visit);
+  };
+  visit(card);
+  return detached;
+}
+
+function moveDetachedCardsToAreaStack(
+  card: BattleCard,
+  input: {
+    zoneId: BattleZoneId;
+    visibility: BattleCard["visibility"];
+    stackId: string;
+    areaSlot: BattleAreaSlot;
+    isRested: boolean;
+  }
+) {
+  return detachSoulCards(card).reverse().map((detachedCard) =>
+    withAreaStackData(
+      withoutDeckRevealData({
+        ...resetMovedCard(detachedCard),
+        zoneId: input.zoneId,
+        visibility: input.visibility,
+        meta: { ...detachedCard.meta, isRested: input.isRested }
+      }),
+      input.stackId,
+      input.areaSlot
+    )
+  );
+}
+
 export function moveCard(state: BattleState, input: MoveCardInput): BattleState {
   const located = findBattleCard(state, input.instanceId);
   if (!located) return state;
@@ -807,17 +842,6 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
   const [removedCard] = fromCards.splice(located.index, 1);
   if (!removedCard) return state;
 
-  const movedCard: BattleCard = {
-    ...resetMovedCard(removedCard),
-    zoneId: input.toZone,
-    visibility,
-    meta: {
-      ...movedMeta(removedCard),
-      isRested: shouldRestMovedCard
-    }
-  };
-  const revealNormalizedMovedCard =
-    input.toZone === "deck" ? movedCard : withoutDeckRevealData(movedCard);
   const toCards = player.zones[input.toZone].cards;
   const targetAreaStacks = isAreaStackZone(input.toZone)
     ? getAreaStacks(toCards)
@@ -826,16 +850,32 @@ export function moveCard(state: BattleState, input: MoveCardInput): BattleState 
     ? getNextAreaSlot(state, input.toZone, targetAreaStacks, located.playerId)
     : null;
   if (isAreaStackZone(input.toZone) && nextAreaSlot == null) return state;
-  const normalizedMovedCard = isAreaStackZone(input.toZone)
-    ? withAreaStackData(
-        revealNormalizedMovedCard,
-        getAreaStackId(revealNormalizedMovedCard),
-        nextAreaSlot ?? 0
-      )
-    : withoutAreaStackData(revealNormalizedMovedCard);
+  const detachedCards = detachSoulCards(removedCard);
+  const areaStackId = getAreaStackId(removedCard);
+  if (isAreaStackZone(input.toZone)) detachedCards.reverse();
+  const normalizedCards = detachedCards.map((card) => {
+    const movedCard: BattleCard = {
+      ...resetMovedCard(card),
+      zoneId: input.toZone,
+      visibility,
+      meta: {
+        ...movedMeta(card),
+        isRested: shouldRestMovedCard
+      }
+    };
+    const revealNormalizedCard =
+      input.toZone === "deck" ? movedCard : withoutDeckRevealData(movedCard);
+    return isAreaStackZone(input.toZone)
+      ? withAreaStackData(
+          revealNormalizedCard,
+          areaStackId,
+          nextAreaSlot ?? 0
+        )
+      : withoutAreaStackData(revealNormalizedCard);
+  });
   const nextIndex = getMoveInsertIndex(input, toCards.length);
 
-  toCards.splice(nextIndex, 0, normalizedMovedCard);
+  toCards.splice(nextIndex, 0, ...normalizedCards);
   if (located.zoneId === "deck" && input.toZone !== "deck") {
     cleanupDeckLookForMovedCard(nextState, input.instanceId);
   }
@@ -918,21 +958,15 @@ export function stackCardOnAreaCard(
   const [removedCard] = fromCards.splice(fromIndex, 1);
   if (!removedCard) return state;
 
-  const movedCard = withAreaStackData(
-    withoutDeckRevealData({
-      ...resetMovedCard(removedCard),
+  player.zones[input.toZone].cards.push(
+    ...moveDetachedCardsToAreaStack(removedCard, {
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
-      meta: {
-        ...removedCard.meta,
-        isRested: located.zoneId === "gauge"
-      }
-    }),
-    targetStackId,
-    targetAreaSlot ?? fallbackTargetStack?.areaSlot ?? 0
+      stackId: targetStackId,
+      areaSlot: targetAreaSlot ?? fallbackTargetStack?.areaSlot ?? 0,
+      isRested: located.zoneId === "gauge"
+    })
   );
-
-  player.zones[input.toZone].cards.push(movedCard);
   if (located.zoneId === "deck") {
     cleanupDeckLookForMovedCard(nextState, input.instanceId);
   }
@@ -1005,21 +1039,15 @@ export function placeCardInAreaSlot(
   const stackId = `area-stack:${input.toZone}:${removedCard.instanceId}`;
   const areaSlot = getNextAreaSlot(state, input.toZone, areaStacks, located.playerId);
   if (areaSlot == null) return state;
-  const movedCard = withAreaStackData(
-    withoutDeckRevealData({
-      ...resetMovedCard(removedCard),
+  player.zones[input.toZone].cards.push(
+    ...moveDetachedCardsToAreaStack(removedCard, {
       zoneId: input.toZone,
       visibility: getVisibilityForZone(input.toZone),
-      meta: {
-        ...removedCard.meta,
-        isRested: located.zoneId === "gauge"
-      }
-    }),
-    stackId,
-    areaSlot
+      stackId,
+      areaSlot,
+      isRested: located.zoneId === "gauge"
+    })
   );
-
-  player.zones[input.toZone].cards.push(movedCard);
   if (located.zoneId === "deck") {
     cleanupDeckLookForMovedCard(nextState, input.instanceId);
   }
