@@ -32,7 +32,7 @@ import {
   setViewerCard,
   shuffleDeck,
   standAllBattleCards,
-  stackCardOnAreaCard,
+  stackCardWithTargetAsSoul,
   swapAreaStacks,
   toggleCardOrientation,
   toggleFlagVisibility
@@ -100,7 +100,7 @@ export function executeBattleCommand(
     case "MOVE_SOUL_CARDS":
       return moveSoulCards(state, command.payload);
     case "STACK_CARD":
-      return stackCardOnAreaCard(state, command.payload);
+      return stackCardWithTargetAsSoul(state, command.payload);
     case "PLACE_AREA_SLOT":
       return placeCardInAreaSlot(state, command.payload);
     case "PLACE_OR_STACK_AREA_CARD":

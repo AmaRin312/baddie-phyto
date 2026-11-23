@@ -8576,15 +8576,15 @@ body:has(.bf-battle-app) {
 }
 
 .bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-grid {
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
 }
 
 .bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-card {
-  min-height: 106.4px;
+  min-height: 0;
 }
 
 .bf-deck-browser-popup.is-deck-viewer .bf-deck-browser-card .bp-board-card {
-  width: min(76px, 100%);
+  width: min(88px, 100%);
 }
 
 .bf-player-board > .bf-zone-set > .bf-set-area-scroll {
@@ -8726,6 +8726,28 @@ body:has(.bf-battle-app) {
 
 .bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area .bf-area-stack-card {
   top: calc(-1 * var(--bf-set-soul-layers, 0) * var(--bf-battle-card-h) * 0.085);
+}
+
+/* Keep all four resolution cards inside the clickable zone bounds. */
+.bf-player-board > .bf-zone-resolution .bf-resolution-card-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card {
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0;
+  aspect-ratio: 5 / 7;
+  margin: 0 !important;
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card.is-native-horizontal {
+  aspect-ratio: 7 / 5;
 }
 
 /* Let the staggered soul previews extend beyond the card without scrolling. */

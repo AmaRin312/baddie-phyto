@@ -2438,15 +2438,25 @@ export function BattleController() {
 
     setDeckContextMenu({
       x: Math.max(8, Math.min(event.clientX, window.innerWidth - 228)),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 154))
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 190))
     });
   }
 
-  function handleDeckContextMenuSelect(action: "look" | "reveal" | "view") {
+  function handleDeckContextMenuSelect(
+    action: "look" | "reveal" | "view" | "shuffle"
+  ) {
     const position = deckContextMenu;
     setDeckContextMenu(null);
     if (action === "view") {
       setDeckViewerOpen(true);
+      return;
+    }
+    if (action === "shuffle") {
+      executeCommand({
+        type: "SHUFFLE_DECK",
+        payload: { playerId: "self" },
+        source: "context_menu"
+      });
       return;
     }
     if (action === "reveal") {
@@ -4149,9 +4159,11 @@ export function BattleController() {
           description="山札にあるカードの一覧です。"
           mode="browse"
           className="is-deck-viewer"
+          pageSize={20}
           canDragCards
           onDragStartCard={handlePopupDragStartCard}
           onDragEndCard={handleDragEndCard}
+          onDoubleClickCard={(card) => setViewer(card.instanceId, { force: true })}
           onExecute={() => undefined}
           onClose={() => setDeckViewerOpen(false)}
         />

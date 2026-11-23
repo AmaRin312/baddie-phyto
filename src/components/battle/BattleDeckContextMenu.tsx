@@ -3,7 +3,7 @@
 type BattleDeckContextMenuProps = {
   x: number;
   y: number;
-  onSelect: (action: "look" | "reveal" | "view") => void;
+  onSelect: (action: "look" | "reveal" | "view" | "shuffle") => void;
   onClose: () => void;
 };
 
@@ -38,6 +38,9 @@ export function BattleDeckContextMenu({
         </button>
         <button type="button" role="menuitem" onClick={() => onSelect("view")}>
           デッキを見る
+        </button>
+        <button type="button" role="menuitem" onClick={() => onSelect("shuffle")}>
+          シャッフル
         </button>
       </div>
     </div>

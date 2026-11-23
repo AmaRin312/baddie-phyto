@@ -973,6 +973,77 @@ export function stackCardOnAreaCard(
   return nextState;
 }
 
+export function stackCardWithTargetAsSoul(
+  state: BattleState,
+  input: StackCardOnAreaCardInput
+): BattleState {
+  if (!isAreaStackZone(input.toZone)) return state;
+
+  const source = findBattleCard(state, input.instanceId);
+  const target = findBattleCard(state, input.targetInstanceId);
+  if (!source || !target || source.card.instanceId === target.card.instanceId) return state;
+  if (source.playerId !== target.playerId || target.zoneId !== input.toZone) return state;
+  if (input.fromZone && source.zoneId !== input.fromZone) return state;
+  if (!canMoveFromZone(source.zoneId) || !canMoveToZone(input.toZone)) return state;
+
+  // Composite cards have their own paired placement rules.
+  if (getCompositeId(source.card) || getCompositeId(target.card)) {
+    return stackCardOnAreaCard(state, input);
+  }
+
+  const targetStack = getAreaStacks(
+    state.players[target.playerId].zones[input.toZone].cards
+  ).find((stack) => stack.cards.some((card) => card.instanceId === target.card.instanceId));
+  if (!targetStack) return state;
+
+  const nextState = cloneBattleState(state);
+  const player = nextState.players[source.playerId];
+  const sourceCards = player.zones[source.zoneId].cards;
+  const sourceIndex = sourceCards.findIndex((card) => card.instanceId === source.card.instanceId);
+  const [removedSource] = sourceCards.splice(sourceIndex, 1);
+  if (!removedSource) return state;
+
+  const destinationCards = player.zones[input.toZone].cards;
+  const targetIndex = destinationCards.findIndex((card) => card.instanceId === target.card.instanceId);
+  const [removedTarget] = destinationCards.splice(targetIndex, 1);
+  if (!removedTarget) return state;
+
+  const lowerCards = detachSoulCards(removedTarget).map((card) =>
+    withoutCompositeData(withoutAreaStackData(withoutDeckRevealData({
+      ...resetMovedCard(card),
+      zoneId: input.toZone,
+      visibility: "public"
+    })))
+  );
+  const sourceSoulCards = removedSource.soul.flatMap(detachSoulCards).reverse().map((card) =>
+    withAreaStackData(
+      withoutDeckRevealData({
+        ...resetMovedCard(card),
+        zoneId: input.toZone,
+        visibility: getVisibilityForZone(input.toZone),
+        meta: { ...card.meta, isRested: false }
+      }),
+      targetStack.stackId,
+      targetStack.areaSlot
+    )
+  );
+  const movedSource = withAreaStackData(
+    withoutAreaStackData(withoutDeckRevealData({
+      ...resetMovedCard(removedSource),
+      zoneId: input.toZone,
+      visibility: getVisibilityForZone(input.toZone),
+      soul: lowerCards
+    })),
+    targetStack.stackId,
+    targetStack.areaSlot
+  );
+  destinationCards.splice(targetIndex, 0, ...sourceSoulCards, movedSource);
+
+  if (source.zoneId === "deck") cleanupDeckLookForMovedCard(nextState, source.card.instanceId);
+  if (target.zoneId === "deck") cleanupDeckLookForMovedCard(nextState, target.card.instanceId);
+  return nextState;
+}
+
 export function placeCardInAreaSlot(
   state: BattleState,
   input: PlaceCardInAreaSlotInput
