@@ -238,6 +238,7 @@ function BattleZoneComponent({
     ["center", "left", "right", "item", "set", "drop", "resolution"].includes(zoneId);
   const draggedItemCount =
     draggedSoulCard != null ? draggedSoulInstanceCount : draggedInstanceCount;
+  const canDropMultipleDeckCardsOnAreaCard = draggedCard?.zoneId === "deck";
   const hasAreaStackCards = isAreaStackZone(zoneId) && areaStacks.length > 0;
   const preserveBattleOrientation = shouldPreserveBattleOrientation(zoneId);
   const isLaevateinnItemZone =
@@ -599,7 +600,7 @@ function BattleZoneComponent({
                     setDropTargetStackId(null);
                     return;
                   }
-                  if (canDrop && draggedItemCount <= 1) {
+                  if (canDrop && (draggedItemCount <= 1 || canDropMultipleDeckCardsOnAreaCard)) {
                     setDropTargetStackId(areaStack.stackId);
                   }
                   handleAreaStackDragEnter(areaStack.stackId);
@@ -611,7 +612,7 @@ function BattleZoneComponent({
                   handleAreaStackDragLeave(areaStack.stackId);
                 }}
                 onDragOver={(event) => {
-                  if (!canDrop || draggedItemCount > 1) return;
+                  if (!canDrop || (draggedItemCount > 1 && !canDropMultipleDeckCardsOnAreaCard)) return;
                   if (isDisabledSetDropHalf(event)) {
                     event.stopPropagation();
                     setIsDragOverZone(false);
@@ -625,7 +626,7 @@ function BattleZoneComponent({
                   setDropTargetStackId(areaStack.stackId);
                 }}
                 onDrop={(event) => {
-                  if (!canDrop || draggedItemCount > 1) return;
+                  if (!canDrop || (draggedItemCount > 1 && !canDropMultipleDeckCardsOnAreaCard)) return;
                   handleCardDrop(event, {
                     targetInstanceId: areaTopCard.instanceId,
                     placeAsNewStack: heldStackId === areaStack.stackId

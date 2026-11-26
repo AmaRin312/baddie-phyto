@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -43,10 +43,11 @@ async function hasActiveSession() {
 }
 
 export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
+  const [activeAccount, setActiveAccount] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -54,22 +55,31 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     async function resolveAuthState() {
       const errorDescription = searchParams.get("error_description");
       const errorCode = searchParams.get("error");
-      const nextPath = searchParams.get("next") || "/home";
 
       if (errorCode || errorDescription) {
         if (!mounted) return;
         setMessage(errorDescription ?? "Discordログインに失敗しました。");
+        setCheckingSession(false);
         return;
       }
 
       if (!mounted) return;
 
-      const sessionReady = await hasActiveSession();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionReady = sessionData.session ? true : await hasActiveSession();
       if (!mounted) return;
 
       if (sessionReady) {
-        window.location.replace(nextPath);
+        const { data: userData } = await supabase.auth.getUser();
+        if (!mounted) return;
+        setActiveAccount(
+          userData.user?.user_metadata?.full_name ??
+            userData.user?.user_metadata?.name ??
+            userData.user?.email ??
+            "ログイン中のアカウント"
+        );
       }
+      if (mounted) setCheckingSession(false);
     }
 
     void resolveAuthState();
@@ -79,7 +89,15 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "SIGNED_IN" && session) {
-        window.location.replace(searchParams.get("next") || "/home");
+        setActiveAccount(
+          session.user.user_metadata?.full_name ??
+            session.user.user_metadata?.name ??
+            session.user.email ??
+            "ログイン中のアカウント"
+        );
+        setCheckingSession(false);
+      } else if (event === "SIGNED_OUT") {
+        setActiveAccount(null);
       }
     });
 
@@ -87,7 +105,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   async function handleDiscordLogin() {
     setLoading(true);
@@ -121,9 +139,41 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     setMessage("DiscordログインURLを取得できませんでした。Supabase の Discord Provider 設定を確認してください。");
   }
 
+  async function handleSiteSignOut() {
+    setLoading(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+    setActiveAccount(null);
+    setMessage("サイトからログアウトしました。別のDiscordアカウントで続ける場合は、Discord側でもアカウントを切り替えてください。");
+    setLoading(false);
+  }
+
   return (
     <div className="dm-auth-form">
       <p className="dm-muted-text">{MODE_TEXT[mode].helper}</p>
+
+      {checkingSession ? (
+        <p className="dm-muted-text">ログイン状態を確認しています...</p>
+      ) : activeAccount ? (
+        <div className="dm-auth-account-state">
+          <p className="dm-muted-text">サイトにログイン中: {activeAccount}</p>
+          <button
+            className="dm-button secondary"
+            type="button"
+            disabled={loading}
+            onClick={() => void handleSiteSignOut()}
+          >
+            {loading ? "ログアウト中..." : "別のアカウントに切り替える"}
+          </button>
+          <p className="dm-muted-text">
+            Discord側で別アカウントに切り替えてから、もう一度ログインしてください。
+          </p>
+        </div>
+      ) : (
 
       <button
         className="dm-button primary"
@@ -133,6 +183,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
       >
         {loading ? "Discordへ移動中..." : MODE_TEXT[mode].button}
       </button>
+      )}
 
       {message && <p className="dm-form-message">{message}</p>}
     </div>

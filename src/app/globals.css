@@ -4484,6 +4484,167 @@ select {
   font-weight: 800;
 }
 
+.bf-deck-change-popup {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.bf-deck-change-top {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.4fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.bf-deck-change-filters {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bf-deck-change-filters .dm-form-label {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.bf-deck-change-filters .dm-input {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.bf-deck-change-selected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 8px 12px;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.bf-deck-change-selected > div:last-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bf-deck-change-selected strong,
+.bf-deck-change-selected span {
+  overflow-wrap: anywhere;
+}
+
+.bf-deck-change-selected > div:last-child > small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.bf-deck-change-selected > div:last-child > strong {
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
+.bf-deck-change-selected .bf-deck-change-images {
+  flex: 0 0 99px;
+  margin: 0;
+}
+
+.bf-deck-change-summary {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bf-deck-change-deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-auto-rows: minmax(126px, auto);
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
+
+.bf-deck-change-deck-card {
+  display: grid;
+  grid-template-rows: 84px auto auto;
+  align-content: start;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  color: #1e3a8a;
+  background: #fff;
+  text-align: center;
+  cursor: pointer;
+}
+
+.bf-deck-change-deck-card:hover {
+  background: #eff6ff;
+}
+
+.bf-deck-change-deck-card.is-selected {
+  border: 2px solid #2563eb;
+  padding: 4px;
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+}
+
+.bf-deck-change-deck-card > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  width: 100%;
+  color: #1e3a8a;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bf-deck-change-deck-card > small {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.bf-deck-change-images {
+  width: 94px;
+  height: 80px;
+}
+
+.bf-deck-change-images.is-hyakugan {
+  height: 82px;
+}
+
+.bf-deck-change-empty {
+  grid-column: 1 / -1;
+  color: #64748b;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .bf-deck-change-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bf-deck-change-selected {
+    min-height: 100px;
+  }
+}
+
 @keyframes bf-hold-progress {
   to {
     transform: rotate(360deg);
@@ -8262,6 +8423,12 @@ body:has(.bf-battle-app) {
 .bf-player-board > .bf-zone-right > .bf-area-stack-zone,
 .bf-player-board > .bf-zone-item .bf-area-stack-zone {
   overflow-y: visible !important;
+}
+
+/* Soul previews extend past the card; don't clip them at the zone viewport. */
+.bf-player-board > .bf-zone > .bf-set-area-scroll:has(.bf-area-stack-card.has-soul-preview),
+.bf-player-board > .bf-zone > .bf-set-area-scroll:has(.bf-area-stack-card.has-soul-preview) > .bf-area-stack-zone {
+  overflow: visible !important;
 }
 
 .dm-site-update-notice {

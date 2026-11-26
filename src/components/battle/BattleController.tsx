@@ -18,6 +18,7 @@ import { BattlePopup } from "@/components/battle/BattlePopup";
 import { BattleSidebar } from "@/components/battle/BattleSidebar";
 import { DeckBrowserPopup } from "@/components/battle/DeckBrowserPopup";
 import { DeckCountPopup } from "@/components/battle/DeckCountPopup";
+import { CardViewer } from "@/components/cards/CardViewer";
 import { useEscapeToClose } from "@/hooks/useEscapeToClose";
 import {
   getAreaStacks,
@@ -88,7 +89,10 @@ import {
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
-import { loadBattleCardAbilityMap } from "@/lib/cards/cardAbilityActions";
+import {
+  loadBattleCardAbilityMap,
+  loadHyakuganCompositeCardIds
+} from "@/lib/cards/cardAbilityActions";
 import { loadDeck, loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlag, loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
@@ -143,6 +147,10 @@ const MULTI_SELECT_ZONE_IDS: ReadonlySet<BattleZoneId> = new Set([
 ]);
 const FRAG_NEW_SUCCESS_MESSAGE = "選択したカードをフラッグに重ねました。";
 
+function isHyakuganBuddyCard(card: CardRecord | null | undefined) {
+  return card?.name.normalize("NFKC").replace(/[\s・･]/gu, "").includes("ヒャクガンヤミゲドウ") ?? false;
+}
+
 const HYAKUGAN_PLACEMENT_TARGET_ZONES: ReadonlyArray<BattleZoneId> = [
   "center",
   "left",
@@ -182,6 +190,7 @@ type PendingBattleActionPopup = {
     | { kind: "card"; instanceId: string; fromZone: BattleZoneId }
     | { kind: "soul"; parentInstanceId: string; soulInstanceId: string };
   sourceCard: BattleCard;
+  instanceIds: string[];
   toZone: BattleZoneId;
   targetInstanceId: string;
   x: number;
@@ -457,6 +466,10 @@ export function BattleController() {
   const [deckChangeCollectionFilter, setDeckChangeCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
   const [deckChangeFlagId, setDeckChangeFlagId] = useState("");
   const [changeableFlags, setChangeableFlags] = useState<FlagRecord[]>([]);
+  const [deckChangeHyakuganIds, setDeckChangeHyakuganIds] = useState<{
+    heavenCardId: string;
+    earthCardId: string;
+  } | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("idle");
   const [syncMessage, setSyncMessage] = useState("");
   const [savingSeatKeys, setSavingSeatKeys] = useState<BattlePlayerSeat[]>([]);
@@ -1715,6 +1728,90 @@ export function BattleController() {
     }
     return filteredChangeableDecks[0].id;
   }, [deckChangeTargetId, filteredChangeableDecks]);
+  const selectedChangeableDeck = filteredChangeableDecks.find(
+    (deck) => deck.id === resolvedDeckChangeTargetId
+  ) ?? null;
+
+  function renderDeckChangeImages(deck: DeckRecord) {
+    const flag = changeableFlags.find((item) => item.id === deck.flag_id);
+    const flagCard = flag?.card_id ? cardMap.get(flag.card_id) ?? null : null;
+    const buddyCard = deck.buddy_card_id ? cardMap.get(deck.buddy_card_id) ?? null : null;
+    const keyCard = deck.key_card_id ? cardMap.get(deck.key_card_id) ?? null : null;
+    const isHyakuganBuddy = Boolean(
+      deckChangeHyakuganIds &&
+      (deck.buddy_card_id === deckChangeHyakuganIds.heavenCardId ||
+        deck.buddy_card_id === deckChangeHyakuganIds.earthCardId ||
+        isHyakuganBuddyCard(buddyCard))
+    );
+    const hyakuganCards = isHyakuganBuddy && deckChangeHyakuganIds
+      ? [
+          cardMap.get(deckChangeHyakuganIds.heavenCardId),
+          cardMap.get(deckChangeHyakuganIds.earthCardId)
+        ].filter((card): card is CardRecord => Boolean(card))
+      : [];
+    const renderCard = (
+      card: CardRecord | null,
+      selectedImageId?: string | null,
+      className = "dm-deck-management-image",
+      preserveOrientation = false
+    ) => {
+      if (!card) return <span className="dm-deck-management-empty">未選択</span>;
+      const cardImages = imagesByCard.get(card.id) ?? [];
+      const imageId = selectedImageId && cardImages.some((image) => image.id === selectedImageId)
+        ? selectedImageId
+        : cardImages.find((image) => image.is_default)?.id ?? null;
+      return (
+        <CardViewer
+          card={card}
+          images={cardImages}
+          selectedImageId={imageId}
+          variant="compact"
+          className={className}
+          forcePortrait={!preserveOrientation}
+          preserveOrientation={preserveOrientation}
+        />
+      );
+    };
+
+    return (
+      <div className={`dm-deck-management-images bf-deck-change-images${isHyakuganBuddy ? " is-hyakugan" : ""}`}>
+        <div className="is-flag">{renderCard(flagCard, undefined, "dm-deck-management-image")}</div>
+        <div className="is-buddy">
+          {hyakuganCards.length === 2 ? (
+            <div className="dm-deck-management-hyakugan-buddy" aria-label="ヒャクガンヤミゲドウのバディ">
+              {hyakuganCards.map((card) => renderCard(
+                card,
+                card.id === buddyCard?.id ? deck.selected_buddy_image_id : null,
+                "dm-deck-management-hyakugan-piece",
+                true
+              ))}
+            </div>
+          ) : renderCard(buddyCard, deck.selected_buddy_image_id)}
+        </div>
+        <div className="is-key">
+          {keyCard ? renderCard(keyCard, null) : null}
+        </div>
+      </div>
+    );
+  }
+
+  function renderDeckChangeOption(deck: DeckRecord) {
+    const selected = deck.id === resolvedDeckChangeTargetId;
+    return (
+      <button
+        key={deck.id}
+        type="button"
+        className={`bf-deck-change-deck-card${selected ? " is-selected" : ""}`}
+        role="radio"
+        aria-checked={selected}
+        onClick={() => setDeckChangeTargetId(deck.id)}
+      >
+        {renderDeckChangeImages(deck)}
+        <strong>{deck.name}</strong>
+        <small>{getDeckEraLabel(deck.era_key)}</small>
+      </button>
+    );
+  }
 
   async function handleOpenDeckChangePopup() {
     setDeckChangeError("");
@@ -1726,12 +1823,19 @@ export function BattleController() {
     setDeckChangeCollectionFilter("all");
     setDeckChangeFlagId("");
     try {
-      const [deckResult, flagsResult] = await Promise.all([loadDecks(), loadFlagsLite()]);
+      const [deckResult, flagsResult, hyakuganResult] = await Promise.all([
+        loadDecks(),
+        loadFlagsLite(),
+        loadHyakuganCompositeCardIds()
+      ]);
       if (deckResult.error) {
         setDeckChangeError(getErrorMessage(deckResult.error) ?? "デッキ一覧を読み込めませんでした。");
         return;
       }
-      setChangeableFlags(flagsResult.error ? [] : flagsResult.data ?? []);
+      const nextFlags = flagsResult.error ? [] : flagsResult.data ?? [];
+      const nextHyakuganIds = hyakuganResult.data;
+      setChangeableFlags(nextFlags);
+      setDeckChangeHyakuganIds(nextHyakuganIds);
 
       const currentUserId = currentUserIdRef.current ?? "";
       const visibleDecks = (deckResult.data ?? []).filter(
@@ -1743,6 +1847,40 @@ export function BattleController() {
       );
 
       setChangeableDecks(visibleDecks);
+      const relatedCardIds = [...new Set([
+        ...visibleDecks.map((deck) => deck.buddy_card_id),
+        ...visibleDecks.map((deck) => deck.key_card_id),
+        ...nextFlags.map((flag) => flag.card_id),
+        ...(nextHyakuganIds
+          ? [nextHyakuganIds.heavenCardId, nextHyakuganIds.earthCardId]
+          : [])
+      ].filter((id): id is string => Boolean(id)))];
+      const loadedCardIds = new Set(cards.map((card) => card.id));
+      const missingCardIds = relatedCardIds.filter((id) => !loadedCardIds.has(id));
+      if (missingCardIds.length > 0) {
+        const [cardsResult, imagesResult] = await Promise.all([
+          loadCardsByIds(missingCardIds),
+          loadCardImagesByCardIds(missingCardIds)
+        ]);
+        if (cardsResult.error || imagesResult.error) {
+          console.warn(
+            "Deck change preview metadata failed to load.",
+            cardsResult.error ?? imagesResult.error
+          );
+        }
+        if (!cardsResult.error && cardsResult.data?.length) {
+          setCards((current) => {
+            const incomingIds = new Set(cardsResult.data!.map((card) => card.id));
+            return [...current.filter((card) => !incomingIds.has(card.id)), ...cardsResult.data!];
+          });
+        }
+        if (!imagesResult.error && imagesResult.data?.length) {
+          setImages((current) => {
+            const incomingIds = new Set(current.map((image) => image.id));
+            return [...current, ...imagesResult.data!.filter((image) => !incomingIds.has(image.id))];
+          });
+        }
+      }
       setDeckChangeTargetId(
         visibleDecks.find((deck: DeckRecord) => deck.id === battleDeck?.id)?.id ??
           visibleDecks[0]?.id ??
@@ -2725,6 +2863,7 @@ export function BattleController() {
     if (
       battleState &&
       (dragSelection.instanceIds.length === 1 ||
+        dragSelection.sourceCard.zoneId === "deck" ||
         typeof dragSelection.sourceCard.meta.compositeId === "string") &&
       isAreaStackZone(toZone) &&
       input.clientX != null &&
@@ -2747,6 +2886,7 @@ export function BattleController() {
           fromZone: dragSelection.sourceCard.zoneId
         },
         sourceCard: dragSelection.sourceCard,
+        instanceIds: dragSelection.instanceIds,
         toZone,
         targetInstanceId,
         x: input.clientX,
@@ -3107,8 +3247,24 @@ export function BattleController() {
   function handleBattleActionPopupSelect(action: BattleActionPopupAction) {
     if (!pendingActionPopup) return;
 
-    const { source, sourceCard, targetInstanceId, toZone } = pendingActionPopup;
+    const { source, sourceCard, instanceIds, targetInstanceId, toZone } = pendingActionPopup;
     let command: BattleCommand | null = null;
+
+    if (source.kind === "card" && instanceIds.length > 1 &&
+        (action === "soulFaceUp" || action === "soulFaceDown")) {
+      executeCommands(instanceIds.map((instanceId): BattleCommand => ({
+        type: action === "soulFaceUp" ? "ADD_SOUL_FACE_UP" : "ADD_SOUL_FACE_DOWN",
+        payload: {
+          instanceId,
+          fromZone: source.fromZone,
+          targetInstanceId
+        },
+        source: "popup"
+      })));
+      handleClearSelection();
+      setPendingActionPopup(null);
+      return;
+    }
 
     if (
       source.kind === "card" &&
@@ -3908,102 +4064,88 @@ export function BattleController() {
             <p>対戦開始に使えるデッキがありません。</p>
           ) : (
             <div className="bf-deck-change-popup">
-              <div className="bf-deck-change-search-row">
-                <label className="dm-form-label" htmlFor="battle-deck-change-collection">
-                  デッキ区分
-                  <select
-                    id="battle-deck-change-collection"
-                    className="dm-input"
-                    value={deckChangeCollectionFilter}
-                    onChange={(event) => setDeckChangeCollectionFilter(event.target.value as typeof deckChangeCollectionFilter)}
-                    disabled={deckChangeLoading}
-                  >
-                    <option value="all">すべて</option>
-                    <option value="private">自分のデッキ</option>
-                    <option value="public">共有デッキ</option>
-                    <option value="default">サンプルデッキ</option>
-                  </select>
-                </label>
-                <label className="dm-form-label" htmlFor="battle-deck-change-flag">
-                  フラッグ
-                  <select
-                    id="battle-deck-change-flag"
-                    className="dm-input"
-                    value={deckChangeFlagId}
-                    onChange={(event) => setDeckChangeFlagId(event.target.value)}
-                    disabled={deckChangeLoading}
-                  >
-                    <option value="">すべて</option>
-                    {changeableFlags.map((flag) => (
-                      <option key={flag.id} value={flag.id}>
-                        {flag.name ?? "名称未設定"}
-                        {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className="bf-deck-change-top">
+                <div className="bf-deck-change-filters">
+                  <label className="dm-form-label" htmlFor="battle-deck-change-collection">
+                    デッキ区分
+                    <select
+                      id="battle-deck-change-collection"
+                      className="dm-input"
+                      value={deckChangeCollectionFilter}
+                      onChange={(event) => setDeckChangeCollectionFilter(event.target.value as typeof deckChangeCollectionFilter)}
+                      disabled={deckChangeLoading}
+                    >
+                      <option value="all">すべて</option>
+                      <option value="private">自分のデッキ</option>
+                      <option value="public">共有デッキ</option>
+                      <option value="default">サンプルデッキ</option>
+                    </select>
+                  </label>
+                  <label className="dm-form-label" htmlFor="battle-deck-change-era">
+                    年代
+                    <select
+                      id="battle-deck-change-era"
+                      className="dm-input"
+                      value={deckChangeEraKey}
+                      onChange={(event) => setDeckChangeEraKey(event.target.value as DeckEraKey | "")}
+                      disabled={deckChangeLoading}
+                    >
+                      <option value="">すべて</option>
+                      {DECK_ERA_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="dm-form-label" htmlFor="battle-deck-change-flag">
+                    フラッグ
+                    <select
+                      id="battle-deck-change-flag"
+                      className="dm-input"
+                      value={deckChangeFlagId}
+                      onChange={(event) => setDeckChangeFlagId(event.target.value)}
+                      disabled={deckChangeLoading}
+                    >
+                      <option value="">すべて</option>
+                      {changeableFlags.map((flag) => (
+                        <option key={flag.id} value={flag.id}>{flag.name ?? "名称未設定"}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="dm-form-label" htmlFor="battle-deck-change-search">
+                    デッキ名
+                    <input
+                      id="battle-deck-change-search"
+                      className="dm-input"
+                      type="search"
+                      value={deckChangeSearchText}
+                      placeholder="デッキ名を入力"
+                      onChange={(event) => setDeckChangeSearchText(event.target.value)}
+                      disabled={deckChangeLoading}
+                    />
+                  </label>
+                </div>
+                <div className="bf-deck-change-selected" aria-live="polite">
+                  {selectedChangeableDeck ? (
+                    <>
+                      {renderDeckChangeImages(selectedChangeableDeck)}
+                      <div>
+                        <small>選択中のデッキ</small>
+                        <strong>{selectedChangeableDeck.name}</strong>
+                        {selectedChangeableDeck.luminize && <span>{selectedChangeableDeck.luminize}</span>}
+                        <small>{getDeckEraLabel(selectedChangeableDeck.era_key)}</small>
+                      </div>
+                    </>
+                  ) : <p>デッキを選択してください。</p>}
+                </div>
               </div>
-              <div className="bf-deck-change-search-row">
-                <label className="dm-form-label" htmlFor="battle-deck-change-search">
-                  デッキ名
-                  <input
-                    id="battle-deck-change-search"
-                    className="dm-input"
-                    type="search"
-                    value={deckChangeSearchText}
-                    placeholder="デッキ名を入力"
-                    onChange={(event) => setDeckChangeSearchText(event.target.value)}
-                    disabled={deckChangeLoading}
-                  />
-                </label>
-                <label className="dm-form-label" htmlFor="battle-deck-change-era">
-                  年代
-                  <select
-                    id="battle-deck-change-era"
-                    className="dm-input"
-                    value={deckChangeEraKey}
-                    onChange={(event) =>
-                      setDeckChangeEraKey(event.target.value as DeckEraKey | "")
-                    }
-                    disabled={deckChangeLoading}
-                  >
-                    <option value="">すべて</option>
-                    {DECK_ERA_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="dm-form-label" htmlFor="battle-deck-change-select">
-                使用デッキ
-                <select
-                  id="battle-deck-change-select"
-                  className="dm-input"
-                  value={resolvedDeckChangeTargetId}
-                  onChange={(event) => setDeckChangeTargetId(event.target.value)}
-                  disabled={deckChangeLoading}
-                >
-                  {filteredChangeableDecks.length === 0 ? (
-                    <option value="">該当なし</option>
-                  ) : (
-                    filteredChangeableDecks.map((deck) => (
-                      <option key={deck.id} value={deck.id}>
-                        {deck.name} / {getDeckEraLabel(deck.era_key)}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-
               <div className="bf-deck-change-summary">
                 <span>候補 {filteredChangeableDecks.length}件</span>
-                {resolvedDeckChangeTargetId && (
-                  <span>
-                    選択中 {filteredChangeableDecks.find((deck) => deck.id === resolvedDeckChangeTargetId)?.name ?? "未選択"}
-                  </span>
+                <span>一覧からデッキを選択してください。</span>
+              </div>
+              <div className="bf-deck-change-deck-grid" role="radiogroup" aria-label="変更先のデッキ">
+                {filteredChangeableDecks.map(renderDeckChangeOption)}
+                {filteredChangeableDecks.length === 0 && (
+                  <p className="bf-deck-change-empty">条件に合うデッキがありません。</p>
                 )}
               </div>
             </div>
