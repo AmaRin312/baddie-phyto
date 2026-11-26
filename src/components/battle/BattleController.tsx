@@ -35,7 +35,9 @@ import {
   cleanupExpiredBattleRooms,
   deleteBattleRoom,
   disbandBattleRoom,
+  leaveBattleRoomOnPageExit,
   loadBattleRoom,
+  markBattleRoomActivity,
   PREALLOCATED_BATTLE_ROOMS,
   leaveBattleRoomBeforeDeckSelection,
   touchBattleRoom,
@@ -946,7 +948,30 @@ export function BattleController() {
 
     sendHeartbeat();
     const intervalId = window.setInterval(sendHeartbeat, 30_000);
-    return () => window.clearInterval(intervalId);
+    let lastActivityRequestAt = 0;
+    const reportActivity = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastActivityRequestAt < 60_000) return;
+      lastActivityRequestAt = now;
+      void markBattleRoomActivity(roomId, selfSeat);
+    };
+    reportActivity();
+    const activityEvents = ["pointerdown", "keydown", "touchstart", "dragstart", "drop", "wheel"] as const;
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, reportActivity, { passive: true })
+    );
+    const handlePageHide = () => {
+      void leaveBattleRoomOnPageExit(roomId, selfSeat);
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.clearInterval(intervalId);
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, reportActivity)
+      );
+      window.removeEventListener("pagehide", handlePageHide);
+    };
   }, [isRealtimeBattle, roomId, selfSeat]);
 
   const refreshOpponentSupplyMetadata = useCallback(async () => {
@@ -1655,7 +1680,7 @@ export function BattleController() {
     });
   }
 
-  function handleDeleteRoomState() {
+  async function handleDeleteRoomState() {
     if (!roomId) return;
     const confirmed = window.confirm(
       isRealtimeBattle
@@ -1666,7 +1691,7 @@ export function BattleController() {
 
     const deleteTask =
       isRealtimeBattle && selfSeat
-        ? (!opponentPresent
+        ? (!opponentPresent || PREALLOCATED_BATTLE_ROOMS.some((room) => room.roomId === roomId)
             ? Promise.all([
                 PREALLOCATED_BATTLE_ROOMS.some((room) => room.roomId === roomId)
                   ? releaseBattleRoom(roomId)
@@ -1683,16 +1708,21 @@ export function BattleController() {
             deleteSyncedPlayerBattleStates(roomId)
           ]);
 
-    void deleteTask.then((results) => {
+    try {
+      const results = await deleteTask;
       const error = results.find((result) => result.error)?.error;
-      if (error) console.error(error);
+      if (error) {
+        console.error(error);
+        window.alert(`退出処理に失敗しました。対戦部屋はまだ使用中の可能性があります。\n${error}`);
+        return;
+      }
 
       void cleanupExpiredBattleRooms();
       window.location.href = "/battle";
-    }).catch((error) => {
+    } catch (error) {
       console.error(error);
-      window.location.href = "/battle";
-    });
+      window.alert("退出処理に失敗しました。通信状態を確認して、もう一度お試しください。");
+    }
   }
 
   function canStartBattleDeck(deck: DeckRecord | null) {

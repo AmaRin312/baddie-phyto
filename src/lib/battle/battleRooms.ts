@@ -11,9 +11,11 @@ export type BattleRoomRecord = {
   host_user_id: string | null;
   host_deck_id: string | null;
   host_last_seen_at: string | null;
+  host_last_activity_at: string | null;
   guest_user_id: string | null;
   guest_deck_id: string | null;
   guest_last_seen_at: string | null;
+  guest_last_activity_at: string | null;
   created_at: string;
   updated_at: string;
   disbanded_at: string | null;
@@ -22,7 +24,10 @@ export type BattleRoomRecord = {
 
 export const PREALLOCATED_BATTLE_ROOMS = [
   { roomId: "bf-room-1", name: "対戦ルーム1" },
-  { roomId: "bf-room-2", name: "対戦ルーム2" }
+  { roomId: "bf-room-2", name: "対戦ルーム2" },
+  { roomId: "bf-room-3", name: "対戦ルーム3" },
+  { roomId: "bf-room-4", name: "対戦ルーム4" },
+  { roomId: "bf-room-5", name: "対戦ルーム5" }
 ] as const;
 
 async function getCurrentUserId() {
@@ -98,6 +103,51 @@ export async function touchBattleRoom(roomId: string, seat: BattlePlayerSeat) {
   return data ? { error: null } : { error: "このルームの参加席を確認できません。" };
 }
 
+export async function markBattleRoomActivity(roomId: string, seat: BattlePlayerSeat) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "ログインが必要です。" };
+
+  const seatUserColumn = seat === "player1" ? "host_user_id" : "guest_user_id";
+  const activityColumn = seat === "player1" ? "host_last_activity_at" : "guest_last_activity_at";
+  const { data, error } = await supabase
+    .from("battle_rooms")
+    .update({ [activityColumn]: new Date().toISOString() })
+    .eq("room_id", roomId)
+    .eq(seatUserColumn, userId)
+    .neq("status", "disbanded")
+    .select("room_id")
+    .maybeSingle<{ room_id: string }>();
+
+  if (error) return { error: error.message };
+  return data ? { error: null } : { error: "このルームの参加席を確認できません。" };
+}
+
+export async function leaveBattleRoomOnPageExit(
+  roomId: string,
+  seat: BattlePlayerSeat
+) {
+  const { data, error } = await supabase.auth.getSession();
+  const session = data.session;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (error || !session || !supabaseUrl || !publishableKey) return;
+
+  try {
+    await fetch(`${supabaseUrl.replace(/\/$/u, "")}/rest/v1/rpc/leave_battle_room`, {
+      method: "POST",
+      headers: {
+        apikey: publishableKey,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ p_room_id: roomId, p_seat_key: seat }),
+      keepalive: true
+    });
+  } catch (leaveError) {
+    console.warn("Battle room page-exit request failed; heartbeat cleanup will release it.", leaveError);
+  }
+}
+
 export async function joinBattleRoom(input: {
   room: BattleRoomRecord;
   deckId?: string;
@@ -144,6 +194,7 @@ export async function joinBattleRoom(input: {
         host_user_id: userId,
         host_deck_id: input.deckId ?? null,
         host_last_seen_at: new Date().toISOString(),
+        host_last_activity_at: new Date().toISOString(),
         disbanded_at: null,
         expires_at: null
       })
@@ -172,6 +223,7 @@ export async function joinBattleRoom(input: {
       guest_user_id: userId,
       guest_deck_id: input.deckId ?? null,
       guest_last_seen_at: new Date().toISOString(),
+      guest_last_activity_at: new Date().toISOString(),
       disbanded_at: null,
       expires_at: null
     })
@@ -196,25 +248,30 @@ export async function joinBattleRoom(input: {
 }
 
 export async function releaseBattleRoom(roomId: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("battle_rooms")
     .update({
       status: "waiting",
       host_user_id: null,
       host_deck_id: null,
       host_last_seen_at: null,
+      host_last_activity_at: null,
       guest_user_id: null,
       guest_deck_id: null,
       guest_last_seen_at: null,
+      guest_last_activity_at: null,
       disbanded_at: null,
       expires_at: null
     })
-    .eq("room_id", roomId);
+    .eq("room_id", roomId)
+    .select("room_id")
+    .maybeSingle<{ room_id: string }>();
 
   if (error) {
     console.error(error);
     return { error: error.message };
   }
+  if (!data) return { error: "解除対象の対戦部屋が見つかりませんでした。" };
 
   return { error: null };
 }
@@ -233,7 +290,8 @@ export async function leaveBattleRoomBeforeDeckSelection(
         status: "waiting",
         guest_user_id: null,
         guest_deck_id: null,
-        guest_last_seen_at: null
+        guest_last_seen_at: null,
+        guest_last_activity_at: null
       })
       .eq("room_id", roomId)
       .eq("guest_user_id", userId)
@@ -259,7 +317,7 @@ export async function leaveBattleRoomBeforeDeckSelection(
   }
 
   if (room.guest_user_id) {
-    return disbandBattleRoom(roomId);
+    return releaseBattleRoom(roomId);
   }
   return releaseBattleRoom(roomId);
 }
@@ -268,25 +326,30 @@ export async function disbandBattleRoom(roomId: string) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 1);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("battle_rooms")
     .update({
       status: "disbanded",
       host_user_id: null,
       host_deck_id: null,
       host_last_seen_at: null,
+      host_last_activity_at: null,
       guest_user_id: null,
       guest_deck_id: null,
       guest_last_seen_at: null,
+      guest_last_activity_at: null,
       disbanded_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString()
     })
-    .eq("room_id", roomId);
+    .eq("room_id", roomId)
+    .select("room_id")
+    .maybeSingle<{ room_id: string }>();
 
   if (error) {
     console.error(error);
     return { error: error.message };
   }
+  if (!data) return { error: "解散対象の対戦部屋が見つかりませんでした。" };
 
   return { error: null };
 }
