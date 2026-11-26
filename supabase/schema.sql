@@ -71,6 +71,8 @@ create table public.decks (
   keyword text,
   flag_id uuid not null references public.flags(id) on delete restrict,
   buddy_card_id uuid not null references public.cards(id) on delete restrict,
+  deck_visibility text not null default 'private'
+    check (deck_visibility in ('private', 'public', 'default')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -239,7 +241,11 @@ create policy "users can update own decks" on public.decks for update to authent
 create policy "users can delete own decks" on public.decks for delete to authenticated using (owner_id = (select auth.uid()));
 
 create policy "users can read own deck cards" on public.deck_cards for select to authenticated
-using (exists (select 1 from public.decks where decks.id = deck_cards.deck_id and decks.owner_id = (select auth.uid())));
+using (exists (
+  select 1 from public.decks
+  where decks.id = deck_cards.deck_id
+    and (decks.owner_id = (select auth.uid()) or decks.deck_visibility in ('public', 'default'))
+));
 create policy "users can insert own deck cards" on public.deck_cards for insert to authenticated
 with check (exists (select 1 from public.decks where decks.id = deck_cards.deck_id and decks.owner_id = (select auth.uid())));
 create policy "users can update own deck cards" on public.deck_cards for update to authenticated

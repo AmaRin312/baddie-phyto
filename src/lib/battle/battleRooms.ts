@@ -272,7 +272,11 @@ export async function disbandBattleRoom(roomId: string) {
     .from("battle_rooms")
     .update({
       status: "disbanded",
+      host_user_id: null,
+      host_deck_id: null,
       host_last_seen_at: null,
+      guest_user_id: null,
+      guest_deck_id: null,
       guest_last_seen_at: null,
       disbanded_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString()

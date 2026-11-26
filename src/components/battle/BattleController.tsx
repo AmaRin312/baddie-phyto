@@ -87,7 +87,10 @@ import {
   createInitialBattleState
 } from "@/lib/battle/createInitialBattleState";
 import type { BattleSelectionMode } from "@/lib/battle/selection/battleSelectionMode";
-import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import {
+  getOrCreateProfile,
+  loadProfileNicknamesByIds
+} from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import {
   loadBattleCardAbilityMap,
@@ -377,6 +380,7 @@ export function BattleController() {
   const [showRoomDeckSelection, setShowRoomDeckSelection] = useState(false);
   const [roomDeckOptions, setRoomDeckOptions] = useState<DeckRecord[]>([]);
   const [roomDeckSelectionId, setRoomDeckSelectionId] = useState("");
+  const [roomDeckCreatorFilter, setRoomDeckCreatorFilter] = useState("");
   const [roomDeckSelectionName, setRoomDeckSelectionName] = useState("");
   const [roomDeckSelectionBusy, setRoomDeckSelectionBusy] = useState(false);
   const [roomDeckSelectionError, setRoomDeckSelectionError] = useState("");
@@ -465,6 +469,8 @@ export function BattleController() {
   const [deckChangeEraKey, setDeckChangeEraKey] = useState<DeckEraKey | "">("");
   const [deckChangeCollectionFilter, setDeckChangeCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
   const [deckChangeFlagId, setDeckChangeFlagId] = useState("");
+  const [deckChangeCreatorFilter, setDeckChangeCreatorFilter] = useState("");
+  const [deckCreatorNicknames, setDeckCreatorNicknames] = useState<Map<string, string>>(new Map());
   const [changeableFlags, setChangeableFlags] = useState<FlagRecord[]>([]);
   const [deckChangeHyakuganIds, setDeckChangeHyakuganIds] = useState<{
     heavenCardId: string;
@@ -590,6 +596,11 @@ export function BattleController() {
             deck.flag_id &&
             deck.buddy_card_id
         );
+        void loadProfileNicknamesByIds(
+          availableDecks
+            .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
+            .map((deck) => deck.owner_id)
+        ).then(setDeckCreatorNicknames);
         const currentRoomDeckId =
           selfSeat === "player1" ? room.host_deck_id : room.guest_deck_id;
         setRoomDeckOptions(availableDecks);
@@ -1717,9 +1728,38 @@ export function BattleController() {
       const matchesCollection =
         deckChangeCollectionFilter === "all" || deck.deck_visibility === deckChangeCollectionFilter;
       const matchesFlag = !deckChangeFlagId || deck.flag_id === deckChangeFlagId;
-      return matchesSearch && matchesEra && matchesCollection && matchesFlag;
+      const matchesCreator = !deckChangeCreatorFilter ||
+        ((deck.deck_visibility === "public" || deck.deck_visibility === "default") &&
+          deck.owner_id === deckChangeCreatorFilter);
+      return matchesSearch && matchesEra && matchesCollection && matchesFlag && matchesCreator;
     });
-  }, [changeableDecks, deckChangeCollectionFilter, deckChangeEraKey, deckChangeFlagId, deckChangeSearchText]);
+  }, [changeableDecks, deckChangeCollectionFilter, deckChangeCreatorFilter, deckChangeEraKey, deckChangeFlagId, deckChangeSearchText]);
+
+  const deckCreatorOptions = useMemo(() => {
+    const ownerIds = [...new Set(
+      [...changeableDecks, ...roomDeckOptions]
+        .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
+        .map((deck) => deck.owner_id)
+    )];
+    const currentUserId = currentUserIdRef.current;
+    return ownerIds
+      .map((ownerId) => ({
+        id: ownerId,
+        label: ownerId === currentUserId
+          ? "自分"
+          : deckCreatorNicknames.get(ownerId) ?? `ユーザー (${ownerId.slice(0, 8)})`
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ja"));
+  }, [changeableDecks, deckCreatorNicknames, roomDeckOptions]);
+
+  const filteredRoomDeckOptions = useMemo(
+    () => roomDeckOptions.filter((deck) =>
+      !roomDeckCreatorFilter ||
+      ((deck.deck_visibility === "public" || deck.deck_visibility === "default") &&
+        deck.owner_id === roomDeckCreatorFilter)
+    ),
+    [roomDeckCreatorFilter, roomDeckOptions]
+  );
 
   const resolvedDeckChangeTargetId = useMemo(() => {
     if (filteredChangeableDecks.length === 0) return "";
@@ -1822,6 +1862,7 @@ export function BattleController() {
     setDeckChangeEraKey("");
     setDeckChangeCollectionFilter("all");
     setDeckChangeFlagId("");
+    setDeckChangeCreatorFilter("");
     try {
       const [deckResult, flagsResult, hyakuganResult] = await Promise.all([
         loadDecks(),
@@ -1845,6 +1886,12 @@ export function BattleController() {
             deck.deck_visibility === "default") &&
           canStartBattleDeck(deck)
       );
+
+      void loadProfileNicknamesByIds(
+        visibleDecks
+          .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
+          .map((deck) => deck.owner_id)
+      ).then(setDeckCreatorNicknames);
 
       setChangeableDecks(visibleDecks);
       const relatedCardIds = [...new Set([
@@ -3547,18 +3594,44 @@ export function BattleController() {
           <h1>使用するデッキを選択</h1>
           <p>ルームへの入室が完了しました。対戦で使うデッキを選んでください。</p>
           {roomDeckOptions.length > 0 ? (
-            <select
-              className="dm-input"
-              value={roomDeckSelectionId}
-              onChange={(event) => setRoomDeckSelectionId(event.target.value)}
-              disabled={roomDeckSelectionBusy}
-            >
-              {roomDeckOptions.map((deck) => (
-                <option key={deck.id} value={deck.id}>
-                  {deck.name}
-                </option>
-              ))}
-            </select>
+            <>
+              <label className="dm-form-label" htmlFor="battle-room-deck-creator">
+                製作者
+                <select
+                  id="battle-room-deck-creator"
+                  className="dm-input"
+                  value={roomDeckCreatorFilter}
+                  onChange={(event) => {
+                    const creatorId = event.target.value;
+                    setRoomDeckCreatorFilter(creatorId);
+                    const nextOptions = roomDeckOptions.filter((deck) =>
+                      !creatorId ||
+                      ((deck.deck_visibility === "public" || deck.deck_visibility === "default") &&
+                        deck.owner_id === creatorId)
+                    );
+                    if (!nextOptions.some((deck) => deck.id === roomDeckSelectionId)) {
+                      setRoomDeckSelectionId(nextOptions[0]?.id ?? "");
+                    }
+                  }}
+                  disabled={roomDeckSelectionBusy}
+                >
+                  <option value="">すべて</option>
+                  {deckCreatorOptions.map((creator) => (
+                    <option key={creator.id} value={creator.id}>{creator.label}</option>
+                  ))}
+                </select>
+              </label>
+              <select
+                className="dm-input"
+                value={roomDeckSelectionId}
+                onChange={(event) => setRoomDeckSelectionId(event.target.value)}
+                disabled={roomDeckSelectionBusy || filteredRoomDeckOptions.length === 0}
+              >
+                {filteredRoomDeckOptions.map((deck) => (
+                  <option key={deck.id} value={deck.id}>{deck.name}</option>
+                ))}
+              </select>
+            </>
           ) : (
             <p role="alert">対戦に使えるデッキがありません。フラッグとバディを設定したデッキを作成してください。</p>
           )}
@@ -4108,6 +4181,21 @@ export function BattleController() {
                       <option value="">すべて</option>
                       {changeableFlags.map((flag) => (
                         <option key={flag.id} value={flag.id}>{flag.name ?? "名称未設定"}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="dm-form-label" htmlFor="battle-deck-change-creator">
+                    製作者
+                    <select
+                      id="battle-deck-change-creator"
+                      className="dm-input"
+                      value={deckChangeCreatorFilter}
+                      onChange={(event) => setDeckChangeCreatorFilter(event.target.value)}
+                      disabled={deckChangeLoading}
+                    >
+                      <option value="">すべて</option>
+                      {deckCreatorOptions.map((creator) => (
+                        <option key={creator.id} value={creator.id}>{creator.label}</option>
                       ))}
                     </select>
                   </label>

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
-import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
+import { getOrCreateProfile, loadProfileNicknamesByIds } from "@/lib/auth/getOrCreateProfile";
 import {
   joinBattleRoom,
   loadActiveBattleRooms,
@@ -122,6 +122,8 @@ export function BattleStartPanel() {
   const [deckCollectionFilter, setDeckCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
   const [deckEraFilter, setDeckEraFilter] = useState("");
   const [deckFlagFilter, setDeckFlagFilter] = useState("");
+  const [deckCreatorFilter, setDeckCreatorFilter] = useState("");
+  const [creatorNicknames, setCreatorNicknames] = useState<Map<string, string>>(new Map());
   const [soloDeckPage, setSoloDeckPage] = useState(0);
   const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
   const [previewDeckCardsLoading, setPreviewDeckCardsLoading] = useState(false);
@@ -164,13 +166,32 @@ export function BattleStartPanel() {
     [currentUserId, decks]
   );
 
+  const creatorOptions = useMemo(() => {
+    const ownerIds = [...new Set(
+      visibleDecks
+        .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
+        .map((deck) => deck.owner_id)
+    )];
+    return ownerIds
+      .map((ownerId) => ({
+        id: ownerId,
+        label: ownerId === currentUserId
+          ? "自分"
+          : creatorNicknames.get(ownerId) ?? `ユーザー (${ownerId.slice(0, 8)})`
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ja"));
+  }, [creatorNicknames, currentUserId, visibleDecks]);
+
   const filteredDecks = useMemo(
     () => visibleDecks.filter((deck) =>
       (deckCollectionFilter === "all" || deck.deck_visibility === deckCollectionFilter) &&
       (!deckEraFilter || deck.era_key === deckEraFilter) &&
-      (!deckFlagFilter || deck.flag_id === deckFlagFilter)
+      (!deckFlagFilter || deck.flag_id === deckFlagFilter) &&
+      (!deckCreatorFilter ||
+        ((deck.deck_visibility === "public" || deck.deck_visibility === "default") &&
+          deck.owner_id === deckCreatorFilter))
     ),
-    [deckCollectionFilter, deckEraFilter, deckFlagFilter, visibleDecks]
+    [deckCollectionFilter, deckCreatorFilter, deckEraFilter, deckFlagFilter, visibleDecks]
   );
   const deckPageCount = Math.max(1, Math.ceil(filteredDecks.length / DECKS_PER_PAGE));
   const currentDeckPage = Math.min(soloDeckPage, deckPageCount - 1);
@@ -181,7 +202,7 @@ export function BattleStartPanel() {
 
   useEffect(() => {
     setSoloDeckPage(0);
-  }, [deckCollectionFilter, deckEraFilter, deckFlagFilter]);
+  }, [deckCollectionFilter, deckEraFilter, deckFlagFilter, deckCreatorFilter]);
 
   const effectiveSelectedDeckId = filteredDecks.some((deck) => deck.id === selectedDeckId)
     ? selectedDeckId
@@ -247,6 +268,11 @@ export function BattleStartPanel() {
         setDecks(nextDecks);
         setFlags(nextFlags);
         setHyakuganCompositeCardIds(hyakuganIds);
+        void loadProfileNicknamesByIds(
+          nextDecks
+            .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
+            .map((deck) => deck.owner_id)
+        ).then(setCreatorNicknames);
 
         const relatedCardIds = [...new Set([
           ...nextDecks.map((deck) => deck.buddy_card_id),
@@ -610,6 +636,15 @@ export function BattleStartPanel() {
                     {flag.name ?? "名称未設定"}
                     {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
                   </option>
+                ))}
+              </select>
+            </label>
+            <label className="dm-form-label dm-deck-search-filter-row">
+              <span>製作者</span>
+              <select className="dm-input" value={deckCreatorFilter} onChange={(event) => { setDeckCreatorFilter(event.target.value); setSoloDeckPage(0); }}>
+                <option value="">すべて</option>
+                {creatorOptions.map((creator) => (
+                  <option key={creator.id} value={creator.id}>{creator.label}</option>
                 ))}
               </select>
             </label>

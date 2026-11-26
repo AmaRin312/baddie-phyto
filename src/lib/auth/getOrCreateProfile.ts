@@ -9,6 +9,32 @@ export type Profile = {
   updated_at: string;
 };
 
+export async function loadProfileNicknamesByIds(profileIds: readonly string[]) {
+  const uniqueIds = [...new Set(profileIds.filter(Boolean))];
+  const nicknames = new Map<string, string>();
+  if (uniqueIds.length === 0) return nicknames;
+
+  const results = await Promise.all(
+    Array.from({ length: Math.ceil(uniqueIds.length / 100) }, (_, index) =>
+      supabase
+        .from("profiles")
+        .select("id,nickname")
+        .in("id", uniqueIds.slice(index * 100, (index + 1) * 100))
+    )
+  );
+
+  for (const result of results) {
+    if (result.error) {
+      console.warn("Deck creator names could not be loaded.", result.error);
+      continue;
+    }
+    for (const profile of result.data ?? []) {
+      if (profile.nickname?.trim()) nicknames.set(profile.id, profile.nickname.trim());
+    }
+  }
+  return nicknames;
+}
+
 const PROFILE_CACHE_TTL_MS = 60_000;
 
 let cachedProfile: Profile | null = null;
