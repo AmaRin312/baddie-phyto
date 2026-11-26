@@ -14,6 +14,7 @@ import {
 } from "@/lib/battle/battleRooms";
 import type { BattlePlayerSeat } from "@/lib/battle/battlePlayerStateSync";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
+import { loadHyakuganCompositeCardIds } from "@/lib/cards/cardAbilityActions";
 import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
@@ -42,6 +43,12 @@ function findDisplayImageId(
 
 function createSoloRoomId(deckId: string) {
   return `solo-${deckId}`;
+}
+
+const DECKS_PER_PAGE = 21;
+
+function isHyakuganBuddyCard(card: CardRecord | null | undefined) {
+  return card?.name.normalize("NFKC").replace(/[\s・･]/gu, "").includes("ヒャクガンヤミゲドウ") ?? false;
 }
 
 function buildBattleUrl(input: {
@@ -83,6 +90,10 @@ export function BattleStartPanel() {
   const [flags, setFlags] = useState<FlagRecord[]>([]);
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
+  const [hyakuganCompositeCardIds, setHyakuganCompositeCardIds] = useState<{
+    heavenCardId: string;
+    earthCardId: string;
+  } | null>(null);
   const [rooms, setRooms] = useState<BattleRoomRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [selectedBattleMode, setSelectedBattleMode] = useState<"solo" | "match" | null>(null);
@@ -90,6 +101,7 @@ export function BattleStartPanel() {
   const [deckCollectionFilter, setDeckCollectionFilter] = useState<"all" | "private" | "public" | "default">("all");
   const [deckEraFilter, setDeckEraFilter] = useState("");
   const [deckFlagFilter, setDeckFlagFilter] = useState("");
+  const [soloDeckPage, setSoloDeckPage] = useState(0);
   const [previewDeck, setPreviewDeck] = useState<DeckRecord | null>(null);
   const [previewDeckCardsLoading, setPreviewDeckCardsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -139,6 +151,16 @@ export function BattleStartPanel() {
     ),
     [deckCollectionFilter, deckEraFilter, deckFlagFilter, visibleDecks]
   );
+  const deckPageCount = Math.max(1, Math.ceil(filteredDecks.length / DECKS_PER_PAGE));
+  const currentDeckPage = Math.min(soloDeckPage, deckPageCount - 1);
+  const visibleDeckPage = useMemo(
+    () => filteredDecks.slice(currentDeckPage * DECKS_PER_PAGE, (currentDeckPage + 1) * DECKS_PER_PAGE),
+    [currentDeckPage, filteredDecks]
+  );
+
+  useEffect(() => {
+    setSoloDeckPage(0);
+  }, [deckCollectionFilter, deckEraFilter, deckFlagFilter]);
 
   const effectiveSelectedDeckId = filteredDecks.some((deck) => deck.id === selectedDeckId)
     ? selectedDeckId
@@ -183,13 +205,15 @@ export function BattleStartPanel() {
       }
 
       setCurrentUserId(profile.id);
-      const [deckResult, flagResult] = await Promise.allSettled([
+      const [deckResult, flagResult, hyakuganResult] = await Promise.allSettled([
         loadDecks(),
-        loadFlagsLite()
+        loadFlagsLite(),
+        loadHyakuganCompositeCardIds()
       ]);
 
       const decksResponse = deckResult.status === "fulfilled" ? deckResult.value : null;
       const flagsResponse = flagResult.status === "fulfilled" ? flagResult.value : null;
+      const hyakuganIds = hyakuganResult.status === "fulfilled" ? hyakuganResult.value.data : null;
 
       if (!decksResponse || decksResponse.error) {
         console.error(decksResponse?.error);
@@ -201,9 +225,12 @@ export function BattleStartPanel() {
 
         setDecks(nextDecks);
         setFlags(nextFlags);
+        setHyakuganCompositeCardIds(hyakuganIds);
 
         const relatedCardIds = [...new Set([
           ...nextDecks.map((deck) => deck.buddy_card_id),
+          ...nextDecks.map((deck) => deck.key_card_id),
+          ...(hyakuganIds ? [hyakuganIds.heavenCardId, hyakuganIds.earthCardId] : []),
           ...nextFlags.map((flag: FlagRecord) => flag.card_id)
         ].filter((id): id is string => Boolean(id)))];
 
@@ -222,7 +249,7 @@ export function BattleStartPanel() {
         );
         setImages(nextImagesResponse?.error ? [] : nextImagesResponse?.data ?? []);
 
-        if (flagsResponse?.error || nextCardsResponse?.error || nextImagesResponse?.error) {
+        if (flagsResponse?.error || hyakuganResult.status === "rejected" || nextCardsResponse?.error || nextImagesResponse?.error) {
           console.warn(
             "Optional battle-start metadata failed to load.",
             flagsResponse?.error ?? nextCardsResponse?.error ?? nextImagesResponse?.error
@@ -323,6 +350,19 @@ export function BattleStartPanel() {
     const buddyCard = deck.buddy_card_id
       ? cardMap.get(deck.buddy_card_id) ?? null
       : null;
+    const keyCard = deck.key_card_id ? cardMap.get(deck.key_card_id) ?? null : null;
+    const isHyakuganBuddy = Boolean(
+      hyakuganCompositeCardIds &&
+      (deck.buddy_card_id === hyakuganCompositeCardIds.heavenCardId ||
+        deck.buddy_card_id === hyakuganCompositeCardIds.earthCardId ||
+        isHyakuganBuddyCard(buddyCard))
+    );
+    const hyakuganHeavenCard = isHyakuganBuddy && hyakuganCompositeCardIds
+      ? cardMap.get(hyakuganCompositeCardIds.heavenCardId) ?? null
+      : null;
+    const hyakuganEarthCard = isHyakuganBuddy && hyakuganCompositeCardIds
+      ? cardMap.get(hyakuganCompositeCardIds.earthCardId) ?? null
+      : null;
     const flagImageId = findDisplayImageId(
       imagesByCard,
       flagCard?.id,
@@ -336,32 +376,64 @@ export function BattleStartPanel() {
 
     return (
       <div className="dm-deck-management-card">
-        <div className="dm-deck-management-images">
-          <div>
+        <div className={`dm-deck-management-images${isHyakuganBuddy ? " is-hyakugan" : ""}`}>
+          <div className="is-flag">
             {flagCard ? (
               <CardViewer
                 card={flagCard}
                 images={imagesByCard.get(flagCard.id) ?? []}
                 selectedImageId={flagImageId}
                 variant="compact"
+                className="dm-deck-management-image"
                 forcePortrait
               />
             ) : (
               <span className="dm-deck-management-empty">未選択</span>
             )}
           </div>
-          <div>
-            {buddyCard ? (
+          <div className="is-buddy">
+            {hyakuganHeavenCard && hyakuganEarthCard ? (
+              <div className="dm-deck-management-hyakugan-buddy" aria-label="ヒャクガンヤミゲドウのバディ">
+                {[hyakuganHeavenCard, hyakuganEarthCard].map((card) => (
+                  <CardViewer
+                    key={card.id}
+                    card={card}
+                    images={imagesByCard.get(card.id) ?? []}
+                    selectedImageId={findDisplayImageId(
+                      imagesByCard,
+                      card.id,
+                      card.id === buddyCard?.id ? deck.selected_buddy_image_id : null
+                    )}
+                    variant="compact"
+                    className="dm-deck-management-hyakugan-piece"
+                    preserveOrientation
+                  />
+                ))}
+              </div>
+            ) : buddyCard ? (
               <CardViewer
                 card={buddyCard}
                 images={imagesByCard.get(buddyCard.id) ?? []}
                 selectedImageId={buddyImageId}
                 variant="compact"
+                className="dm-deck-management-image"
                 forcePortrait
               />
             ) : (
               <span className="dm-deck-management-empty">未選択</span>
             )}
+          </div>
+          <div className="is-key">
+            {keyCard ? (
+              <CardViewer
+                card={keyCard}
+                images={imagesByCard.get(keyCard.id) ?? []}
+                selectedImageId={findDisplayImageId(imagesByCard, keyCard.id, null)}
+                variant="compact"
+                className="dm-deck-management-image"
+                forcePortrait
+              />
+            ) : null}
           </div>
         </div>
         <p className="dm-muted-text">{getDeckEraLabel(deck.era_key)}</p>
@@ -490,25 +562,25 @@ export function BattleStartPanel() {
               description="使用するデッキを選択してください。"
             >
           <div className="dm-deck-search-filters">
-            <label className="dm-form-label">
-              デッキ区分
-              <select className="dm-input" value={deckCollectionFilter} onChange={(event) => setDeckCollectionFilter(event.target.value as typeof deckCollectionFilter)}>
+            <label className="dm-form-label dm-deck-search-filter-row">
+              <span>デッキ区分</span>
+              <select className="dm-input" value={deckCollectionFilter} onChange={(event) => { setDeckCollectionFilter(event.target.value as typeof deckCollectionFilter); setSoloDeckPage(0); }}>
                 <option value="all">すべて</option>
                 <option value="private">自分のデッキ</option>
                 <option value="public">共有デッキ</option>
                 <option value="default">サンプルデッキ</option>
               </select>
             </label>
-            <label className="dm-form-label">
-              年代
-              <select className="dm-input" value={deckEraFilter} onChange={(event) => setDeckEraFilter(event.target.value)}>
+            <label className="dm-form-label dm-deck-search-filter-row">
+              <span>年代</span>
+              <select className="dm-input" value={deckEraFilter} onChange={(event) => { setDeckEraFilter(event.target.value); setSoloDeckPage(0); }}>
                 <option value="">すべて</option>
                 {DECK_ERA_OPTIONS.map((era) => <option key={era.value} value={era.value}>{era.label}</option>)}
               </select>
             </label>
-            <label className="dm-form-label">
-              フラッグ
-              <select className="dm-input" value={deckFlagFilter} onChange={(event) => setDeckFlagFilter(event.target.value)}>
+            <label className="dm-form-label dm-deck-search-filter-row">
+              <span>フラッグ</span>
+              <select className="dm-input" value={deckFlagFilter} onChange={(event) => { setDeckFlagFilter(event.target.value); setSoloDeckPage(0); }}>
                 <option value="">すべて</option>
                 {flags.map((flag) => (
                   <option key={flag.id} value={flag.id}>
@@ -631,7 +703,7 @@ export function BattleStartPanel() {
       ) : (
         <div className="dm-deck-management-section">
           <div className="dm-app-grid">
-            {filteredDecks.map(renderDeck)}
+            {visibleDeckPage.map(renderDeck)}
             {filteredDecks.length === 0 && (
               <AppCard
                 title="デッキがありません"
@@ -639,6 +711,27 @@ export function BattleStartPanel() {
               />
             )}
           </div>
+          {filteredDecks.length > DECKS_PER_PAGE && (
+            <nav className="dm-battle-deck-pagination" aria-label="デッキ一覧ページ">
+              <button
+                type="button"
+                className="dm-button secondary"
+                disabled={currentDeckPage === 0}
+                onClick={() => setSoloDeckPage((page) => Math.max(0, page - 1))}
+              >
+                前へ
+              </button>
+              <span>{currentDeckPage + 1} / {deckPageCount} ページ（{filteredDecks.length}件）</span>
+              <button
+                type="button"
+                className="dm-button secondary"
+                disabled={currentDeckPage >= deckPageCount - 1}
+                onClick={() => setSoloDeckPage((page) => Math.min(deckPageCount - 1, page + 1))}
+              >
+                次へ
+              </button>
+            </nav>
+          )}
         </div>
       ))}
 

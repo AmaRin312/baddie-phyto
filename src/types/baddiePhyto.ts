@@ -125,6 +125,7 @@ export type DeckRecord = {
   id: string;
   owner_id: string;
   name: string;
+  luminize?: string | null;
   flag_id: string | null;
   buddy_card_id: string | null;
     key_card_id?: string | null;

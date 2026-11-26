@@ -143,6 +143,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [isNewDeckDraft, setIsNewDeckDraft] = useState(false);
   const [deckName, setDeckName] = useState("");
+  const [luminize, setLuminize] = useState("");
   const [selectedFlagId, setSelectedFlagId] = useState("");
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
   const [selectedBuddyCardId, setSelectedBuddyCardId] = useState("");
@@ -264,6 +265,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setDeck(nextDeck);
     setIsNewDeckDraft(false);
     setDeckName(nextDeck.name);
+    setLuminize(nextDeck.luminize ?? "");
     setSelectedFlagId(nextDeck.flag_id ?? "");
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
@@ -369,6 +371,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setDeck(null);
         setIsNewDeckDraft(true);
         setDeckName("");
+        setLuminize("");
         setSelectedFlagId("");
         setSelectedFlagImageId("");
         setSelectedBuddyCardId("");
@@ -647,6 +650,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const hasUnsavedChanges = isNewDeckDraft
     ? Boolean(
         deckName.trim() ||
+          luminize.trim() ||
           selectedFlagId ||
           selectedFlagImageId ||
           effectiveSelectedBuddyCardId ||
@@ -660,6 +664,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       )
     : deck
       ? deckName.trim() !== deck.name ||
+        luminize.trim() !== (deck.luminize ?? "") ||
         selectedFlagId !== (deck.flag_id ?? "") ||
         selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
         effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
@@ -774,6 +779,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     const settingsResult = await updateDeckSettings({
       deckId: targetDeck.id,
       name: deckName.trim() || "無題のデッキ",
+      luminize: luminize.trim() || null,
       flagId: selectedFlagId || null,
       buddyCardId: effectiveSelectedBuddyCardId || null,
       keyCardId: selectedKeyCardId || null,
@@ -847,6 +853,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         const copySettingsResult = await updateDeckSettings({
           deckId: copiedDeck.id,
           name: deckName.trim() || "無題のデッキ",
+          luminize: luminize.trim() || null,
           flagId: selectedFlagId || null,
           buddyCardId: effectiveSelectedBuddyCardId || null,
           keyCardId: selectedKeyCardId || null,
@@ -1140,6 +1147,16 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <label>
                   デッキ名
                   <input value={deckName} onChange={(event) => setDeckName(event.target.value)} disabled={!canEditDeck} placeholder="未入力なら「無題のデッキ」" />
+                </label>
+                <label>
+                  ルミナイズ（任意）
+                  <input
+                    value={luminize}
+                    onChange={(event) => setLuminize(event.target.value)}
+                    disabled={!canEditDeck}
+                    maxLength={120}
+                    placeholder="ルミナイズ名を入力"
+                  />
                 </label>
 
                 <div className="dm-deck-linked-card-strip">

@@ -20,7 +20,7 @@ export function DeckCountPopup({
   onSubmit,
   onCancel
 }: DeckCountPopupProps) {
-  const [value, setValue] = useState("1");
+  const [value, setValue] = useState("");
   const parsedValue = Number.parseInt(value, 10);
   const isValid =
     Number.isInteger(parsedValue) && parsedValue >= 1 && parsedValue <= maxCount;

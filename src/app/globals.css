@@ -5156,9 +5156,21 @@ select {
 }
 
 .dm-deck-management-section .dm-app-grid {
-  grid-template-columns: repeat(auto-fill, 135px);
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   justify-content: start;
   gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .dm-deck-management-sections .dm-deck-management-section .dm-app-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .dm-deck-management-sections .dm-deck-management-section .dm-app-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .dm-deck-management-section .dm-app-card {
@@ -5327,15 +5339,12 @@ select {
 }
 
 .dm-deck-management-images .dm-deck-management-hyakugan-piece img {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 35px !important;
-  height: 49px !important;
-  max-width: none;
-  max-height: none;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center;
+  position: static;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  transform: none;
   object-fit: contain;
 }
 
@@ -8724,26 +8733,39 @@ body:has(.bf-battle-app) {
   overflow-y: visible !important;
 }
 
-.bf-player-board > .bf-zone-set .bf-area-stack-zone.is-set-area .bf-area-stack-card {
-  top: calc(-1 * var(--bf-set-soul-layers, 0) * var(--bf-battle-card-h) * 0.085);
-}
-
 /* Keep all four resolution cards inside the clickable zone bounds. */
 .bf-player-board > .bf-zone-resolution .bf-resolution-card-row {
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex !important;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-items: center;
-  gap: 4px;
-  width: 100%;
+  justify-content: flex-start;
+  gap: 0;
+  width: max-content;
+  height: 100%;
+  transform: translateX(-44px);
 }
 
 .bf-player-board > .bf-zone-resolution .bf-resolution-card {
-  width: 100% !important;
+  flex: 0 0 88px;
+  width: 88px !important;
   height: auto !important;
   min-width: 0;
   aspect-ratio: 5 / 7;
   margin: 0 !important;
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card:not(:first-child) {
+  margin-left: -40px !important;
+}
+
+.bf-player-board > .bf-zone-resolution .bf-resolution-card-row > .bf-resolution-card:first-child,
+.bf-player-board > .bf-zone-resolution .bf-resolution-card-row:has(
+    > .bf-resolution-card:first-child.is-native-horizontal
+  ) > .bf-resolution-card:first-child {
+  margin-left: 0 !important;
 }
 
 .bf-player-board > .bf-zone-resolution .bf-resolution-card.is-native-horizontal {
@@ -8847,4 +8869,49 @@ body:has(.bf-battle-app) {
   display: grid;
   gap: 16px;
   padding: 18px;
+}
+
+.dm-deck-search-filters {
+  display: grid;
+  gap: 10px;
+  max-width: 680px;
+  margin-bottom: 18px;
+}
+
+.dm-deck-search-filter-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.dm-deck-search-filter-row .dm-input {
+  margin: 0;
+}
+
+.dm-battle-deck-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.dm-battle-deck-pagination > span {
+  color: var(--dm-muted);
+  font-size: 14px;
+}
+
+.dm-deck-luminize-name {
+  margin: 4px 0 0;
+  color: var(--dm-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+@media (max-width: 560px) {
+  .dm-deck-search-filter-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }

@@ -10,6 +10,7 @@ const DECK_SELECT_COLUMNS = [
   "id",
   "owner_id",
   "name",
+  "luminize",
   "flag_id",
   "buddy_card_id",
   "key_card_id",
@@ -22,14 +23,20 @@ const DECK_SELECT_COLUMNS = [
   "created_at",
   "updated_at"
 ].join(",");
-const DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD = DECK_SELECT_COLUMNS
-  .split(",")
-  .filter((column) => column !== "key_card_id")
-  .join(",");
-const DECK_SELECT_COLUMNS_LEGACY = DECK_SELECT_COLUMNS
-  .split(",")
-  .filter((column) => column !== "key_card_id" && column !== "selected_buddy_image_id")
-  .join(",");
+const DECK_SELECT_COLUMN_VARIANTS = [
+  [],
+  ["luminize"],
+  ["key_card_id"],
+  ["selected_buddy_image_id"],
+  ["luminize", "key_card_id"],
+  ["luminize", "selected_buddy_image_id"],
+  ["key_card_id", "selected_buddy_image_id"],
+  ["luminize", "key_card_id", "selected_buddy_image_id"]
+].map((excluded) =>
+  DECK_SELECT_COLUMNS.split(",")
+    .filter((column) => !excluded.includes(column))
+    .join(",")
+);
 
 const DECK_CARD_SELECT_COLUMNS = [
   "id",
@@ -131,6 +138,12 @@ function isMissingColumnError(error: { code?: string; message: string }, columnN
   return error.code === "PGRST204" || error.message.includes(columnName);
 }
 
+function canRetryDeckSelect(error: { message: string }) {
+  return ["luminize", "key_card_id", "selected_buddy_image_id"].some((column) =>
+    error.message.includes(column)
+  );
+}
+
 export async function loadDecks(options?: { fresh?: boolean }) {
   const cached = options?.fresh ? null : getTimedCache(decksCache, "all");
   if (cached) return cached;
@@ -141,20 +154,14 @@ export async function loadDecks(options?: { fresh?: boolean }) {
     try {
       let result = await supabase
         .from("decks")
-        .select(DECK_SELECT_COLUMNS)
+        .select(DECK_SELECT_COLUMN_VARIANTS[0])
         .order("updated_at", { ascending: false })
         .returns<DeckRecord[]>();
-      if (result.error && isMissingColumnError(result.error, "key_card_id")) {
+      for (const columns of DECK_SELECT_COLUMN_VARIANTS.slice(1)) {
+        if (!result.error || !canRetryDeckSelect(result.error)) break;
         result = await supabase
           .from("decks")
-          .select(DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD)
-          .order("updated_at", { ascending: false })
-          .returns<DeckRecord[]>();
-      }
-      if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
-        result = await supabase
-          .from("decks")
-          .select(DECK_SELECT_COLUMNS_LEGACY)
+          .select(columns)
           .order("updated_at", { ascending: false })
           .returns<DeckRecord[]>();
       }
@@ -352,20 +359,14 @@ export async function loadDeck(deckId: string) {
     try {
       let result = await supabase
         .from("decks")
-        .select(DECK_SELECT_COLUMNS)
+        .select(DECK_SELECT_COLUMN_VARIANTS[0])
         .eq("id", deckId)
         .maybeSingle<DeckRecord>();
-      if (result.error && isMissingColumnError(result.error, "key_card_id")) {
+      for (const columns of DECK_SELECT_COLUMN_VARIANTS.slice(1)) {
+        if (!result.error || !canRetryDeckSelect(result.error)) break;
         result = await supabase
           .from("decks")
-          .select(DECK_SELECT_COLUMNS_WITHOUT_KEY_CARD)
-          .eq("id", deckId)
-          .maybeSingle<DeckRecord>();
-      }
-      if (result.error && isMissingColumnError(result.error, "selected_buddy_image_id")) {
-        result = await supabase
-          .from("decks")
-          .select(DECK_SELECT_COLUMNS_LEGACY)
+          .select(columns)
           .eq("id", deckId)
           .maybeSingle<DeckRecord>();
       }
@@ -509,6 +510,7 @@ export async function createDraftDeck(input?: {
 export async function updateDeckSettings(input: {
   deckId: string;
   name: string;
+  luminize: string | null;
   flagId: string | null;
   buddyCardId: string | null;
   keyCardId: string | null;
@@ -529,10 +531,11 @@ export async function updateDeckSettings(input: {
     era_key: input.eraKey
   };
 
-  const result = await supabase
+  let result = await supabase
     .from("decks")
     .update({
       ...baseUpdate,
+      luminize: input.luminize,
       selected_buddy_image_id: input.selectedBuddyImageId,
       sleeve_supply_id: input.sleeveSupplyId,
       playmat_supply_id: input.playmatSupplyId
@@ -540,6 +543,8 @@ export async function updateDeckSettings(input: {
     .eq("id", input.deckId)
     .select("*")
     .single<DeckRecord>();
+
+  if (result.error?.message.includes("luminize")) return result;
 
   if (
     !result.error ||
@@ -623,19 +628,21 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
     era_key: sourceDeck.era_key ?? null
   };
 
-  const insertWithBuddyImage = await supabase
+  const insertPayload = {
+    ...baseInsert,
+    luminize: sourceDeck.luminize ?? null,
+    selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null,
+    key_card_id: sourceDeck.key_card_id ?? null,
+    sleeve_supply_id: sourceDeck.sleeve_supply_id ?? null,
+    playmat_supply_id: sourceDeck.playmat_supply_id ?? null
+  };
+  let insertWithBuddyImage = await supabase
     .from("decks")
-    .insert({
-      ...baseInsert,
-      selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null,
-      key_card_id: sourceDeck.key_card_id ?? null,
-      sleeve_supply_id: sourceDeck.sleeve_supply_id ?? null,
-      playmat_supply_id: sourceDeck.playmat_supply_id ?? null
-    })
+    .insert(insertPayload)
     .select("id")
     .single<{ id: string }>();
 
-  const canUseLegacyInsert = Boolean(insertWithBuddyImage.error && !sourceDeck.key_card_id && (
+  const canUseLegacyInsert = Boolean(insertWithBuddyImage.error && !insertWithBuddyImage.error.message.includes("luminize") && !sourceDeck.key_card_id && (
       isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "key_card_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "sleeve_supply_id") ||

@@ -772,6 +772,11 @@ export default function DecksPage() {
               <div>
                 <p className="dm-kicker">DECK ACTION</p>
                 <h2 id="deck-action-modal-title">{selectedDeckForAction.name}</h2>
+                {selectedDeckForAction.luminize?.trim() && (
+                  <p className="dm-deck-luminize-name">
+                    {selectedDeckForAction.luminize}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

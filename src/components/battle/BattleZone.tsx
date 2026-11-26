@@ -589,8 +589,7 @@ function BattleZoneComponent({
                       ? ({
                           right: laevateinnActive
                             ? `calc(75% - ${0.5 - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`
-                            : `calc(50% - ${1.5 - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`,
-                          "--bf-set-soul-layers": attachedCards.length
+                            : `calc(50% - ${1.5 - setSlotIndex} * (var(--bf-battle-card-w) * 0.85 + 6px) - ${isWideSetCard ? "var(--bf-battle-card-h) * 0.425" : "var(--bf-battle-card-w) * 0.425"})`
                         } as CSSProperties)
                       : undefined
                 }

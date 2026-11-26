@@ -1346,6 +1346,10 @@ export function BattleController() {
 
     if (!destinationZone) return [];
     const entries: BattleActivityLogEntry[] = [];
+    const movedCards: Array<{
+      source: NonNullable<ReturnType<typeof getPreviousCard>>;
+      destination: NonNullable<ReturnType<typeof getNextCard>>;
+    }> = [];
     movementIds.forEach((instanceId, index) => {
       const source = getPreviousCard(instanceId);
       const destination = getNextCard(instanceId);
@@ -1354,6 +1358,7 @@ export function BattleController() {
         !destination ||
         (source.zoneId === destination.zoneId && !sourceIsSoul && !destinationIsSoul)
       ) return;
+      movedCards.push({ source, destination });
       const movedCardName = source.card.visibility === "public" || destination.card.visibility === "public"
         ? cardName(instanceId, true) ?? "カード"
         : "カード";
@@ -1366,6 +1371,27 @@ export function BattleController() {
         )
       );
     });
+
+    const shouldSummarizeDeckMove =
+      movedCards.length > 1 &&
+      movedCards.every(
+        ({ source, destination }) =>
+          source.zoneId === "deck" &&
+          destination.zoneId === destinationZone &&
+          (destinationZone === "hand" || destinationZone === "gauge") &&
+          source.card.visibility !== "public" &&
+          destination.card.visibility !== "public"
+      );
+    if (shouldSummarizeDeckMove) {
+      const firstSource = movedCards[0].source;
+      const firstDestination = movedCards[0].destination;
+      return [
+        entry(
+          `カード : ${zoneLabel(firstSource.playerId, firstSource.zoneId)} → ${zoneLabel(firstDestination.playerId, firstDestination.zoneId)} ×${movedCards.length}`
+        )
+      ];
+    }
+
     return entries;
   }
 

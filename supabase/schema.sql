@@ -67,6 +67,7 @@ create table public.decks (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(trim(name)) between 1 and 120),
+  luminize text,
   flag_id uuid not null references public.flags(id) on delete restrict,
   buddy_card_id uuid not null references public.cards(id) on delete restrict,
   created_at timestamptz not null default now(),
