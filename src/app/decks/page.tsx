@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { CardViewer } from "@/components/cards/CardViewer";
 import { AppCard } from "@/components/common/card/AppCard";
 import { AppShell } from "@/components/common/layout/AppShell";
-import { BackButton } from "@/components/common/navigation/BackButton";
 import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadHyakuganCompositeCardIds } from "@/lib/cards/cardAbilityActions";
@@ -17,8 +16,12 @@ import {
   loadDeckCards,
   type DeckListSection
 } from "@/lib/decks/deckActions";
-import { loadManagedCardSets } from "@/lib/decks/deckCardSearch";
+import {
+  DECK_ERA_FILTER_STORAGE_KEY,
+  loadManagedCardSets
+} from "@/lib/decks/deckCardSearch";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
+import { CARD_CSV_OFFICIAL_WORLDS } from "@/lib/cards/import/cardCsvSchema";
 import { getPublicSupplyImageUrl, loadBattleSupplies } from "@/lib/supplies/supplyActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
@@ -40,8 +43,27 @@ type DeckSection = {
 };
 
 const DECKS_PER_PAGE = 30;
-const DECK_ERA_FILTER_STORAGE_KEY = "baddie-phyto:deck-list-era-filter";
 const LAST_AVAILABLE_DECK_ERA = DECK_ERA_OPTIONS[DECK_ERA_OPTIONS.length - 1]?.value ?? "god";
+
+function sortDeckFlags(flags: readonly FlagRecord[]) {
+  const worldPriority = new Map(
+    [...CARD_CSV_OFFICIAL_WORLDS].reverse().map((world, index) => [world as string, index])
+  );
+  return flags
+    .map((flag, index) => ({ flag, index }))
+    .sort((left, right) => {
+      const specialPriority = (flag: FlagRecord) =>
+        flag.name?.includes("百鬼夜行") ? 2 : flag.name?.includes("ドラゴン・アイン") ? 1 : 0;
+      const specialDifference = specialPriority(left.flag) - specialPriority(right.flag);
+      if (specialDifference) return specialDifference;
+      const getPriority = (flag: FlagRecord) => Math.min(
+        ...flag.usable_worlds.map((world) => worldPriority.get(world) ?? Number.MAX_SAFE_INTEGER),
+        Number.MAX_SAFE_INTEGER
+      );
+      return getPriority(left.flag) - getPriority(right.flag) || left.index - right.index;
+    })
+    .map(({ flag }) => flag);
+}
 
 function getLatestRegisteredEra(eraKeys: readonly (DeckEraKey | null | undefined)[]) {
   const registeredEras = new Set(eraKeys.filter((era): era is DeckEraKey => Boolean(era)));
@@ -87,6 +109,7 @@ export default function DecksPage() {
   const [eraFilterReady, setEraFilterReady] = useState(false);
   const [flagFilter, setFlagFilter] = useState("");
   const [sectionPages, setSectionPages] = useState<Record<string, number>>({});
+  const [collapsedDeckSections, setCollapsedDeckSections] = useState<Record<string, boolean>>({});
   const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
   const [pageRefreshKey, setPageRefreshKey] = useState(0);
   const [selectedDeckForAction, setSelectedDeckForAction] =
@@ -669,7 +692,6 @@ export default function DecksPage() {
   return (
     <AppShell>
       <div className="dm-page-actions">
-        <BackButton fallbackHref="/" />
         <Link href="/decks/new" className="dm-button primary">
           デッキ作成
         </Link>
@@ -711,7 +733,7 @@ export default function DecksPage() {
           aria-label="フラッグで絞り込み"
         >
           <option value="">フラッグ: すべて</option>
-          {flags.filter(flag => flag.is_active && flag.can_be_selected_as_flag).map(flag => (
+          {sortDeckFlags(flags.filter(flag => flag.is_active && flag.can_be_selected_as_flag)).map(flag => (
             <option key={flag.id} value={flag.id}>{flag.name ?? "名称未設定"}</option>
           ))}
         </select>
@@ -729,17 +751,34 @@ export default function DecksPage() {
                 const pageCount = Math.max(1, Math.ceil(totalCount / DECKS_PER_PAGE));
                 const page = Math.min(sectionPages[section.key] ?? 0, pageCount - 1);
                 const pageDecks = section.decks;
+                const isCollapsed = Boolean(collapsedDeckSections[section.key]);
+                const sectionContentId = `deck-section-content-${section.key}`;
                 return (
                   <>
               <div className="dm-section-heading">
                 <div>
-                  <h2>{section.title}</h2>
+                  <h2>
+                    <button
+                      type="button"
+                      className="dm-deck-section-toggle"
+                      aria-expanded={!isCollapsed}
+                      aria-controls={sectionContentId}
+                      onClick={() => setCollapsedDeckSections((current) => ({
+                        ...current,
+                        [section.key]: !current[section.key]
+                      }))}
+                    >
+                      {section.title}
+                      <span aria-hidden="true">{isCollapsed ? "▸" : "▾"}</span>
+                    </button>
+                  </h2>
                 </div>
                 <span>{totalCount}件</span>
               </div>
-              <div className="dm-app-grid">
-                {pageDecks.map(renderDeckCard)}
-              </div>
+              <div id={sectionContentId} hidden={isCollapsed}>
+                <div className="dm-app-grid">
+                  {pageDecks.map(renderDeckCard)}
+                </div>
                     {totalCount > DECKS_PER_PAGE && (
                       <nav className="dm-deck-pagination" aria-label={`${section.title}のページ切り替え`}>
                         <button type="button" className="dm-button secondary" disabled={loadingPageAssets || page === 0} onClick={() => setSectionPage(section.key, page - 1)}>前</button>
@@ -747,6 +786,7 @@ export default function DecksPage() {
                         <button type="button" className="dm-button secondary" disabled={loadingPageAssets || page >= pageCount - 1} onClick={() => setSectionPage(section.key, page + 1)}>次</button>
                       </nav>
                     )}
+              </div>
                   </>
                 );
               })()}

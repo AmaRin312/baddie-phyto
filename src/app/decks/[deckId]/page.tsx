@@ -12,6 +12,7 @@ import { getOrCreateProfile } from "@/lib/auth/getOrCreateProfile";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadCardAbilityBehaviorKeyMap } from "@/lib/cards/cardAbilityActions";
 import {
+  deleteDeck,
   createDraftDeck,
   copyDeck,
   loadDeck,
@@ -28,6 +29,7 @@ import {
   loadSiteSupplySettings
 } from "@/lib/supplies/supplyActions";
 import {
+  DECK_ERA_FILTER_STORAGE_KEY,
   EMPTY_DECK_CARD_SEARCH_FILTERS,
   loadDeckCardSearchOptions,
   resolveDeckSearchWorlds,
@@ -138,12 +140,31 @@ function canRunDeckCardSearch(filters: DeckCardSearchFilters) {
   );
 }
 
+function getDefaultDeckEra(sets: readonly DeckCardSetOption[]): DeckEraKey | "" {
+  const availableEras = new Set(sets.map((set) => set.eraKey));
+  try {
+    const previousEra = window.localStorage.getItem(DECK_ERA_FILTER_STORAGE_KEY);
+    if (
+      DECK_ERA_OPTIONS.some((option) => option.value === previousEra) &&
+      availableEras.has(previousEra as DeckEraKey)
+    ) {
+      return previousEra as DeckEraKey;
+    }
+  } catch {
+    // Storage can be unavailable; fall back to the newest visible era.
+  }
+  return [...DECK_ERA_OPTIONS].reverse().find((option) => availableEras.has(option.value))?.value ?? "";
+}
+
 export default function DeckDetailPage({ params }: DeckDetailPageProps) {
   const router = useRouter();
   const [deck, setDeck] = useState<DeckRecord | null>(null);
   const [isNewDeckDraft, setIsNewDeckDraft] = useState(false);
+  const [discardOnBack, setDiscardOnBack] = useState(false);
+  const [discardingDraft, setDiscardingDraft] = useState(false);
   const [deckName, setDeckName] = useState("");
   const [luminize, setLuminize] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [selectedFlagId, setSelectedFlagId] = useState("");
   const [selectedFlagImageId, setSelectedFlagImageId] = useState("");
   const [selectedBuddyCardId, setSelectedBuddyCardId] = useState("");
@@ -266,6 +287,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     setIsNewDeckDraft(false);
     setDeckName(nextDeck.name);
     setLuminize(nextDeck.luminize ?? "");
+    setKeyword(nextDeck.keyword ?? "");
     setSelectedFlagId(nextDeck.flag_id ?? "");
     setSelectedFlagImageId(nextDeck.selected_flag_image_id ?? "");
     setSelectedBuddyCardId(nextDeck.buddy_card_id ?? "");
@@ -280,7 +302,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     );
     setSelectedPlaymatSupplyId(nextDeck.playmat_supply_id ?? "");
     setSaveVisibilities([nextDeck.deck_visibility ?? "private"]);
-    setDeckEra(nextDeck.era_key ?? "");
+    setDeckEra(nextDeck.era_key ?? getDefaultDeckEra(searchOptionsResult.sets));
     setSavedDeckCards(nextDeckCards);
     setDraftDeckCards(createDeckCardDrafts(nextDeckCards));
     setFlags(nextFlags);
@@ -316,6 +338,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         window.location.href = "/login";
         return;
       }
+      setDiscardOnBack(new URLSearchParams(window.location.search).get("draft") === "1");
       if (imageDeckIdRef.current !== resolvedDeckId) {
         imageDeckIdRef.current = resolvedDeckId;
         loadedImageCardIdsRef.current.clear();
@@ -372,6 +395,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setIsNewDeckDraft(true);
         setDeckName("");
         setLuminize("");
+        setKeyword("");
         setSelectedFlagId("");
         setSelectedFlagImageId("");
         setSelectedBuddyCardId("");
@@ -382,7 +406,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
         setSelectedSleeveSupplyId("");
         setSelectedPlaymatSupplyId("");
         setSaveVisibilities(["private"]);
-        setDeckEra("");
+        setDeckEra(getDefaultDeckEra(searchOptionsResult.sets));
         setSavedDeckCards([]);
         setDraftDeckCards([]);
         setSearchFilters(EMPTY_DECK_CARD_SEARCH_FILTERS);
@@ -651,6 +675,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     ? Boolean(
         deckName.trim() ||
           luminize.trim() ||
+          keyword.trim() ||
           selectedFlagId ||
           selectedFlagImageId ||
           effectiveSelectedBuddyCardId ||
@@ -665,6 +690,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     : deck
       ? deckName.trim() !== deck.name ||
         luminize.trim() !== (deck.luminize ?? "") ||
+        keyword.trim() !== (deck.keyword ?? "") ||
         selectedFlagId !== (deck.flag_id ?? "") ||
         selectedFlagImageId !== (deck.selected_flag_image_id ?? "") ||
         effectiveSelectedBuddyCardId !== (deck.buddy_card_id ?? "") ||
@@ -780,6 +806,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
       deckId: targetDeck.id,
       name: deckName.trim() || "無題のデッキ",
       luminize: luminize.trim() || null,
+      keyword: keyword.trim() || null,
       flagId: selectedFlagId || null,
       buddyCardId: effectiveSelectedBuddyCardId || null,
       keyCardId: selectedKeyCardId || null,
@@ -854,6 +881,7 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
           deckId: copiedDeck.id,
           name: deckName.trim() || "無題のデッキ",
           luminize: luminize.trim() || null,
+          keyword: keyword.trim() || null,
           flagId: selectedFlagId || null,
           buddyCardId: effectiveSelectedBuddyCardId || null,
           keyCardId: selectedKeyCardId || null,
@@ -874,7 +902,36 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
 
     setSavingDeck(false);
+    setDiscardOnBack(false);
     router.push("/decks");
+  }
+
+  async function handleEditorBack() {
+    if (savingDeck || discardingDraft) return;
+    setMessage("");
+    if (discardOnBack && deck) {
+      setDiscardingDraft(true);
+      try {
+        const result = await deleteDeck(deck.id);
+        if (result.error) {
+          console.error(result.error);
+          setMessage(`新規デッキを破棄できませんでした。${result.error.message}`);
+          setDiscardingDraft(false);
+          return;
+        }
+        if (!result.data) {
+          setMessage("新規デッキを削除できませんでした。権限を確認してください。");
+          setDiscardingDraft(false);
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        setMessage("新規デッキを破棄できませんでした。通信状態を確認してください。");
+        setDiscardingDraft(false);
+        return;
+      }
+    }
+    router.replace("/decks");
   }
 
   function setLocalCardQuantity(
@@ -1144,20 +1201,21 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   void handleSaveDeck();
                 }}
               >
-                <label>
-                  デッキ名
-                  <input value={deckName} onChange={(event) => setDeckName(event.target.value)} disabled={!canEditDeck} placeholder="未入力なら「無題のデッキ」" />
-                </label>
-                <label>
-                  ルミナイズ（任意）
-                  <input
-                    value={luminize}
-                    onChange={(event) => setLuminize(event.target.value)}
-                    disabled={!canEditDeck}
-                    maxLength={120}
-                    placeholder="ルミナイズ名を入力"
-                  />
-                </label>
+                <input
+                  aria-label="デッキ名"
+                  value={deckName}
+                  onChange={(event) => setDeckName(event.target.value)}
+                  disabled={!canEditDeck}
+                  placeholder="デッキ名"
+                />
+                <input
+                  aria-label="ルミナイズ（任意）"
+                  value={luminize}
+                  onChange={(event) => setLuminize(event.target.value)}
+                  disabled={!canEditDeck}
+                  maxLength={120}
+                  placeholder="ルミナイズ（任意）"
+                />
 
                 <div className="dm-deck-linked-card-strip">
                   <button
@@ -1250,54 +1308,68 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </button>
                 </div>
 
-                <div className="dm-deck-key-card-setting">
-                  <span>キーカード（任意）</span>
-                  <div className="dm-deck-key-card-slot">
-                    <button
-                      type="button"
-                      className="dm-deck-linked-card is-mini dm-deck-key-drop-target"
-                      title={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "デッキ内カードをドロップしてキーカードに設定"}
-                      aria-label={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "キーカードのドロップ先"}
-                      disabled={!canEditDeck}
-                      onClick={() => setKeyCardPickerOpen(true)}
-                      onDragOver={(event) => {
-                        if (!canEditDeck || !event.dataTransfer.types.includes(DECK_CARD_DRAG_TYPE)) return;
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = "move";
-                      }}
-                      onDrop={(event) => {
-                        const cardId = event.dataTransfer.getData(DECK_CARD_DRAG_TYPE);
-                        if (!canEditDeck || !cardId) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setAsKeyCard(cardId);
-                        setDraggedDeckCardId(null);
-                      }}
-                    >
-                      {selectedKeyCard ? (
-                        <CardViewer
-                          card={selectedKeyCard}
-                          images={imagesByCard.get(selectedKeyCard.id) ?? []}
-                          selectedImageId={getImageSelectValue(selectedKeyCard.id) || null}
-                          variant="compact"
-                        />
-                      ) : (
-                        <span>キーカードを選択</span>
-                      )}
-                    </button>
-                    {selectedKeyCard && (
+                <div className="dm-deck-key-card-row">
+                  <div className="dm-deck-key-card-setting">
+                    <div className="dm-deck-key-card-slot">
                       <button
                         type="button"
-                        className="dm-deck-key-card-clear"
-                        aria-label="キーカードを解除"
-                        title="キーカードを解除"
+                        className="dm-deck-linked-card is-mini dm-deck-key-drop-target"
+                        title={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "デッキ内カードをドロップしてキーカードに設定"}
+                        aria-label={selectedKeyCard ? `キーカード: ${selectedKeyCard.name}` : "キーカードのドロップ先"}
                         disabled={!canEditDeck}
-                        onClick={() => setSelectedKeyCardId("")}
+                        onClick={() => setKeyCardPickerOpen(true)}
+                        onDragOver={(event) => {
+                          if (!canEditDeck || !event.dataTransfer.types.includes(DECK_CARD_DRAG_TYPE)) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          const cardId = event.dataTransfer.getData(DECK_CARD_DRAG_TYPE);
+                          if (!canEditDeck || !cardId) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setAsKeyCard(cardId);
+                          setDraggedDeckCardId(null);
+                        }}
                       >
-                        ×
+                        {selectedKeyCard ? (
+                          <CardViewer
+                            card={selectedKeyCard}
+                            images={imagesByCard.get(selectedKeyCard.id) ?? []}
+                            selectedImageId={getImageSelectValue(selectedKeyCard.id) || null}
+                            variant="compact"
+                          />
+                        ) : (
+                          <span className="dm-deck-key-card-placeholder">
+                            <span>キーカード</span>
+                            <span>（任意）</span>
+                          </span>
+                        )}
                       </button>
-                    )}
+                      {selectedKeyCard && (
+                        <button
+                          type="button"
+                          className="dm-deck-key-card-clear"
+                          aria-label="キーカードを解除"
+                          title="キーカードを解除"
+                          disabled={!canEditDeck}
+                          onClick={() => setSelectedKeyCardId("")}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  <textarea
+                    className="dm-deck-keyword-input"
+                    aria-label="キーワード（任意）"
+                    placeholder="キーワード（任意）"
+                    value={keyword}
+                    onChange={(event) => setKeyword(event.target.value)}
+                    disabled={!canEditDeck}
+                    rows={4}
+                  />
                 </div>
 
                 <button
@@ -1359,7 +1431,20 @@ export default function DeckDetailPage({ params }: DeckDetailPageProps) {
                 >
                   {!canEditDeck ? "閲覧中" : hasUnsavedChanges ? "デッキを保存" : "保存済み"}
                 </Button>
-                <BackButton fallbackHref="/decks" fullWidth />
+                {discardOnBack || isNewDeckDraft ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={discardingDraft}
+                    disabled={savingDeck}
+                    fullWidth
+                    onClick={() => void handleEditorBack()}
+                  >
+                    戻る
+                  </Button>
+                ) : (
+                  <BackButton fallbackHref="/decks" fullWidth />
+                )}
               </form>
             </AppCard>
           </aside>

@@ -11,6 +11,7 @@ const DECK_SELECT_COLUMNS = [
   "owner_id",
   "name",
   "luminize",
+  "keyword",
   "flag_id",
   "buddy_card_id",
   "key_card_id",
@@ -32,7 +33,7 @@ const DECK_SELECT_COLUMN_VARIANTS = [
   ["luminize", "selected_buddy_image_id"],
   ["key_card_id", "selected_buddy_image_id"],
   ["luminize", "key_card_id", "selected_buddy_image_id"]
-].map((excluded) =>
+].flatMap((excluded) => [excluded, [...excluded, "keyword"]]).map((excluded) =>
   DECK_SELECT_COLUMNS.split(",")
     .filter((column) => !excluded.includes(column))
     .join(",")
@@ -139,7 +140,7 @@ function isMissingColumnError(error: { code?: string; message: string }, columnN
 }
 
 function canRetryDeckSelect(error: { message: string }) {
-  return ["luminize", "key_card_id", "selected_buddy_image_id"].some((column) =>
+  return ["luminize", "keyword", "key_card_id", "selected_buddy_image_id"].some((column) =>
     error.message.includes(column)
   );
 }
@@ -511,6 +512,7 @@ export async function updateDeckSettings(input: {
   deckId: string;
   name: string;
   luminize: string | null;
+  keyword: string | null;
   flagId: string | null;
   buddyCardId: string | null;
   keyCardId: string | null;
@@ -523,6 +525,7 @@ export async function updateDeckSettings(input: {
 }) {
   const baseUpdate = {
     name: input.name,
+    keyword: input.keyword,
     flag_id: input.flagId,
     buddy_card_id: input.buddyCardId,
     key_card_id: input.keyCardId,
@@ -544,7 +547,7 @@ export async function updateDeckSettings(input: {
     .select("*")
     .single<DeckRecord>();
 
-  if (result.error?.message.includes("luminize")) return result;
+  if (result.error?.message.includes("luminize") || result.error?.message.includes("keyword")) return result;
 
   if (
     !result.error ||
@@ -630,6 +633,7 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
 
   const insertPayload = {
     ...baseInsert,
+    ...(sourceDeck.keyword != null ? { keyword: sourceDeck.keyword } : {}),
     luminize: sourceDeck.luminize ?? null,
     selected_buddy_image_id: sourceDeck.selected_buddy_image_id ?? null,
     key_card_id: sourceDeck.key_card_id ?? null,
@@ -642,7 +646,7 @@ export async function copyDeck(input: { sourceDeckId: string; name?: string }) {
     .select("id")
     .single<{ id: string }>();
 
-  const canUseLegacyInsert = Boolean(insertWithBuddyImage.error && !insertWithBuddyImage.error.message.includes("luminize") && !sourceDeck.key_card_id && (
+  const canUseLegacyInsert = Boolean(insertWithBuddyImage.error && !insertWithBuddyImage.error.message.includes("luminize") && !insertWithBuddyImage.error.message.includes("keyword") && !sourceDeck.keyword && !sourceDeck.key_card_id && (
       isMissingColumnError(insertWithBuddyImage.error, "selected_buddy_image_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "key_card_id") ||
       isMissingColumnError(insertWithBuddyImage.error, "sleeve_supply_id") ||
@@ -710,7 +714,12 @@ export async function setDeckCard(input: {
 }
 
 export async function deleteDeck(deckId: string) {
-  const result = await supabase.from("decks").delete().eq("id", deckId);
+  const result = await supabase
+    .from("decks")
+    .delete()
+    .eq("id", deckId)
+    .select("id")
+    .maybeSingle();
   if (!result.error) {
     clearDeckCaches();
   }

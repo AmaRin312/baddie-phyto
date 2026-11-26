@@ -9,8 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // The callback page exchanges the PKCE code explicitly. Disable the SDK's
-    // URL auto-detection so the same one-time code cannot be exchanged twice.
-    detectSessionInUrl: false
+    // Let Supabase handle both PKCE codes and implicit-flow tokens returned by
+    // OAuth providers before the callback page checks for an active session.
+    detectSessionInUrl: true
   }
 });

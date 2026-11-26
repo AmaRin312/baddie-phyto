@@ -2715,6 +2715,7 @@ export function BattleController() {
     if (
       dragSelection.instanceIds.length > 1 &&
       !dragSelection.sourceCard.meta.compositeId &&
+      dragSelection.sourceCard.zoneId !== "deck" &&
       isAreaStackZone(toZone)
     ) {
       setDragSelection(null);

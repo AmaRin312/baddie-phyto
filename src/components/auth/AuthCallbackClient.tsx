@@ -9,14 +9,14 @@ async function wait(ms: number) {
 }
 
 async function waitForSessionReady() {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data: sessionData } = await supabase.auth.getSession();
     if (sessionData.session) return true;
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (!userError && userData.user) return true;
 
-    if (attempt < 9) {
+    if (attempt < 19) {
       await wait(250);
     }
   }

@@ -3,6 +3,8 @@ import { invalidateDeckListCache } from "@/lib/decks/deckActions";
 import { CARD_CSV_OFFICIAL_WORLDS } from "@/lib/cards/import/cardCsvSchema";
 import type { CardRecord, CardType } from "@/types/baddiePhyto";
 
+export const DECK_ERA_FILTER_STORAGE_KEY = "baddie-phyto:deck-list-era-filter";
+
 const WORLD_ORDER = new Map(
   CARD_CSV_OFFICIAL_WORLDS.map((world, index) => [world.replace(/ワールド$/u, ""), index])
 );

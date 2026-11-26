@@ -217,7 +217,7 @@ function BattleZoneComponent({
               targetPlayerId: playerId
             }))) ||
       (draggedCard != null &&
-        (draggedInstanceCount > 1
+        (draggedInstanceCount > 1 && draggedCard.zoneId !== "deck"
           ? canDropMultipleCards({
               card: draggedCard,
               toZone: zoneId,

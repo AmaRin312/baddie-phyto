@@ -16,6 +16,7 @@ import type { BattlePlayerSeat } from "@/lib/battle/battlePlayerStateSync";
 import { loadCardsByIds } from "@/lib/cards/cardActions";
 import { loadHyakuganCompositeCardIds } from "@/lib/cards/cardAbilityActions";
 import { loadDeckCards, loadDecks } from "@/lib/decks/deckActions";
+import { CARD_CSV_OFFICIAL_WORLDS } from "@/lib/cards/import/cardCsvSchema";
 import { loadFlagsLite } from "@/lib/flags/flagActions";
 import { loadCardImagesByCardIds } from "@/lib/storage/cardImageStorage";
 import {
@@ -45,7 +46,27 @@ function createSoloRoomId(deckId: string) {
   return `solo-${deckId}`;
 }
 
-const DECKS_PER_PAGE = 21;
+const DECKS_PER_PAGE = 30;
+
+function sortBattleFlags(flags: readonly FlagRecord[]) {
+  const worldPriority = new Map(
+    [...CARD_CSV_OFFICIAL_WORLDS].reverse().map((world, index) => [world as string, index])
+  );
+  return flags
+    .map((flag, index) => ({ flag, index }))
+    .sort((left, right) => {
+      const specialPriority = (flag: FlagRecord) =>
+        flag.name?.includes("百鬼夜行") ? 2 : flag.name?.includes("ドラゴン・アイン") ? 1 : 0;
+      const specialDifference = specialPriority(left.flag) - specialPriority(right.flag);
+      if (specialDifference) return specialDifference;
+      const getPriority = (flag: FlagRecord) => Math.min(
+        ...flag.usable_worlds.map((world) => worldPriority.get(world) ?? Number.MAX_SAFE_INTEGER),
+        Number.MAX_SAFE_INTEGER
+      );
+      return getPriority(left.flag) - getPriority(right.flag) || left.index - right.index;
+    })
+    .map(({ flag }) => flag);
+}
 
 function isHyakuganBuddyCard(card: CardRecord | null | undefined) {
   return card?.name.normalize("NFKC").replace(/[\s・･]/gu, "").includes("ヒャクガンヤミゲドウ") ?? false;
@@ -561,6 +582,8 @@ export function BattleStartPanel() {
               title="一人回し"
               description="使用するデッキを選択してください。"
             >
+          <div className="dm-solo-deck-selection">
+          <div className="dm-solo-deck-conditions">
           <div className="dm-deck-search-filters">
             <label className="dm-form-label dm-deck-search-filter-row">
               <span>デッキ区分</span>
@@ -582,7 +605,7 @@ export function BattleStartPanel() {
               <span>フラッグ</span>
               <select className="dm-input" value={deckFlagFilter} onChange={(event) => { setDeckFlagFilter(event.target.value); setSoloDeckPage(0); }}>
                 <option value="">すべて</option>
-                {flags.map((flag) => (
+                {sortBattleFlags(flags).map((flag) => (
                   <option key={flag.id} value={flag.id}>
                     {flag.name ?? "名称未設定"}
                     {flag.usable_worlds.length === 0 ? "（ワールド指定なし）" : ""}
@@ -591,27 +614,26 @@ export function BattleStartPanel() {
               </select>
             </label>
           </div>
-          <label className="dm-form-label" htmlFor="battle-solo-deck">
-            使用デッキ
-          </label>
-          <select
-            id="battle-solo-deck"
-            className="dm-input"
-            value={effectiveSelectedDeckId}
-            onChange={(event) => setSelectedDeckId(event.target.value)}
-          >
-            <option value="">デッキを選択してください</option>
-            {filteredDecks.map((deck) => (
-              <option key={deck.id} value={deck.id}>
-                {deck.name}
-              </option>
-            ))}
-          </select>
-
+            <p className="dm-muted-text">下のデッキ一覧から使用するデッキを選択してください。</p>
+            <button
+              type="button"
+              className="dm-button secondary"
+              onClick={() => startSolo()}
+            >
+              デッキを選ばずに一人回し
+            </button>
+          </div>
+          <div className="dm-solo-deck-selected" aria-live="polite" aria-atomic="true">
           {selectedDeck ? (
             <>
-              <h3>{selectedDeck.name}</h3>
-              {renderDeckSummary(selectedDeck)}
+              <div className="dm-solo-deck-selected-summary">
+                {renderDeckSummary(selectedDeck)}
+                <div className="dm-solo-deck-selected-text">
+                  <span className="dm-muted-text">選択中のデッキ</span>
+                  <h3>{selectedDeck.name}</h3>
+                  {selectedDeck.luminize && <p>{selectedDeck.luminize}</p>}
+                </div>
+              </div>
               <button
                 type="button"
                 className="dm-button primary"
@@ -625,26 +647,12 @@ export function BattleStartPanel() {
                   対戦開始にはフラッグとバディが必要です。
                 </p>
               )}
-              <button
-                type="button"
-                className="dm-button secondary"
-                onClick={() => startSolo()}
-              >
-                デッキを選ばずに一人回し
-              </button>
             </>
           ) : (
-            <>
-              <p className="dm-muted-text">条件に合うデッキがありません。</p>
-              <button
-                type="button"
-                className="dm-button primary"
-                onClick={() => startSolo()}
-              >
-                デッキを選ばずに一人回し
-              </button>
-            </>
+            <p className="dm-muted-text">デッキが選択されていません。</p>
           )}
+          </div>
+          </div>
             </AppCard>
           )}
         </>
