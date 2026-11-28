@@ -265,6 +265,7 @@ export default function DecksPage() {
     if (!currentUserId || !eraFilterReady) return;
     let cancelled = false;
     if (!loading) setLoadingPageAssets(true);
+    lastDeckRefreshAt.current = Date.now();
     void loadDeckListPages({
       ownerId: currentUserId,
       pages: {
@@ -279,7 +280,7 @@ export default function DecksPage() {
       if (cancelled) return;
       if (pageResult.error || !pageResult.data) {
         console.error(pageResult.error);
-        setMessage("デッキ一覧の読み込みに失敗しました。商品表示条件のSQL適用状況を確認してください。");
+        setMessage("デッキ一覧を読み込めませんでした。データベースへの接続が一時的に不安定な可能性があります。時間をおいて再試行してください。");
         setLoadingPageAssets(false);
         return;
       }
@@ -311,7 +312,7 @@ export default function DecksPage() {
     }).catch((error) => {
       console.error(error);
       if (!cancelled) {
-        setMessage("デッキ一覧の読み込みに失敗しました。");
+        setMessage("デッキ一覧を読み込めませんでした。データベースへの接続が一時的に不安定な可能性があります。時間をおいて再試行してください。");
         setLoadingPageAssets(false);
       }
     }).finally(() => {
@@ -739,7 +740,22 @@ export default function DecksPage() {
         </select>
       </div>
 
-      {message && <p className="dm-form-message">{message}</p>}
+      {message && (
+        <div className="dm-form-message" role="status">
+          <p>{message}</p>
+          {!loading && message.startsWith("デッキ一覧を読み込めませんでした") && (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage("");
+                setPageRefreshKey((value) => value + 1);
+              }}
+            >
+              デッキ一覧を再読み込み
+            </button>
+          )}
+        </div>
+      )}
       {loading ? (
         <AppCard title="読み込み中" description="デッキを読み込んでいます。" />
       ) : (

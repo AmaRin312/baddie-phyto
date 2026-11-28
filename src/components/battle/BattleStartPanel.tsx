@@ -268,6 +268,8 @@ export function BattleStartPanel() {
         setDecks(nextDecks);
         setFlags(nextFlags);
         setHyakuganCompositeCardIds(hyakuganIds);
+        // Let the deck choices render before optional preview metadata finishes.
+        setLoading(false);
         void loadProfileNicknamesByIds(
           nextDecks
             .filter((deck) => deck.deck_visibility === "public" || deck.deck_visibility === "default")
