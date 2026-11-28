@@ -7,6 +7,8 @@ import {
 } from "@/lib/siteUpdates";
 
 const DISMISSED_ANNOUNCEMENT_KEY = "site-update-dismissed-id";
+const ANNOUNCEMENT_POLL_INTERVAL_MS = 5 * 60_000;
+const ANNOUNCEMENT_FOCUS_DEBOUNCE_MS = 30_000;
 
 export function SiteUpdateNotice() {
   const [announcement, setAnnouncement] = useState<{
@@ -17,9 +19,15 @@ export function SiteUpdateNotice() {
   useEffect(() => {
     let active = true;
     let checking = false;
+    let lastCheckedAt = 0;
     async function checkForAnnouncement() {
-      if (checking || document.visibilityState === "hidden") return;
+      if (
+        checking ||
+        document.visibilityState === "hidden" ||
+        Date.now() - lastCheckedAt < ANNOUNCEMENT_FOCUS_DEBOUNCE_MS
+      ) return;
       checking = true;
+      lastCheckedAt = Date.now();
       try {
         const { data, error } = await loadSiteUpdateAnnouncement();
         if (!active || error) return;
@@ -42,7 +50,10 @@ export function SiteUpdateNotice() {
     }
 
     void checkForAnnouncement();
-    const timer = window.setInterval(() => void checkForAnnouncement(), 60_000);
+    const timer = window.setInterval(
+      () => void checkForAnnouncement(),
+      ANNOUNCEMENT_POLL_INTERVAL_MS
+    );
     window.addEventListener("focus", checkForAnnouncement);
     document.addEventListener("visibilitychange", checkForAnnouncement);
     return () => {
