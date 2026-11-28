@@ -13,21 +13,43 @@ import { supabase } from "@/lib/supabase/client";
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
 
   useEffect(() => {
-    async function loadProfile() {
-      const nextProfile = await getOrCreateProfile();
-
-      if (!nextProfile) {
-        window.location.href = "/login";
-        return;
-      }
-
-      setProfile(nextProfile);
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      if (!active) return;
       setLoading(false);
+      setProfileLoadError(true);
+    }, 12_000);
+
+    async function loadProfile() {
+      try {
+        const nextProfile = await getOrCreateProfile();
+        if (!active) return;
+
+        if (!nextProfile) {
+          window.location.href = "/login";
+          return;
+        }
+
+        setProfile(nextProfile);
+        setProfileLoadError(false);
+      } catch (error) {
+        console.error("Profile page could not load the current profile.", error);
+        if (active) setProfileLoadError(true);
+      } finally {
+        window.clearTimeout(timeout);
+        if (active) setLoading(false);
+      }
     }
 
     void loadProfile();
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   async function handleLogout() {
@@ -52,6 +74,13 @@ export default function ProfilePage() {
           <p className="dm-muted-text">読み込み中...</p>
         ) : profile ? (
           <ProfileForm profile={profile} />
+        ) : profileLoadError ? (
+          <div>
+            <p className="dm-form-message">プロフィールの読み込みが完了しませんでした。通信を確認して再読み込みしてください。</p>
+            <button className="dm-button secondary" type="button" onClick={() => window.location.reload()}>
+              再読み込み
+            </button>
+          </div>
         ) : null}
       </AppCard>
 

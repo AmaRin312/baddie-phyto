@@ -43,6 +43,8 @@ export function ShortcutSettingsPanel() {
   const [duplicateConfirmation, setDuplicateConfirmation] =
     useState<DuplicateConfirmation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -62,17 +64,44 @@ export function ShortcutSettingsPanel() {
   );
 
   useEffect(() => {
-    async function load() {
-      const result = await loadShortcutSettings();
-      setSettings(result.data);
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      if (!active) return;
       setLoading(false);
-      if (result.error) {
-        setMessage("ショートカット設定の読み込みに失敗したため、デフォルトを使用しています。");
+      setLoadError(true);
+      setMessage("読み込みがタイムアウトしました。設定は変更せず、再試行してください。");
+    }, 12_000);
+
+    async function load() {
+      try {
+        const result = await loadShortcutSettings();
+        if (!active) return;
+        if (result.error) {
+          setLoadError(true);
+          setMessage("ショートカット設定を読み込めませんでした。設定は変更せず、再試行してください。");
+          return;
+        }
+        setSettings(result.data);
+        setLoadError(false);
+        setMessage("");
+      } catch (error) {
+        console.error("Shortcut settings could not be loaded.", error);
+        if (!active) return;
+        setLoadError(true);
+        setMessage("ショートカット設定を読み込めませんでした。設定は変更せず、再試行してください。");
+      } finally {
+        window.clearTimeout(timeout);
+        if (active) setLoading(false);
       }
     }
 
     void load();
-  }, []);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [loadAttempt]);
 
   useEffect(() => {
     if (!pendingBinding) return;
@@ -158,6 +187,25 @@ export function ShortcutSettingsPanel() {
 
   if (loading) {
     return <p className="dm-muted-text">ショートカット設定を読み込み中...</p>;
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <p className="dm-form-message">{message}</p>
+        <button
+          className="dm-button secondary"
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setMessage("");
+            setLoadAttempt((attempt) => attempt + 1);
+          }}
+        >
+          再試行
+        </button>
+      </div>
+    );
   }
 
   return (
