@@ -486,6 +486,7 @@ export function BattleController() {
     player1: 0,
     player2: 0
   });
+  const blockedSaveSeatsRef = useRef(new Set<BattlePlayerSeat>());
 
   function mergePlayerStates(
     state: BattleState,
@@ -550,6 +551,13 @@ export function BattleController() {
     playerVersionsRef.current = {
       ...playerVersionsRef.current,
       [seatKey]: Math.max(playerVersionsRef.current[seatKey] ?? 0, version)
+    };
+  }
+
+  function replacePlayerVersion(seatKey: BattlePlayerSeat, version: number) {
+    playerVersionsRef.current = {
+      ...playerVersionsRef.current,
+      [seatKey]: version
     };
   }
 
@@ -1519,6 +1527,7 @@ export function BattleController() {
 
     if (!roomId || !selfSeat) return;
     if (!hasSelfPlayerStateChanged(previousState, nextState)) return;
+    if (blockedSaveSeatsRef.current.has(selfSeat)) return;
 
     setSavingSeatKeys((current) => Array.from(new Set([...current, selfSeat])));
     setSyncMessage("");
@@ -1538,10 +1547,20 @@ export function BattleController() {
         setSyncMessage(
           `${selfSeat}側の同期保存に失敗しました。再読み込みまたは再操作で再試行できます。`
         );
+        if (!result.versionConflict) {
+          return;
+        }
+
         const latest = await loadSyncedPlayerBattleStates(roomId);
+        if (latest.error) {
+          return;
+        }
+
         const latestSeat = latest.data[selfSeat];
         if (latestSeat) {
           rememberPlayerVersion(selfSeat, latestSeat.version);
+          setRealtimeStatus("connected");
+          setSyncMessage("");
           setBattleState((current) =>
             current
               ? mergePlayerStates(current, {
@@ -1549,6 +1568,45 @@ export function BattleController() {
                 })
               : current
           );
+          return;
+        }
+
+        const roomResult = await loadBattleRoom(roomId);
+        const expectedOwnerId = currentUserIdRef.current;
+        const currentSeatOwner = roomResult.data
+          ? selfSeat === "player1"
+            ? roomResult.data.host_user_id
+            : roomResult.data.guest_user_id
+          : null;
+        if (
+          roomResult.error ||
+          !roomResult.data
+        ) {
+          return;
+        }
+        if (
+          roomResult.data.status === "disbanded" ||
+          !expectedOwnerId ||
+          currentSeatOwner !== expectedOwnerId
+        ) {
+          blockedSaveSeatsRef.current.add(selfSeat);
+          setSyncMessage("対戦席の状態が終了しています。ルーム一覧から入り直してください。");
+          return;
+        }
+
+        replacePlayerVersion(selfSeat, 0);
+        const recreated = await saveSyncedPlayerBattleState({
+          roomId,
+          seatKey: selfSeat,
+          state: nextState.players.self,
+          expectedVersion: 0
+        });
+        if (recreated.data) {
+          rememberPlayerVersion(selfSeat, recreated.data.version);
+          setRealtimeStatus("connected");
+          setSyncMessage("");
+        } else {
+          setSyncMessage("盤面の同期を復旧できませんでした。操作を止めて再読み込みしてください。");
         }
         return;
       }

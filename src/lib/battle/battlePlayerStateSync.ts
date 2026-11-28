@@ -138,7 +138,11 @@ export async function saveSyncedPlayerBattleState(input: {
   seatKey: BattlePlayerSeat;
   state: PlayerState;
   expectedVersion: number;
-}): Promise<{ data: { version: number } | null; error: string | null }> {
+}): Promise<{
+  data: { version: number } | null;
+  error: string | null;
+  versionConflict: boolean;
+}> {
   const measurement = startBattleSaveMeasurement(
     `battle_player_states:${input.seatKey}`,
     input.state
@@ -156,9 +160,13 @@ export async function saveSyncedPlayerBattleState(input: {
   }
 
   if (error) {
-    console.error(error);
+    if (error.code !== "40001") console.error(error);
     finishBattleSaveMeasurement(measurement, true, data);
-    return { data: null, error: error.message };
+    return {
+      data: null,
+      error: error.message,
+      versionConflict: error.code === "40001"
+    };
   }
 
   finishBattleSaveMeasurement(measurement, false, data);
@@ -166,7 +174,8 @@ export async function saveSyncedPlayerBattleState(input: {
   const version = result?.[0]?.version;
   return {
     data: typeof version === "number" ? { version } : null,
-    error: typeof version === "number" ? null : "保存結果からバージョンを取得できませんでした。"
+    error: typeof version === "number" ? null : "保存結果からバージョンを取得できませんでした。",
+    versionConflict: false
   };
 }
 
