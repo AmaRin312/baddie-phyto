@@ -5,7 +5,7 @@ import type { CardImageRecord, CardRecord } from "@/types/baddiePhyto";
 const EMPTY_IMAGES: readonly CardImageRecord[] = [];
 
 type BoardCardProps = {
-  card: CardRecord;
+  card: CardRecord | null;
   images?: readonly CardImageRecord[];
   selectedImageId?: string | null;
   isPublic?: boolean;
@@ -24,6 +24,21 @@ export const BoardCard = memo(function BoardCard({
   forcePortraitZoomPercent,
   preserveOrientation = false
 }: BoardCardProps) {
+  if (!card) {
+    return (
+      <div className="bp-board-card" aria-label={isPublic ? "カードを読み込み中" : "裏向きカード"}>
+        {!isPublic && sleeveImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={sleeveImageUrl} alt="裏向きカード" draggable={false} />
+        ) : (
+          <div className={`bp-board-card-fallback${isPublic ? " is-loading" : ""}`}>
+            {isPublic ? "読み込み中" : "BF"}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bp-board-card">
       <CardViewer

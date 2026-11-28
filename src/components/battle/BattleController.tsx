@@ -33,15 +33,12 @@ import {
 } from "@/lib/battle/textCommands";
 import {
   cleanupExpiredBattleRooms,
-  deleteBattleRoom,
-  disbandBattleRoom,
   leaveBattleRoomOnPageExit,
+  leaveBattleRoom,
   loadBattleRoom,
   markBattleRoomActivity,
-  PREALLOCATED_BATTLE_ROOMS,
   leaveBattleRoomBeforeDeckSelection,
   touchBattleRoom,
-  releaseBattleRoom,
   updateBattleRoomDeck
 } from "@/lib/battle/battleRooms";
 import {
@@ -375,6 +372,7 @@ export function BattleController() {
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [images, setImages] = useState<CardImageRecord[]>([]);
   const requestedImageCardIdsRef = useRef(new Set<string>());
+  const requestedCardRecordIdsRef = useRef(new Set<string>());
   const [battleSupplies, setBattleSupplies] = useState<BattleSupplyRecord[]>([]);
   const [siteSupplySettings, setSiteSupplySettings] =
     useState<SiteSupplySettingsRecord | null>(null);
@@ -1106,6 +1104,40 @@ export function BattleController() {
     [cards]
   );
 
+  useEffect(() => {
+    const missingCardIds = [...battleCardLookup.visibleImageCardIds].filter(
+      (cardId) =>
+        !cardMap.has(cardId) &&
+        !requestedCardRecordIdsRef.current.has(cardId)
+    );
+    if (missingCardIds.length === 0) return;
+
+    missingCardIds.forEach((cardId) =>
+      requestedCardRecordIdsRef.current.add(cardId)
+    );
+    void loadCardsByIds(missingCardIds).then((result) => {
+      if (result.error) {
+        missingCardIds.forEach((cardId) =>
+          requestedCardRecordIdsRef.current.delete(cardId)
+        );
+        console.warn("Visible battle card records could not be loaded.", result.error);
+        return;
+      }
+
+      if (!result.data?.length) return;
+      setCards((current) => {
+        const existingIds = new Set(current.map((card) => card.id));
+        const newCards = result.data!.filter((card) => !existingIds.has(card.id));
+        return newCards.length > 0 ? [...current, ...newCards] : current;
+      });
+    }).catch((error: unknown) => {
+      missingCardIds.forEach((cardId) =>
+        requestedCardRecordIdsRef.current.delete(cardId)
+      );
+      console.warn("Visible battle card records could not be loaded.", error);
+    });
+  }, [battleCardLookup, cardMap]);
+
   const imagesByCardRef = useRef(new Map<string, CardImageRecord[]>());
   const imagesByCard = useMemo(() => {
     const map = new Map<string, CardImageRecord[]>();
@@ -1689,32 +1721,29 @@ export function BattleController() {
     );
     if (!confirmed) return;
 
-    const deleteTask =
-      isRealtimeBattle && selfSeat
-        ? (!opponentPresent || PREALLOCATED_BATTLE_ROOMS.some((room) => room.roomId === roomId)
-            ? Promise.all([
-                PREALLOCATED_BATTLE_ROOMS.some((room) => room.roomId === roomId)
-                  ? releaseBattleRoom(roomId)
-                  : deleteBattleRoom(roomId),
-                deleteBattleState(roomId),
-                deleteSyncedPlayerBattleStates(roomId)
-              ])
-            : Promise.all([
-                disbandBattleRoom(roomId),
-                deleteSyncedPlayerBattleState({ roomId, seatKey: selfSeat })
-              ]))
-        : Promise.all([
-            deleteBattleState(roomId),
-            deleteSyncedPlayerBattleStates(roomId)
-          ]);
-
     try {
-      const results = await deleteTask;
-      const error = results.find((result) => result.error)?.error;
-      if (error) {
-        console.error(error);
-        window.alert(`退出処理に失敗しました。対戦部屋はまだ使用中の可能性があります。\n${error}`);
-        return;
+      if (isRealtimeBattle) {
+        if (!selfSeat) {
+          window.alert("退出する参加席を確認できませんでした。対戦画面を再読み込みしてください。");
+          return;
+        }
+
+        const result = await leaveBattleRoom(roomId, selfSeat);
+        if (result.error) {
+          window.alert(`退出処理に失敗しました。対戦部屋はまだ使用中の可能性があります。\n${result.error}`);
+          return;
+        }
+      } else {
+        const results = await Promise.all([
+          deleteBattleState(roomId),
+          deleteSyncedPlayerBattleStates(roomId)
+        ]);
+        const error = results.find((result) => result.error)?.error;
+        if (error) {
+          console.error(error);
+          window.alert(`退出処理に失敗しました。\n${error}`);
+          return;
+        }
       }
 
       void cleanupExpiredBattleRooms();

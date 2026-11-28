@@ -47,6 +47,26 @@ export async function cleanupExpiredBattleRooms() {
   return { error };
 }
 
+export async function leaveBattleRoom(
+  roomId: string,
+  seat: BattlePlayerSeat
+) {
+  const { data, error } = await supabase.rpc("leave_battle_room", {
+    p_room_id: roomId,
+    p_seat_key: seat
+  });
+
+  if (error) {
+    console.error("Battle room leave request failed.", error);
+    return { error: error.message };
+  }
+  if (data !== true) {
+    return { error: "このルームの参加席を確認できませんでした。再読み込みしてからお試しください。" };
+  }
+
+  return { error: null };
+}
+
 export async function loadActiveBattleRooms() {
   await cleanupExpiredBattleRooms();
 
@@ -280,46 +300,7 @@ export async function leaveBattleRoomBeforeDeckSelection(
   roomId: string,
   seat: BattlePlayerSeat
 ) {
-  const userId = await getCurrentUserId();
-  if (!userId) return { error: "ログインが必要です。" };
-
-  if (seat === "player2") {
-    const { data, error } = await supabase
-      .from("battle_rooms")
-      .update({
-        status: "waiting",
-        guest_user_id: null,
-        guest_deck_id: null,
-        guest_last_seen_at: null,
-        guest_last_activity_at: null
-      })
-      .eq("room_id", roomId)
-      .eq("guest_user_id", userId)
-      .eq("status", "playing")
-      .select("room_id")
-      .maybeSingle<{ room_id: string }>();
-
-    if (error || !data) {
-      console.error(error);
-      return { error: error?.message ?? "退出する席を確認できませんでした。ルームを再読み込みしてください。" };
-    }
-    return { error: null };
-  }
-
-  const { data: room, error: loadError } = await supabase
-    .from("battle_rooms")
-    .select("guest_user_id")
-    .eq("room_id", roomId)
-    .eq("host_user_id", userId)
-    .maybeSingle<{ guest_user_id: string | null }>();
-  if (loadError || !room) {
-    return { error: loadError?.message ?? "ルームの席を確認できませんでした。" };
-  }
-
-  if (room.guest_user_id) {
-    return releaseBattleRoom(roomId);
-  }
-  return releaseBattleRoom(roomId);
+  return leaveBattleRoom(roomId, seat);
 }
 
 export async function disbandBattleRoom(roomId: string) {

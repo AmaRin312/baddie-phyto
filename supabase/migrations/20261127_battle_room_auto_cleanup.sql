@@ -219,8 +219,6 @@ revoke all on function public.cleanup_expired_battle_rooms() from public;
 grant execute on function public.cleanup_expired_battle_rooms() to authenticated;
 
 create extension if not exists pg_cron with schema pg_catalog;
-grant usage on schema cron to postgres;
-grant all privileges on all tables in schema cron to postgres;
 select cron.schedule(
   'cleanup-expired-battle-rooms',
   '* * * * *',

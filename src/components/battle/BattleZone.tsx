@@ -100,8 +100,9 @@ function areBattleZonePropsEqual(previous: BattleZoneProps, next: BattleZoneProp
   return true;
 }
 
-function shouldShowFace(card: BattleCard) {
-  return card.visibility !== "face_down";
+function shouldShowFace(card: BattleCard, playerId: "self" | "opponent") {
+  return card.visibility === "public" ||
+    (card.visibility === "private" && playerId === "self");
 }
 
 function shouldPreserveBattleOrientation(zoneId: BattleZoneId) {
@@ -533,7 +534,7 @@ function BattleZoneComponent({
                   card={card}
                   images={imagesByCard.get(card.id) ?? []}
                   selectedImageId={battleCard.selectedImageId}
-                  isPublic={shouldShowFace(battleCard)}
+                  isPublic={shouldShowFace(battleCard, playerId)}
                   variant="board"
                   sleeveImageUrl={sleeveImageUrl}
                   preserveOrientation={
@@ -564,10 +565,9 @@ function BattleZoneComponent({
             const areaIsSelected = selectedInstanceIds.has(areaTopCard.instanceId);
             const areaIsDragging =
               draggedSingleCard?.instanceId === areaTopCard.instanceId;
-            if (!areaCardRecord) return null;
             const areaIsRested = isBattleCardRested(areaTopCard);
             const areaIsNativeHorizontal =
-              preserveBattleOrientation && areaCardRecord.orientation === "horizontal";
+              preserveBattleOrientation && areaCardRecord?.orientation === "horizontal";
             const isWideSetCard =
               (areaIsNativeHorizontal && !isHyakuganComposite) || isHyakuganComposite;
             const setSlotIndex = areaStack.areaSlot % setCardsPerColumn;
@@ -687,14 +687,14 @@ function BattleZoneComponent({
                         card={attachedCardRecord}
                         images={imagesByCard.get(attachedCardRecord.id) ?? []}
                         selectedImageId={soulCard.selectedImageId}
-                        isPublic={shouldShowFace(soulCard)}
+                        isPublic={shouldShowFace(soulCard, playerId)}
                         variant="board"
                         sleeveImageUrl={sleeveImageUrl}
                       />
                     </span>
                   );
                 })}
-                {compositeCards.length > 1 ? (
+              {compositeCards.length > 1 && compositeCards.every((card) => cardMap.has(card.cardId)) ? (
                   <BattleCompositeCardView
                     cards={compositeCards}
                     cardMap={cardMap}
@@ -703,10 +703,10 @@ function BattleZoneComponent({
                   />
                 ) : (
                 <BoardCard
-                  card={areaCardRecord}
-                  images={imagesByCard.get(areaCardRecord.id) ?? []}
+                  card={areaCardRecord ?? null}
+                  images={areaCardRecord ? imagesByCard.get(areaCardRecord.id) ?? [] : []}
                   selectedImageId={areaTopCard.selectedImageId}
-                  isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard)}
+                  isPublic={zoneId === "gauge" ? false : shouldShowFace(areaTopCard, playerId)}
                   variant="board"
                   sleeveImageUrl={sleeveImageUrl}
                   preserveOrientation={areaIsNativeHorizontal}
@@ -765,7 +765,6 @@ function BattleZoneComponent({
           {zoneId === "gauge" && cards.length > 0 ? (
             cards.map((gaugeCard, gaugeIndex) => {
               const gaugeCardRecord = cardMap.get(gaugeCard.cardId);
-              if (!gaugeCardRecord) return null;
               const gaugeIsSelected = selectedInstanceIds.has(gaugeCard.instanceId);
               const gaugeIsDragging =
                 draggedSingleCard?.instanceId === gaugeCard.instanceId;
@@ -826,8 +825,8 @@ function BattleZoneComponent({
                   }
                 >
                   <BoardCard
-                    card={gaugeCardRecord}
-                    images={imagesByCard.get(gaugeCardRecord.id) ?? []}
+                    card={gaugeCardRecord ?? null}
+                    images={gaugeCardRecord ? imagesByCard.get(gaugeCardRecord.id) ?? [] : []}
                     selectedImageId={gaugeCard.selectedImageId}
                     isPublic={false}
                     variant="board"
@@ -836,11 +835,11 @@ function BattleZoneComponent({
                 </button>
               );
             })
-          ) : topCard && cardRecord ? (
+          ) : topCard ? (
             (() => {
               const isRested = isBattleCardRested(topCard);
               const isNativeHorizontal =
-                preserveBattleOrientation && cardRecord.orientation === "horizontal";
+                preserveBattleOrientation && cardRecord?.orientation === "horizontal";
 
               return (
             <button
@@ -889,10 +888,10 @@ function BattleZoneComponent({
               }
             >
               <BoardCard
-                card={cardRecord}
-                images={imagesByCard.get(cardRecord.id) ?? []}
+                card={cardRecord ?? null}
+                images={cardRecord ? imagesByCard.get(cardRecord.id) ?? [] : []}
                 selectedImageId={topCard.selectedImageId}
-                isPublic={zoneId === "gauge" ? false : shouldShowFace(topCard)}
+                isPublic={zoneId === "gauge" ? false : shouldShowFace(topCard, playerId)}
                 variant="board"
                 sleeveImageUrl={sleeveImageUrl}
                 preserveOrientation={isNativeHorizontal}

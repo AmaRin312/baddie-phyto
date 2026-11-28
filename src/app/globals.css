@@ -2319,6 +2319,22 @@ select {
   font-weight: 900;
 }
 
+.bp-board-card-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #020617, #1e3a8a 55%, #020617);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.bp-board-card-fallback.is-loading {
+  color: #475569;
+  background: #e2e8f0;
+}
+
 .bf-composite-card-view {
   width: 100%;
   height: 100%;
@@ -8449,6 +8465,31 @@ body:has(.bf-battle-app) {
 .dm-admin-update-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dm-site-update-notice button { padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 9px; background: white; cursor: pointer; }
 .dm-site-update-notice button:first-child { color: white; background: #2563eb; }
+
+/* Keep both board halves on the same grid; mirroring alone establishes the
+   opponent's perspective and must not shift the board's zone anchors. */
+.bf-board-half.is-opponent .bf-player-board-wrap {
+  transform: none !important;
+}
+
+/* Gauge cards use the same physical size on both sides. The opponent board's
+   180-degree parent rotation supplies the mirrored orientation. */
+.bf-player-board > .bf-zone-gauge .bf-card-button.is-gauge-card {
+  width: calc(var(--bf-battle-card-w) * 0.72) !important;
+  height: calc(var(--bf-battle-card-h) * 0.72) !important;
+  overflow: visible !important;
+}
+
+.bf-player-board > .bf-zone-gauge,
+.bf-player-board > .bf-zone-gauge > .bf-stack-zone {
+  overflow: visible !important;
+}
+
+/* Preserve landscape card artwork on the mirrored board as well. */
+.bf-player-board.is-mirrored .bf-card-button.is-native-horizontal .bp-board-card,
+.bf-player-board.is-mirrored .bf-card-button.is-native-horizontal .bf-board-card {
+  transform: rotate(180deg);
+}
 
 .dm-deck-key-card-row {
   display: grid;
