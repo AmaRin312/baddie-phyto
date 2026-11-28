@@ -7,7 +7,18 @@ export type Profile = {
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+  isFallback?: boolean;
 };
+
+export function updateCachedProfileNickname(userId: string, nickname: string | null) {
+  if (!cachedProfile || cachedProfile.id !== userId) return;
+  cachedProfile = {
+    ...cachedProfile,
+    nickname,
+    updated_at: new Date().toISOString()
+  };
+  cachedProfileAt = Date.now();
+}
 
 export async function loadProfileNicknamesByIds(profileIds: readonly string[]) {
   const uniqueIds = [...new Set(profileIds.filter(Boolean))];
@@ -85,7 +96,8 @@ export async function getOrCreateProfile(): Promise<Profile | null> {
     nickname: null,
     is_admin: false,
     created_at: user.created_at ?? new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    isFallback: true
   };
 
   const { data, error } = await supabase

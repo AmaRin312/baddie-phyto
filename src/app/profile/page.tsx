@@ -32,6 +32,10 @@ export default function ProfilePage() {
           window.location.href = "/login";
           return;
         }
+        if (nextProfile.isFallback) {
+          setProfileLoadError(true);
+          return;
+        }
 
         setProfile(nextProfile);
         setProfileLoadError(false);
@@ -76,7 +80,7 @@ export default function ProfilePage() {
           <ProfileForm profile={profile} />
         ) : profileLoadError ? (
           <div>
-            <p className="dm-form-message">プロフィールの読み込みが完了しませんでした。通信を確認して再読み込みしてください。</p>
+            <p className="dm-form-message">プロフィールをサーバーから確認できないため、編集欄を開いていません。既存のニックネームは変更していません。通信を確認して再読み込みしてください。</p>
             <button className="dm-button secondary" type="button" onClick={() => window.location.reload()}>
               再読み込み
             </button>
