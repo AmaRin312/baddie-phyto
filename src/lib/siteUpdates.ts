@@ -17,6 +17,7 @@ type CachedAnnouncement = {
 };
 
 let announcementRequest: ReturnType<typeof fetchAnnouncementFromSupabase> | null = null;
+let announcementRetryAt = 0;
 
 function readCachedAnnouncement(): CachedAnnouncement | null {
   if (typeof window === "undefined") return null;
@@ -49,11 +50,15 @@ async function fetchAnnouncementFromSupabase() {
     .eq("id", true)
     .maybeSingle<SiteUpdateAnnouncement>();
   if (!result.error && result.data) cacheAnnouncement(result.data);
+  announcementRetryAt = result.error ? Date.now() + 5 * 60_000 : 0;
   return result;
 }
 
 export async function loadSiteUpdateAnnouncement() {
   const cached = readCachedAnnouncement();
+  if (Date.now() < announcementRetryAt) {
+    return { data: cached?.data ?? null, error: null };
+  }
   if (cached && Date.now() - cached.savedAt < announcementCacheTtlMs) {
     return { data: cached.data, error: null };
   }

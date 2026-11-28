@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { createResilientFetch } from "./resilientFetch";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -8,11 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: {
-    // The app makes many parallel reads. Avoid multiplying requests during a
-    // PostgREST 503/520 incident; callers can show an error and retry on demand.
-    retry: false
-  },
+  global: { fetch: createResilientFetch() },
   auth: {
     // Let Supabase handle both PKCE codes and implicit-flow tokens returned by
     // OAuth providers before the callback page checks for an active session.

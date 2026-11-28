@@ -52,6 +52,13 @@ let cachedProfile: Profile | null = null;
 let cachedProfileAt = 0;
 let inFlightProfilePromise: Promise<Profile | null> | null = null;
 
+supabase.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+    cachedProfile = null;
+    cachedProfileAt = 0;
+  }
+});
+
 async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
