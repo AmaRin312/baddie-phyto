@@ -1103,6 +1103,7 @@ export function BattleController() {
     () => new Map(cards.map((card) => [card.id, card])),
     [cards]
   );
+  const battleCardLookup = useMemo(() => buildBattleCardLookup(battleState), [battleState]);
 
   useEffect(() => {
     const missingCardIds = [...battleCardLookup.visibleImageCardIds].filter(
@@ -1188,7 +1189,6 @@ export function BattleController() {
     [resolvePlayerSupplyImageUrl]
   );
 
-  const battleCardLookup = useMemo(() => buildBattleCardLookup(battleState), [battleState]);
   const activeCard = battleState?.activeViewerCardInstanceId
     ? battleCardLookup.get(battleState.activeViewerCardInstanceId)?.card ?? null
     : null;
