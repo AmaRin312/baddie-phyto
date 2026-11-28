@@ -231,7 +231,7 @@ export function BattleStartPanel() {
     void refreshRooms();
     const refreshOnFocus = () => void refreshRooms();
     window.addEventListener("focus", refreshOnFocus);
-    const intervalId = window.setInterval(refreshOnFocus, 30_000);
+    const intervalId = window.setInterval(refreshOnFocus, 60_000);
     return () => {
       window.removeEventListener("focus", refreshOnFocus);
       window.clearInterval(intervalId);

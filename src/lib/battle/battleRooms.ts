@@ -68,8 +68,6 @@ export async function leaveBattleRoom(
 }
 
 export async function loadActiveBattleRooms() {
-  await cleanupExpiredBattleRooms();
-
   const { data, error } = await supabase
     .from("battle_rooms")
     .select("*")
