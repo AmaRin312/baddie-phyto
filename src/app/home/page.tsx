@@ -9,24 +9,57 @@ import { getOrCreateProfile, type Profile } from "@/lib/auth/getOrCreateProfile"
 export default function HomePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    async function loadProfile() {
-      const nextProfile = await getOrCreateProfile();
-      if (!nextProfile) {
-        window.location.href = "/login";
-        return;
-      }
-      setProfile(nextProfile);
+    let mounted = true;
+    const timeout = window.setTimeout(() => {
+      if (!mounted) return;
+      setLoadError(true);
       setLoading(false);
+    }, 15_000);
+
+    async function loadProfile() {
+      try {
+        const nextProfile = await getOrCreateProfile();
+        if (!mounted) return;
+        if (!nextProfile) {
+          window.location.href = "/login";
+          return;
+        }
+        setProfile(nextProfile);
+        setLoadError(false);
+        setLoading(false);
+      } catch (error) {
+        console.error("Home profile could not be loaded.", error);
+        if (!mounted) return;
+        setLoadError(true);
+        setLoading(false);
+      } finally {
+        window.clearTimeout(timeout);
+      }
     }
     void loadProfile();
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   return (
     <AppShell>
       {loading ? (
         <AppCard title="読み込み中" description="ログイン状態を確認しています。" />
+      ) : loadError ? (
+        <AppCard
+          title="ログイン状態を確認できません"
+          description="通信が完了しませんでした。接続を確認して、ページを再読み込みしてください。"
+        >
+          <button className="dm-button primary" onClick={() => window.location.reload()}>
+            再読み込み
+          </button>
+        </AppCard>
       ) : (
         <div className="dm-app-grid">
           <AppCard

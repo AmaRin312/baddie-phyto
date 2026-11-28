@@ -53,34 +53,46 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
     let mounted = true;
 
     async function resolveAuthState() {
-      const errorDescription = searchParams.get("error_description");
-      const errorCode = searchParams.get("error");
+      try {
+        const errorDescription = searchParams.get("error_description");
+        const errorCode = searchParams.get("error");
 
-      if (errorCode || errorDescription) {
+        if (errorCode || errorDescription) {
+          if (!mounted) return;
+          setMessage(errorDescription ?? "Discordログインに失敗しました。");
+          return;
+        }
+
         if (!mounted) return;
-        setMessage(errorDescription ?? "Discordログインに失敗しました。");
-        setCheckingSession(false);
-        return;
-      }
 
-      if (!mounted) return;
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const sessionReady = sessionData.session ? true : await hasActiveSession();
-      if (!mounted) return;
-
-      if (sessionReady) {
-        const { data: userData } = await supabase.auth.getUser();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const sessionReady = sessionData.session ? true : await hasActiveSession();
         if (!mounted) return;
-        setActiveAccount(
-          userData.user?.user_metadata?.full_name ??
-            userData.user?.user_metadata?.name ??
-            userData.user?.email ??
-            "ログイン中のアカウント"
-        );
+
+        if (sessionReady) {
+          const { data: userData } = await supabase.auth.getUser();
+          if (!mounted) return;
+          setActiveAccount(
+            userData.user?.user_metadata?.full_name ??
+              userData.user?.user_metadata?.name ??
+              userData.user?.email ??
+              "ログイン中のアカウント"
+          );
+        }
+      } catch (error) {
+        if (!mounted) return;
+        console.error("Login session check failed.", error);
+        setMessage("ログイン状態を確認できませんでした。再読み込みしてください。");
+      } finally {
+        if (mounted) setCheckingSession(false);
       }
-      if (mounted) setCheckingSession(false);
     }
+
+    const sessionCheckTimeout = window.setTimeout(() => {
+      if (!mounted) return;
+      setMessage("ログイン状態の確認に時間がかかっています。再読み込みしてください。");
+      setCheckingSession(false);
+    }, 12_000);
 
     void resolveAuthState();
 
@@ -103,6 +115,7 @@ export function AuthForm({ mode, initialMessage = "" }: AuthFormProps) {
 
     return () => {
       mounted = false;
+      window.clearTimeout(sessionCheckTimeout);
       subscription.unsubscribe();
     };
   }, [searchParams]);
